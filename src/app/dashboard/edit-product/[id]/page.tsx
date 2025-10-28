@@ -4,13 +4,19 @@ import { useEffect, useMemo, useState } from 'react';
 import imageCompression from 'browser-image-compression';
 import { supabase } from '@/lib/supabaseClient';
 import Link from 'next/link';
+import { useParams, useRouter } from 'next/navigation';
 
 const MAX_IMAGES = 10;
 
 type Category = { id: string; name: string };
 type ImagePreview = { file: File; preview: string };
+type ExistingImage = { id: string; url: string; idx: number };
 
-export default function NewProduct() {
+export default function EditProduct() {
+  const params = useParams();
+  const router = useRouter();
+  const productId = params.id as string;
+
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState<string>('');
@@ -19,7 +25,9 @@ export default function NewProduct() {
   const [categoryId, setCategoryId] = useState<string | null>(null);
 
   const [imagePreviews, setImagePreviews] = useState<ImagePreview[]>([]);
+  const [existingImages, setExistingImages] = useState<ExistingImage[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingData, setLoadingData] = useState(true);
   const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [dragActive, setDragActive] = useState(false);
@@ -27,18 +35,64 @@ export default function NewProduct() {
 
   const [categories, setCategories] = useState<Category[]>([]);
 
+  // Cargar datos del producto
   useEffect(() => {
     (async () => {
-      const { data, error } = await supabase
-        .from('categories')
-        .select('id, name')
-        .order('name', { ascending: true });
-      if (!error && data) setCategories(data);
+      try {
+        // Cargar categorías
+        const { data: categoriesData, error: categoriesError } = await supabase
+          .from('categories')
+          .select('id, name')
+          .order('name', { ascending: true });
+        
+        if (categoriesError) throw categoriesError;
+        setCategories(categoriesData || []);
+
+        // Cargar producto
+        const { data: productData, error: productError } = await supabase
+          .from('products')
+          .select('*')
+          .eq('id', productId)
+          .single();
+
+        if (productError) throw productError;
+        if (!productData) throw new Error('Producto no encontrado');
+
+        // Verificar permisos (solo el creador puede editar)
+        const { data: session } = await supabase.auth.getSession();
+        if (productData.created_by !== session?.session?.user?.id) {
+          throw new Error('No tienes permisos para editar este producto');
+        }
+
+        // Cargar datos del producto
+        setTitle(productData.title || '');
+        setDescription(productData.description || '');
+        setPrice(productData.price?.toString() || '');
+        setSaleType(productData.sale_type || 'direct');
+        setCondition(productData.condition || 'nuevo');
+        setCategoryId(productData.category_id);
+
+        // Cargar imágenes existentes
+        const { data: imagesData, error: imagesError } = await supabase
+          .from('product_images')
+          .select('id, url, idx')
+          .eq('product_id', productId)
+          .order('idx', { ascending: true });
+
+        if (imagesError) throw imagesError;
+        setExistingImages(imagesData || []);
+
+      } catch (err: any) {
+        showMsg('error', '❌ ' + (err?.message ?? 'Error al cargar el producto'));
+        setTimeout(() => router.push('/dashboard'), 2000);
+      } finally {
+        setLoadingData(false);
+      }
     })();
-  }, []);
+  }, [productId, router]);
 
   const priceNumber = useMemo(() => Number(price || 0), [price]);
-  const imagesCount = imagePreviews.length;
+  const totalImagesCount = existingImages.length + imagePreviews.length;
 
   // Validación en tiempo real
   const validateField = (field: string, value: any) => {
@@ -69,7 +123,7 @@ export default function NewProduct() {
         }
         break;
       case 'images':
-        if (imagePreviews.length === 0) {
+        if (totalImagesCount === 0) {
           errors.images = 'Agrega al menos una imagen';
         } else {
           delete errors.images;
@@ -86,10 +140,10 @@ export default function NewProduct() {
       title.trim().length >= 3 &&
       priceNumber > 0 &&
       categoryId &&
-      imagePreviews.length > 0 &&
+      totalImagesCount > 0 &&
       Object.keys(validationErrors).length === 0
     );
-  }, [title, priceNumber, categoryId, imagePreviews.length, validationErrors]);
+  }, [title, priceNumber, categoryId, totalImagesCount, validationErrors]);
 
   // Procesar archivos (común para input y drag&drop)
   function processFiles(files: FileList | File[]) {
@@ -107,7 +161,7 @@ export default function NewProduct() {
     }
 
     // Limitar a MAX_IMAGES
-    const remaining = MAX_IMAGES - imagePreviews.length;
+    const remaining = MAX_IMAGES - totalImagesCount;
     const toAdd = validFiles.slice(0, remaining);
 
     if (validFiles.length > remaining) {
@@ -122,7 +176,7 @@ export default function NewProduct() {
     setImagePreviews(prev => [...prev, ...newPreviews]);
     
     // Validar imágenes después de agregar
-    setTimeout(() => validateField('images', imagePreviews.length + toAdd.length), 100);
+    setTimeout(() => validateField('images', totalImagesCount + toAdd.length), 100);
   }
 
   // Manejar selección de archivos
@@ -160,28 +214,35 @@ export default function NewProduct() {
     }
   }
 
-  // Reordenar imágenes
-  function moveImage(fromIndex: number, toIndex: number) {
-    setImagePreviews(prev => {
-      const newPreviews = [...prev];
-      const [movedItem] = newPreviews.splice(fromIndex, 1);
-      newPreviews.splice(toIndex, 0, movedItem);
-      return newPreviews;
-    });
-  }
-
-  // Eliminar imagen de preview
-  function removeImage(idx: number) {
+  // Eliminar imagen nueva
+  function removeNewImage(idx: number) {
     setImagePreviews(prev => {
       const newPreviews = [...prev];
       newPreviews[idx] && URL.revokeObjectURL(newPreviews[idx].preview);
       const filtered = newPreviews.filter((_, i) => i !== idx);
       
       // Validar imágenes después de eliminar
-      setTimeout(() => validateField('images', filtered.length), 100);
+      setTimeout(() => validateField('images', existingImages.length + filtered.length), 100);
       
       return filtered;
     });
+  }
+
+  // Eliminar imagen existente
+  async function removeExistingImage(imageId: string) {
+    try {
+      const { error } = await supabase
+        .from('product_images')
+        .delete()
+        .eq('id', imageId);
+
+      if (error) throw error;
+
+      setExistingImages(prev => prev.filter(img => img.id !== imageId));
+      showMsg('success', 'Imagen eliminada correctamente');
+    } catch (err: any) {
+      showMsg('error', 'Error al eliminar imagen: ' + err.message);
+    }
   }
 
   // Mostrar mensaje temporal
@@ -221,73 +282,75 @@ export default function NewProduct() {
       if (!title.trim()) throw new Error('Título requerido');
       if (!priceNumber || priceNumber <= 0) throw new Error('Precio inválido');
       if (!categoryId) throw new Error('Selecciona una categoría');
-      if (imagePreviews.length === 0) throw new Error('Agrega al menos una imagen');
+      if (totalImagesCount === 0) throw new Error('Agrega al menos una imagen');
 
-      // Obtener usuario actual
-      const { data: session } = await supabase.auth.getSession();
-      const created_by = session?.session?.user?.id ?? null;
-
-      // 1. Insertar producto
-      const { data: newProduct, error: insertError } = await supabase
+      // 1. Actualizar producto
+      const { error: updateError } = await supabase
         .from('products')
-        .insert({
+        .update({
           title: title.trim(),
           description: description.trim() || null,
           price: priceNumber,
           sale_type: saleType,
           condition,
           category_id: categoryId,
-          created_by,
         })
-        .select('id')
-        .single();
-
-      if (insertError || !newProduct) throw insertError;
-
-      // 2. Comprimir imágenes
-      const compressed = await Promise.all(
-        imagePreviews.map(({ file }) => compress(file))
-      );
-
-      // 3. Subir imágenes a Storage
-      const imageUrls = await Promise.all(
-        compressed.map((f, idx) => uploadToBucket(f, newProduct.id.toString(), idx))
-      );
-
-      // 4. Guardar referencias en product_images
-      const { error: imagesError } = await supabase
-        .from('product_images')
-        .insert(imageUrls.map((url, idx) => ({
-          product_id: newProduct.id,
-          url,
-          idx,
-        })));
-
-      if (imagesError) throw imagesError;
-
-      // 5. Actualizar cover_url
-      const { error: updateError } = await supabase
-        .from('products')
-        .update({ cover_url: imageUrls[0] })
-        .eq('id', newProduct.id);
+        .eq('id', productId);
 
       if (updateError) throw updateError;
 
-      // Success
-      showMsg('success', '✅ Producto agregado correctamente');
+      // 2. Si hay imágenes nuevas, subirlas
+      if (imagePreviews.length > 0) {
+        // Comprimir imágenes
+        const compressed = await Promise.all(
+          imagePreviews.map(({ file }) => compress(file))
+        );
+
+        // Subir imágenes a Storage
+        const imageUrls = await Promise.all(
+          compressed.map((f, idx) => uploadToBucket(f, productId, existingImages.length + idx))
+        );
+
+        // Guardar referencias en product_images
+        const { error: imagesError } = await supabase
+          .from('product_images')
+          .insert(imageUrls.map((url, idx) => ({
+            product_id: productId,
+            url,
+            idx: existingImages.length + idx,
+          })));
+
+        if (imagesError) throw imagesError;
+      }
+
+      // 3. Actualizar cover_url si es necesario
+      const allImages = [...existingImages, ...imagePreviews.map((_, idx) => ({
+        id: `new-${idx}`,
+        url: '',
+        idx: existingImages.length + idx
+      }))];
       
-      // Limpiar form
-      setTitle(''); 
-      setDescription(''); 
-      setPrice(''); 
+      if (allImages.length > 0) {
+        const firstImageUrl = existingImages.length > 0 ? existingImages[0].url : '';
+        if (firstImageUrl) {
+          const { error: coverError } = await supabase
+            .from('products')
+            .update({ cover_url: firstImageUrl })
+            .eq('id', productId);
+
+          if (coverError) throw coverError;
+        }
+      }
+
+      // Success
+      showMsg('success', '✅ Producto actualizado correctamente');
+      
+      // Limpiar nuevas imágenes
       imagePreviews.forEach(({ preview }) => URL.revokeObjectURL(preview));
       setImagePreviews([]);
-      setSaleType('direct'); 
-      setCondition('nuevo'); 
-      setCategoryId(null);
       
     } catch (err: any) {
-      showMsg('error', '❌ ' + (err?.message ?? 'Error al guardar'));
+      showMsg('error', '❌ ' + (err?.message ?? 'Error al actualizar'));
     } finally {
       setLoading(false);
     }
@@ -300,10 +363,23 @@ export default function NewProduct() {
     };
   }, []);
 
+  if (loadingData) {
+    return (
+      <main className="min-h-screen bg-gray-50 p-6">
+        <div className="flex justify-center items-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-black mx-auto mb-4"></div>
+            <p className="text-gray-600">Cargando producto...</p>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-gray-50 p-6">
       <div className="flex justify-between items-center mb-4">
-        <h1 className="text-2xl font-bold">Nuevo producto</h1>
+        <h1 className="text-2xl font-bold">Editar producto</h1>
         <Link href="/dashboard" className="underline text-sm">← Volver</Link>
       </div>
 
@@ -439,78 +515,105 @@ export default function NewProduct() {
         {/* Imágenes */}
         <div>
           <label className="block text-sm font-medium mb-1">
-            Imágenes ({imagesCount}/{MAX_IMAGES}) * — La primera será la portada
+            Imágenes ({totalImagesCount}/{MAX_IMAGES}) * — La primera será la portada
           </label>
           
-          {/* Vista previa de imágenes */}
-          {imagePreviews.length > 0 && (
-            <div className="grid grid-cols-5 gap-2 mb-3">
-              {imagePreviews.map((preview, idx) => (
-                <div 
-                  key={idx} 
-                  className="relative group cursor-move"
-                  draggable
-                  onDragStart={(e) => {
-                    e.dataTransfer.setData('text/plain', idx.toString());
-                  }}
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    const fromIndex = parseInt(e.dataTransfer.getData('text/plain'));
-                    if (fromIndex !== idx) {
-                      moveImage(fromIndex, idx);
-                    }
-                  }}
-                >
-                  <img
-                    src={preview.preview}
-                    alt={`Preview ${idx + 1}`}
-                    className={`w-full h-24 object-cover rounded border transition-transform ${
-                      hoveredImage === idx ? 'scale-105 shadow-lg' : ''
-                    }`}
-                    onMouseEnter={() => setHoveredImage(idx)}
-                    onMouseLeave={() => setHoveredImage(null)}
-                  />
-                  {idx === 0 && (
-                    <span className="absolute top-1 left-1 bg-blue-500 text-white text-xs px-1 rounded">
-                      Portada
-                    </span>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => removeImage(idx)}
-                    className="absolute top-1 right-1 bg-red-500 text-white w-6 h-6 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    ×
-                  </button>
-                  <div className="absolute bottom-1 left-1 bg-black bg-opacity-50 text-white text-xs px-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
-                    Arrastra para reordenar
+          {/* Imágenes existentes */}
+          {existingImages.length > 0 && (
+            <div className="mb-4">
+              <h3 className="text-sm font-medium mb-2 text-gray-600">Imágenes actuales:</h3>
+              <div className="grid grid-cols-5 gap-2">
+                {existingImages.map((img, idx) => (
+                  <div key={img.id} className="relative group">
+                    <img
+                      src={img.url}
+                      alt={`Imagen ${idx + 1}`}
+                      className="w-full h-24 object-cover rounded border"
+                    />
+                    {idx === 0 && (
+                      <span className="absolute top-1 left-1 bg-blue-500 text-white text-xs px-1 rounded">
+                        Portada
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => removeExistingImage(img.id)}
+                      className="absolute top-1 right-1 bg-red-500 text-white w-6 h-6 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      ×
+                    </button>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Vista previa de imágenes nuevas */}
+          {imagePreviews.length > 0 && (
+            <div className="mb-4">
+              <h3 className="text-sm font-medium mb-2 text-gray-600">Nuevas imágenes:</h3>
+              <div className="grid grid-cols-5 gap-2">
+                {imagePreviews.map((preview, idx) => (
+                  <div 
+                    key={idx} 
+                    className="relative group cursor-move"
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData('text/plain', idx.toString());
+                    }}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      const fromIndex = parseInt(e.dataTransfer.getData('text/plain'));
+                      if (fromIndex !== idx) {
+                        // Reordenar solo las nuevas imágenes
+                        setImagePreviews(prev => {
+                          const newPreviews = [...prev];
+                          const [movedItem] = newPreviews.splice(fromIndex, 1);
+                          newPreviews.splice(idx, 0, movedItem);
+                          return newPreviews;
+                        });
+                      }
+                    }}
+                  >
+                    <img
+                      src={preview.preview}
+                      alt={`Preview ${idx + 1}`}
+                      className={`w-full h-24 object-cover rounded border transition-transform ${
+                        hoveredImage === idx ? 'scale-105 shadow-lg' : ''
+                      }`}
+                      onMouseEnter={() => setHoveredImage(idx)}
+                      onMouseLeave={() => setHoveredImage(null)}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeNewImage(idx)}
+                      className="absolute top-1 right-1 bg-red-500 text-white w-6 h-6 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      ×
+                    </button>
+                    <div className="absolute bottom-1 left-1 bg-black bg-opacity-50 text-white text-xs px-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
+                      Nueva imagen
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
           {/* Área de drag & drop */}
-          <div
-            className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-              dragActive 
-                ? 'border-blue-500 bg-blue-50' 
-                : imagesCount >= MAX_IMAGES 
-                  ? 'border-gray-300 bg-gray-50' 
+          {totalImagesCount < MAX_IMAGES && (
+            <div
+              className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+                dragActive 
+                  ? 'border-blue-500 bg-blue-50' 
                   : 'border-gray-300 hover:border-gray-400'
-            }`}
-            onDragEnter={handleDragEnter}
-            onDragLeave={handleDragLeave}
-            onDragOver={handleDragOver}
-            onDrop={handleDrop}
-          >
-            {imagesCount >= MAX_IMAGES ? (
-              <div className="text-gray-500">
-                <p className="text-lg font-medium">Límite de imágenes alcanzado</p>
-                <p className="text-sm">Elimina algunas imágenes para agregar más</p>
-              </div>
-            ) : (
+              }`}
+              onDragEnter={handleDragEnter}
+              onDragLeave={handleDragLeave}
+              onDragOver={handleDragOver}
+              onDrop={handleDrop}
+            >
               <div>
                 <div className="text-4xl mb-2">📷</div>
                 <p className="text-lg font-medium mb-2">
@@ -526,20 +629,28 @@ export default function NewProduct() {
                   onChange={handleFileChange}
                   className="hidden"
                   id="image-upload"
-                  disabled={imagesCount >= MAX_IMAGES}
                 />
                 <label
                   htmlFor="image-upload"
                   className="bg-black text-white px-4 py-2 rounded cursor-pointer hover:bg-gray-800 transition-colors"
                 >
-                  Seleccionar imágenes
+                  Agregar más imágenes
                 </label>
                 <p className="text-xs text-gray-400 mt-2">
-                  JPG, PNG, WEBP • Máx 5MB por imagen • {MAX_IMAGES - imagesCount} restantes
+                  JPG, PNG, WEBP • Máx 5MB por imagen • {MAX_IMAGES - totalImagesCount} restantes
                 </p>
               </div>
-            )}
-          </div>
+            </div>
+          )}
+
+          {totalImagesCount >= MAX_IMAGES && (
+            <div className="border-2 border-dashed border-gray-300 bg-gray-50 rounded-lg p-8 text-center">
+              <div className="text-gray-500">
+                <p className="text-lg font-medium">Límite de imágenes alcanzado</p>
+                <p className="text-sm">Elimina algunas imágenes para agregar más</p>
+              </div>
+            </div>
+          )}
           
           {validationErrors.images && (
             <p className="text-red-500 text-sm mt-1">{validationErrors.images}</p>
@@ -556,9 +667,10 @@ export default function NewProduct() {
               : 'bg-gray-300 text-gray-500 cursor-not-allowed'
           }`}
         >
-          {loading ? 'Subiendo…' : isFormValid ? 'Agregar producto' : 'Completa todos los campos'}
+          {loading ? 'Actualizando…' : isFormValid ? 'Actualizar producto' : 'Completa todos los campos'}
         </button>
       </form>
     </main>
   );
 }
+
