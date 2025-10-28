@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabaseClient';
 import Link from 'next/link';
+import AddToCartButton from '@/components/AddToCartButton';
 
 type Product = {
   id: string;
@@ -54,9 +55,7 @@ export default async function ProductPage(
             {Number(p.price).toLocaleString('es-PY')} Gs.
           </p>
 
-          <button className="mt-6 px-4 py-2 rounded-lg bg-black text-white">
-            Agregar al carrito
-          </button>
+          <AddToCartButton productId={p.id} />
         </div>
       </div>
     </main>

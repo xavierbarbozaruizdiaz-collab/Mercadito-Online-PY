@@ -94,12 +94,20 @@ export default function Dashboard() {
     <main className="min-h-screen bg-gray-50 p-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Panel del vendedor</h1>
-        <Link
-          href="/dashboard/new-product"
-          className="px-4 py-2 rounded bg-black text-white hover:bg-gray-800 transition-colors"
-        >
-          + Nuevo producto
-        </Link>
+        <div className="flex gap-3">
+          <Link
+            href="/orders"
+            className="px-4 py-2 rounded bg-blue-500 text-white hover:bg-blue-600 transition-colors"
+          >
+            📦 Mis pedidos
+          </Link>
+          <Link
+            href="/dashboard/new-product"
+            className="px-4 py-2 rounded bg-black text-white hover:bg-gray-800 transition-colors"
+          >
+            + Nuevo producto
+          </Link>
+        </div>
       </div>
 
       {loading ? (
