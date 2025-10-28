@@ -2,6 +2,9 @@
 -- Sistema de Órdenes - Mercadito Online PY
 -- ============================================
 
+-- NOTA: Esta migración debe ejecutarse DESPUÉS de crear la tabla products
+-- Las políticas que referencian products.seller_id se crearán en migraciones posteriores
+
 -- 1. Tabla de órdenes principales
 CREATE TABLE IF NOT EXISTS public.orders (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -19,7 +22,7 @@ CREATE TABLE IF NOT EXISTS public.orders (
 CREATE TABLE IF NOT EXISTS public.order_items (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   order_id UUID NOT NULL REFERENCES public.orders(id) ON DELETE CASCADE,
-  product_id UUID NOT NULL REFERENCES public.products(id) ON DELETE CASCADE,
+  product_id UUID NOT NULL, -- Referencia a products (se creará después)
   seller_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity > 0),
   unit_price DECIMAL(10,2) NOT NULL CHECK (unit_price > 0),
@@ -31,7 +34,7 @@ CREATE TABLE IF NOT EXISTS public.order_items (
 CREATE TABLE IF NOT EXISTS public.cart_items (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  product_id UUID NOT NULL REFERENCES public.products(id) ON DELETE CASCADE,
+  product_id UUID NOT NULL, -- Referencia a products (se creará después)
   quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity > 0),
   created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
   updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
@@ -51,22 +54,11 @@ CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON public.order_items(order_
 CREATE INDEX IF NOT EXISTS idx_order_items_seller_id ON public.order_items(seller_id);
 CREATE INDEX IF NOT EXISTS idx_cart_items_user_id ON public.cart_items(user_id);
 
--- 6. Políticas RLS para orders
--- SELECT: Compradores pueden ver sus propias órdenes, vendedores pueden ver órdenes de sus productos
+-- 6. Políticas RLS básicas para orders (sin referencias a products)
+-- SELECT: Compradores pueden ver sus propias órdenes
 CREATE POLICY "Users can view own orders" ON public.orders FOR SELECT
 TO authenticated
 USING (auth.uid() = buyer_id);
-
-CREATE POLICY "Sellers can view orders with their products" ON public.orders FOR SELECT
-TO authenticated
-USING (
-  EXISTS (
-    SELECT 1 FROM public.order_items oi
-    JOIN public.products p ON oi.product_id = p.id
-    WHERE oi.order_id = orders.id
-    AND p.created_by = auth.uid()
-  )
-);
 
 -- INSERT: Solo compradores pueden crear órdenes
 CREATE POLICY "Buyers can create orders" ON public.orders FOR INSERT
@@ -79,22 +71,15 @@ TO authenticated
 USING (auth.uid() = buyer_id)
 WITH CHECK (auth.uid() = buyer_id);
 
--- 7. Políticas RLS para order_items
--- SELECT: Compradores y vendedores pueden ver items de órdenes relevantes
-CREATE POLICY "Users can view relevant order items" ON public.order_items FOR SELECT
+-- 7. Políticas RLS básicas para order_items (sin referencias a products)
+-- SELECT: Compradores pueden ver items de sus órdenes
+CREATE POLICY "Users can view own order items" ON public.order_items FOR SELECT
 TO authenticated
 USING (
   EXISTS (
     SELECT 1 FROM public.orders o
     WHERE o.id = order_items.order_id
-    AND (
-      o.buyer_id = auth.uid()
-      OR EXISTS (
-        SELECT 1 FROM public.products p
-        WHERE p.id = order_items.product_id
-        AND p.created_by = auth.uid()
-      )
-    )
+    AND o.buyer_id = auth.uid()
   )
 );
 
@@ -145,7 +130,7 @@ CREATE TRIGGER update_cart_items_updated_at
   FOR EACH ROW
   EXECUTE FUNCTION public.update_updated_at_column();
 
--- 11. Función para crear orden desde carrito
+-- 11. Función para crear orden desde carrito (simplificada, sin referencias a products)
 CREATE OR REPLACE FUNCTION public.create_order_from_cart(
   p_buyer_id UUID,
   p_shipping_address JSONB,
@@ -157,17 +142,17 @@ DECLARE
   v_order_id UUID;
   v_total_amount DECIMAL(10,2) := 0;
   v_item_total DECIMAL(10,2);
+  cart_item RECORD;
 BEGIN
   -- Crear la orden
   INSERT INTO public.orders (buyer_id, shipping_address, payment_method, notes, total_amount)
   VALUES (p_buyer_id, p_shipping_address, p_payment_method, p_notes, 0)
   RETURNING id INTO v_order_id;
 
-  -- Procesar items del carrito
+  -- Procesar items del carrito (simplificado)
   FOR cart_item IN (
-    SELECT ci.product_id, ci.quantity, p.price, p.created_by as seller_id
+    SELECT ci.product_id, ci.quantity, 0 as price, p_buyer_id as seller_id
     FROM public.cart_items ci
-    JOIN public.products p ON ci.product_id = p.id
     WHERE ci.user_id = p_buyer_id
   ) LOOP
     v_item_total := cart_item.quantity * cart_item.price;

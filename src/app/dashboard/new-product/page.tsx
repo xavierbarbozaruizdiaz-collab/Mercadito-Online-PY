@@ -29,11 +29,20 @@ export default function NewProduct() {
 
   useEffect(() => {
     (async () => {
+      console.log('Cargando categorías...');
       const { data, error } = await supabase
         .from('categories')
         .select('id, name')
         .order('name', { ascending: true });
-      if (!error && data) setCategories(data);
+      
+      console.log('Categorías cargadas:', { data, error });
+      
+      if (!error && data) {
+        setCategories(data);
+        console.log('Categorías establecidas:', data);
+      } else {
+        console.error('Error cargando categorías:', error);
+      }
     })();
   }, []);
 
@@ -225,7 +234,7 @@ export default function NewProduct() {
 
       // Obtener usuario actual
       const { data: session } = await supabase.auth.getSession();
-      const created_by = session?.session?.user?.id ?? null;
+      const seller_id = session?.session?.user?.id ?? null;
 
       // 1. Insertar producto
       const { data: newProduct, error: insertError } = await supabase
@@ -237,7 +246,7 @@ export default function NewProduct() {
           sale_type: saleType,
           condition,
           category_id: categoryId,
-          created_by,
+          seller_id,
         })
         .select('id')
         .single();

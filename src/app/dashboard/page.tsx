@@ -26,7 +26,7 @@ export default function Dashboard() {
         const { data, error } = await supabase
           .from('products')
           .select('id, title, price, cover_url, created_at')
-          .eq('created_by', session.session.user.id)
+          .eq('seller_id', session.session.user.id)
           .order('created_at', { ascending: false });
 
         if (error) throw error;
