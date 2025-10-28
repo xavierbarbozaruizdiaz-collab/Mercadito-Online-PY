@@ -42,7 +42,7 @@ export default function NewProduct() {
         } else {
           showMsg('error', 'No se pudieron cargar las categorías');
         }
-      } catch (err) {
+      } catch {
         showMsg('error', 'Error de conexión con la base de datos');
       }
     })();
@@ -52,7 +52,7 @@ export default function NewProduct() {
   const imagesCount = imagePreviews.length;
 
   // Validación en tiempo real
-  const validateField = (field: string, value: any) => {
+  const validateField = (field: string, value: string | number) => {
     const errors = { ...validationErrors };
     
     switch (field) {
@@ -305,8 +305,8 @@ export default function NewProduct() {
       setCondition('nuevo'); 
       setCategoryId(null);
       
-    } catch (err: any) {
-      showMsg('error', '❌ ' + (err?.message ?? 'Error al guardar'));
+    } catch (err: unknown) {
+      showMsg('error', '❌ ' + (err instanceof Error ? err.message : 'Error al guardar'));
     } finally {
       setLoading(false);
     }
@@ -419,7 +419,7 @@ export default function NewProduct() {
             <select
               className="border p-2 w-full rounded"
               value={condition}
-              onChange={(e) => setCondition(e.target.value as any)}
+              onChange={(e) => setCondition(e.target.value as 'nuevo' | 'usado_como_nuevo' | 'usado')}
               required
             >
               <option value="nuevo">Nuevo</option>
