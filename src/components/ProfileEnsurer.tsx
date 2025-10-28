@@ -22,18 +22,18 @@ export default function ProfileEnsurer() {
         return;
       }
       
-      if (data.success) {
-        setMessage(data.message);
+      if (data && data.startsWith('SUCCESS')) {
+        setMessage(data);
         setProfileExists(true);
         
-        if (data.created) {
+        if (data.includes('creado')) {
           // Si se creó el perfil, recargar la página para que el admin layout funcione
           setTimeout(() => {
             window.location.reload();
           }, 2000);
         }
       } else {
-        setMessage(data.message);
+        setMessage(data || 'Error desconocido');
         setProfileExists(false);
       }
     } catch (err) {

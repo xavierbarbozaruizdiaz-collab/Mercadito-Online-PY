@@ -10,7 +10,7 @@ export default function AdminRoleAssigner() {
 
   const checkAdminStatus = async () => {
     try {
-      const { data, error } = await supabase.rpc('is_current_user_admin');
+      const { data, error } = await supabase.rpc('is_user_admin');
       
       if (error) {
         setMessage('Error verificando estado: ' + error.message);
@@ -29,18 +29,18 @@ export default function AdminRoleAssigner() {
     setMessage(null);
     
     try {
-      const { data, error } = await supabase.rpc('assign_current_user_admin');
+      const { data, error } = await supabase.rpc('assign_admin_role');
       
       if (error) {
         setMessage('Error asignando rol: ' + error.message);
         return;
       }
       
-      if (data.success) {
-        setMessage(`✅ ${data.message}`);
+      if (data && data.startsWith('SUCCESS')) {
+        setMessage(`✅ ${data}`);
         setIsAdmin(true);
       } else {
-        setMessage(`❌ ${data.message}`);
+        setMessage(`❌ ${data}`);
       }
     } catch (err) {
       setMessage('Error asignando rol de administrador');

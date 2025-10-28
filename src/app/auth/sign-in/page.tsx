@@ -13,7 +13,16 @@ export default function SignInPage() {
     e.preventDefault();
     setMsg(null);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    setMsg(error ? `Error: ${error.message}` : 'Sesión iniciada. Recargá la página.');
+    
+    if (error) {
+      setMsg(`Error: ${error.message}`);
+    } else {
+      setMsg('Sesión iniciada. Redirigiendo...');
+      // Redirigir al dashboard después del login exitoso
+      setTimeout(() => {
+        window.location.href = '/dashboard';
+      }, 1500);
+    }
   }
 
   async function signUp(e: React.FormEvent) {

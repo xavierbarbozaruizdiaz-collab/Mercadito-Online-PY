@@ -4,6 +4,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import UserMenu from "@/components/UserMenu";
 import CartButton from "@/components/CartButton";
+import Link from "next/link";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -31,7 +32,9 @@ export default function RootLayout({
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         {/* Header global */}
         <header className="flex items-center justify-between px-4 py-3 border-b bg-white sticky top-0 z-50">
-          <h1 className="text-lg sm:text-xl font-bold truncate">🛒 Mercadito Online PY</h1>
+          <Link href="/" className="text-lg sm:text-xl font-bold truncate hover:text-blue-600 transition-colors">
+            🛒 Mercadito Online PY
+          </Link>
           <div className="flex items-center gap-2 sm:gap-4">
             <CartButton />
             <UserMenu />
