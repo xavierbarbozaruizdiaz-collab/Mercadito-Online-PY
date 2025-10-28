@@ -164,8 +164,8 @@ export default function ProductsListClient() {
   return (
     <div className="max-w-7xl mx-auto">
       {/* Header con búsqueda */}
-      <div className="mb-8">
-        <div className="flex flex-col md:flex-row gap-4 mb-6">
+      <div className="mb-6 sm:mb-8">
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-4 sm:mb-6">
           {/* Búsqueda principal */}
           <div className="flex-1">
             <div className="relative">
@@ -174,20 +174,20 @@ export default function ProductsListClient() {
                 placeholder="Buscar productos..."
                 value={filters.search}
                 onChange={(e) => updateFilter('search', e.target.value)}
-                className="w-full px-4 py-3 pl-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 sm:px-4 py-2 sm:py-3 pl-10 sm:pl-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base"
               />
-              <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400">
+              <div className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm sm:text-base">
                 🔍
               </div>
             </div>
           </div>
 
           {/* Ordenamiento */}
-          <div className="md:w-48">
+          <div className="sm:w-48">
             <select
               value={filters.sortBy}
               onChange={(e) => updateFilter('sortBy', e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
             >
               <option value="date_desc">Más recientes</option>
               <option value="date_asc">Más antiguos</option>
@@ -199,20 +199,20 @@ export default function ProductsListClient() {
         </div>
 
         {/* Filtros avanzados */}
-        <div className="bg-white rounded-lg border p-4">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-gray-700">Filtros</h3>
+        <div className="bg-white rounded-lg border p-3 sm:p-4">
+          <div className="flex items-center justify-between mb-3 sm:mb-4">
+            <h3 className="font-semibold text-gray-700 text-sm sm:text-base">Filtros</h3>
             {hasActiveFilters && (
               <button
                 onClick={clearFilters}
-                className="text-sm text-blue-600 hover:text-blue-800 underline"
+                className="text-xs sm:text-sm text-blue-600 hover:text-blue-800 underline"
               >
                 Limpiar filtros
               </button>
             )}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
             {/* Categoría */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Categoría</label>
@@ -322,7 +322,7 @@ export default function ProductsListClient() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
             {products.map((product) => (
               <div key={product.id} className="bg-white rounded-lg shadow-sm border overflow-hidden hover:shadow-md transition-shadow">
                 <div className="relative">

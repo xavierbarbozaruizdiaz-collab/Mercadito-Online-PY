@@ -18,6 +18,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Mercadito Online PY",
   description: "Ecommerce simple con Next.js + Supabase",
+  viewport: "width=device-width, initial-scale=1",
 };
 
 export default function RootLayout({
@@ -29,9 +30,9 @@ export default function RootLayout({
     <html lang="es">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         {/* Header global */}
-        <header className="flex items-center justify-between px-4 py-3 border-b bg-white">
-          <h1 className="text-xl font-bold">🛒 Mercadito Online PY</h1>
-          <div className="flex items-center gap-4">
+        <header className="flex items-center justify-between px-4 py-3 border-b bg-white sticky top-0 z-50">
+          <h1 className="text-lg sm:text-xl font-bold truncate">🛒 Mercadito Online PY</h1>
+          <div className="flex items-center gap-2 sm:gap-4">
             <CartButton />
             <UserMenu />
           </div>

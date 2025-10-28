@@ -190,10 +190,10 @@ export function CartPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50 p-8">
+    <main className="min-h-screen bg-gray-50 p-4 sm:p-8">
       <div className="max-w-4xl mx-auto">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold">Carrito de Compras</h1>
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-0 mb-6">
+          <h1 className="text-2xl sm:text-3xl font-bold">Carrito de Compras</h1>
           <Link href="/" className="underline text-sm">← Continuar comprando</Link>
         </div>
 
@@ -210,51 +210,51 @@ export function CartPage() {
             </Link>
           </div>
         ) : (
-          <div className="grid lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
             {/* Items del carrito */}
-            <div className="lg:col-span-2 space-y-4">
+            <div className="lg:col-span-2 space-y-3 sm:space-y-4">
               {cartItems.map((item) => (
-                <div key={item.id} className="bg-white rounded-lg shadow-sm border p-4">
-                  <div className="flex gap-4">
+                <div key={item.id} className="bg-white rounded-lg shadow-sm border p-3 sm:p-4">
+                  <div className="flex gap-3 sm:gap-4">
                     <img
                       src={item.product.cover_url ?? 'https://placehold.co/100x100?text=Producto'}
                       alt={item.product.title}
-                      className="w-20 h-20 object-cover rounded"
+                      className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded"
                     />
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-lg">{item.product.title}</h3>
-                      <p className="text-gray-600">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-base sm:text-lg line-clamp-2">{item.product.title}</h3>
+                      <p className="text-gray-600 text-sm">
                         {item.product.price.toLocaleString('es-PY')} Gs. c/u
                       </p>
                       <div className="flex items-center gap-2 mt-2">
                         <button
                           onClick={() => updateQuantity(item.id, item.quantity - 1)}
                           disabled={updating === item.id}
-                          className="w-8 h-8 rounded-full border flex items-center justify-center hover:bg-gray-100 disabled:opacity-50"
+                          className="w-7 h-7 sm:w-8 sm:h-8 rounded-full border flex items-center justify-center hover:bg-gray-100 disabled:opacity-50 text-sm"
                         >
                           -
                         </button>
-                        <span className="px-3 py-1 border rounded min-w-[40px] text-center">
+                        <span className="px-2 sm:px-3 py-1 border rounded min-w-[35px] sm:min-w-[40px] text-center text-sm">
                           {item.quantity}
                         </span>
                         <button
                           onClick={() => updateQuantity(item.id, item.quantity + 1)}
                           disabled={updating === item.id}
-                          className="w-8 h-8 rounded-full border flex items-center justify-center hover:bg-gray-100 disabled:opacity-50"
+                          className="w-7 h-7 sm:w-8 sm:h-8 rounded-full border flex items-center justify-center hover:bg-gray-100 disabled:opacity-50 text-sm"
                         >
                           +
                         </button>
                         <button
                           onClick={() => removeFromCart(item.id)}
                           disabled={updating === item.id}
-                          className="ml-4 text-red-500 hover:text-red-700 disabled:opacity-50"
+                          className="ml-2 sm:ml-4 text-red-500 hover:text-red-700 disabled:opacity-50 text-sm"
                         >
                           Eliminar
                         </button>
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-lg font-semibold">
+                      <p className="text-base sm:text-lg font-semibold">
                         {(item.product.price * item.quantity).toLocaleString('es-PY')} Gs.
                       </p>
                     </div>
@@ -265,8 +265,8 @@ export function CartPage() {
 
             {/* Resumen del pedido */}
             <div className="lg:col-span-1">
-              <div className="bg-white rounded-lg shadow-sm border p-6 sticky top-4">
-                <h2 className="text-xl font-semibold mb-4">Resumen del pedido</h2>
+              <div className="bg-white rounded-lg shadow-sm border p-4 sm:p-6 sticky top-4">
+                <h2 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4">Resumen del pedido</h2>
                 <div className="space-y-3">
                   <div className="flex justify-between">
                     <span>Productos ({totalItems})</span>

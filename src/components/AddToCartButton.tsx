@@ -63,7 +63,7 @@ export default function AddToCartButton({ productId }: AddToCartButtonProps) {
     <button
       onClick={addToCart}
       disabled={loading}
-      className={`mt-6 px-6 py-3 rounded-lg font-medium transition-colors ${
+      className={`mt-4 sm:mt-6 px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-medium transition-colors text-sm sm:text-base ${
         added
           ? 'bg-green-500 text-white'
           : 'bg-black text-white hover:bg-gray-800'

@@ -91,19 +91,19 @@ export default function Dashboard() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50 p-8">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Panel del vendedor</h1>
-        <div className="flex gap-3">
+    <main className="min-h-screen bg-gray-50 p-4 sm:p-8">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-0 mb-6">
+        <h1 className="text-xl sm:text-2xl font-bold">Panel del vendedor</h1>
+        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
           <Link
             href="/orders"
-            className="px-4 py-2 rounded bg-blue-500 text-white hover:bg-blue-600 transition-colors"
+            className="px-3 sm:px-4 py-2 rounded bg-blue-500 text-white hover:bg-blue-600 transition-colors text-sm sm:text-base text-center"
           >
             📦 Mis pedidos
           </Link>
           <Link
             href="/dashboard/new-product"
-            className="px-4 py-2 rounded bg-black text-white hover:bg-gray-800 transition-colors"
+            className="px-3 sm:px-4 py-2 rounded bg-black text-white hover:bg-gray-800 transition-colors text-sm sm:text-base text-center"
           >
             + Nuevo producto
           </Link>
@@ -129,38 +129,38 @@ export default function Dashboard() {
       ) : (
         <div className="space-y-4">
           <h2 className="text-lg font-semibold">Mis productos ({products.length})</h2>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-3">
             {products.map((product) => (
               <div key={product.id} className="bg-white rounded-lg shadow-sm border overflow-hidden">
                 {product.cover_url && (
                   <img
                     src={product.cover_url}
                     alt={product.title}
-                    className="w-full h-48 object-cover"
+                    className="w-full h-40 sm:h-48 object-cover"
                   />
                 )}
-                <div className="p-4">
-                  <h3 className="font-medium text-lg mb-2 line-clamp-2">{product.title}</h3>
-                  <p className="text-2xl font-bold text-green-600 mb-3">
+                <div className="p-3 sm:p-4">
+                  <h3 className="font-medium text-base sm:text-lg mb-2 line-clamp-2">{product.title}</h3>
+                  <p className="text-lg sm:text-2xl font-bold text-green-600 mb-3">
                     {product.price.toLocaleString()} Gs.
                   </p>
-                  <div className="flex gap-2">
+                  <div className="flex flex-col sm:flex-row gap-2">
                     <Link
                       href={`/dashboard/edit-product/${product.id}`}
-                      className="flex-1 px-3 py-2 bg-blue-500 text-white rounded text-center hover:bg-blue-600 transition-colors"
+                      className="flex-1 px-3 py-2 bg-blue-500 text-white rounded text-center hover:bg-blue-600 transition-colors text-sm"
                     >
                       ✏️ Editar
                     </Link>
                     <Link
                       href={`/products/${product.id}`}
-                      className="flex-1 px-3 py-2 bg-gray-500 text-white rounded text-center hover:bg-gray-600 transition-colors"
+                      className="flex-1 px-3 py-2 bg-gray-500 text-white rounded text-center hover:bg-gray-600 transition-colors text-sm"
                     >
                       👁️ Ver
                     </Link>
                     <button
                       onClick={() => deleteProduct(product.id)}
                       disabled={deletingId === product.id}
-                      className="px-3 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="px-3 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                     >
                       {deletingId === product.id ? '⏳' : '🗑️'}
                     </button>

@@ -38,20 +38,20 @@ export default async function ProductPage(
   const p = data as Product;
 
   return (
-    <main className="min-h-screen bg-gray-50 p-8">
+    <main className="min-h-screen bg-gray-50 p-4 sm:p-8">
       <Link href="/" className="underline text-sm">← Volver</Link>
 
-      <div className="bg-white rounded-2xl shadow p-6 mt-3 grid md:grid-cols-2 gap-6">
+      <div className="bg-white rounded-lg sm:rounded-2xl shadow p-4 sm:p-6 mt-3 grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
         <img
           src={p.image_url ?? 'https://placehold.co/800x600?text=Producto'}
           alt={p.title}
-          className="w-full rounded-xl object-cover"
+          className="w-full rounded-lg sm:rounded-xl object-cover"
         />
 
-        <div>
-          <h1 className="text-3xl font-bold">{p.title}</h1>
-          {p.description && <p className="text-gray-600 mt-2">{p.description}</p>}
-          <p className="mt-4 text-2xl font-bold text-green-700">
+        <div className="space-y-4">
+          <h1 className="text-2xl sm:text-3xl font-bold">{p.title}</h1>
+          {p.description && <p className="text-gray-600 text-sm sm:text-base">{p.description}</p>}
+          <p className="text-xl sm:text-2xl font-bold text-green-700">
             {Number(p.price).toLocaleString('es-PY')} Gs.
           </p>
 
