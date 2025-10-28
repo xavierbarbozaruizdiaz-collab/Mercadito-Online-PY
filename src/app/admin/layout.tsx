@@ -3,9 +3,11 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabaseClient';
+import ProfileEnsurer from '@/components/ProfileEnsurer';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [allowed, setAllowed] = useState<boolean | null>(null);
+  const [profileError, setProfileError] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -17,7 +19,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           return;
         }
 
-        // 2) perfil por ID (cumple RLS: “Users can view own profile”)
+        // 2) perfil por ID (cumple RLS: "Users can view own profile")
         const { data: profile, error: pErr } = await supabase
           .from('profiles')
           .select('id, role')
@@ -25,8 +27,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           .single();
 
         if (pErr || !profile) {
-          alert('No se encontró perfil para este usuario.');
-          window.location.href = '/';
+          setProfileError(true);
           return;
         }
 
@@ -42,6 +43,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       }
     })();
   }, []);
+
+  if (profileError) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-8">
+        <div className="max-w-2xl mx-auto">
+          <ProfileEnsurer />
+        </div>
+      </div>
+    );
+  }
 
   if (allowed === null) return <main className="p-8">Verificando permisos…</main>;
 
