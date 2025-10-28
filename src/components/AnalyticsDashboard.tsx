@@ -106,7 +106,7 @@ export default function AnalyticsDashboard() {
         if (!productSales.has(productId)) {
           productSales.set(productId, {
             id: productId,
-            title: item.products.title,
+            title: item.products[0]?.title || 'Producto desconocido',
             total_sales: 0,
             revenue: 0
           });
