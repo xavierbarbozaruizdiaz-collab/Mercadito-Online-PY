@@ -5,7 +5,7 @@ import imageCompression from 'browser-image-compression';
 import { supabase } from '@/lib/supabaseClient';
 import Link from 'next/link';
 
-const MAX_IMAGES = 10;
+const MAX_IMAGES = 5; // Reducido de 10 a 5 para ser más razonable
 
 type Category = { id: string; name: string };
 type ImagePreview = { file: File; preview: string };
@@ -30,18 +30,30 @@ export default function NewProduct() {
   useEffect(() => {
     (async () => {
       console.log('Cargando categorías...');
-      const { data, error } = await supabase
-        .from('categories')
-        .select('id, name')
-        .order('name', { ascending: true });
+      console.log('Supabase URL:', process.env.NEXT_PUBLIC_SUPABASE_URL);
+      console.log('Supabase Key:', process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? 'Presente' : 'Faltante');
       
-      console.log('Categorías cargadas:', { data, error });
-      
-      if (!error && data) {
-        setCategories(data);
-        console.log('Categorías establecidas:', data);
-      } else {
-        console.error('Error cargando categorías:', error);
+      try {
+        const { data, error } = await supabase
+          .from('categories')
+          .select('id, name')
+          .order('name', { ascending: true });
+        
+        console.log('Respuesta completa de categorías:', { data, error, status: 'success' });
+        
+        if (error) {
+          console.error('Error específico:', error.message, error.code, error.details);
+          showMsg('error', `Error cargando categorías: ${error.message}`);
+        } else if (data) {
+          setCategories(data);
+          console.log('Categorías cargadas exitosamente:', data.length);
+        } else {
+          console.error('No hay datos ni error - respuesta vacía');
+          showMsg('error', 'No se pudieron cargar las categorías');
+        }
+      } catch (err) {
+        console.error('Error inesperado:', err);
+        showMsg('error', 'Error de conexión con la base de datos');
       }
     })();
   }, []);
@@ -78,7 +90,7 @@ export default function NewProduct() {
         }
         break;
       case 'images':
-        if (imagePreviews.length === 0) {
+        if (value === 0) {
           errors.images = 'Agrega al menos una imagen';
         } else {
           delete errors.images;
@@ -193,6 +205,13 @@ export default function NewProduct() {
     });
   }
 
+  // Limpiar todas las imágenes
+  function clearAllImages() {
+    imagePreviews.forEach(({ preview }) => URL.revokeObjectURL(preview));
+    setImagePreviews([]);
+    validateField('images', 0);
+  }
+
   // Mostrar mensaje temporal
   function showMsg(type: 'success' | 'error', text: string) {
     setMsg({ type, text });
@@ -268,8 +287,9 @@ export default function NewProduct() {
         .from('product_images')
         .insert(imageUrls.map((url, idx) => ({
           product_id: newProduct.id,
-          url,
-          idx,
+          image_url: url,
+          url: url, // Para compatibilidad
+          is_cover: idx === 0, // La primera imagen es la portada
         })));
 
       if (imagesError) throw imagesError;
@@ -447,9 +467,20 @@ export default function NewProduct() {
 
         {/* Imágenes */}
         <div>
-          <label className="block text-sm font-medium mb-1">
-            Imágenes ({imagesCount}/{MAX_IMAGES}) * — La primera será la portada
-          </label>
+          <div className="flex justify-between items-center mb-1">
+            <label className="block text-sm font-medium">
+              Imágenes ({imagesCount}/{MAX_IMAGES}) * — La primera será la portada
+            </label>
+            {imagePreviews.length > 0 && (
+              <button
+                type="button"
+                onClick={clearAllImages}
+                className="text-red-600 text-sm hover:text-red-800 underline"
+              >
+                Limpiar todas
+              </button>
+            )}
+          </div>
           
           {/* Vista previa de imágenes */}
           {imagePreviews.length > 0 && (
