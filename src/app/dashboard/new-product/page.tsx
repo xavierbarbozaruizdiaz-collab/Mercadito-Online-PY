@@ -29,30 +29,20 @@ export default function NewProduct() {
 
   useEffect(() => {
     (async () => {
-      console.log('Cargando categorías...');
-      console.log('Supabase URL:', process.env.NEXT_PUBLIC_SUPABASE_URL);
-      console.log('Supabase Key:', process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? 'Presente' : 'Faltante');
-      
       try {
         const { data, error } = await supabase
           .from('categories')
           .select('id, name')
           .order('name', { ascending: true });
         
-        console.log('Respuesta completa de categorías:', { data, error, status: 'success' });
-        
         if (error) {
-          console.error('Error específico:', error.message, error.code, error.details);
           showMsg('error', `Error cargando categorías: ${error.message}`);
         } else if (data) {
           setCategories(data);
-          console.log('Categorías cargadas exitosamente:', data.length);
         } else {
-          console.error('No hay datos ni error - respuesta vacía');
           showMsg('error', 'No se pudieron cargar las categorías');
         }
       } catch (err) {
-        console.error('Error inesperado:', err);
         showMsg('error', 'Error de conexión con la base de datos');
       }
     })();
