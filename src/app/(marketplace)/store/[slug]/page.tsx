@@ -169,6 +169,17 @@ export default function StoreProfilePage() {
   // Usar productos de la tienda en lugar de productos del seller
   const products = storeProducts;
   
+  // Debug: log productos actuales
+  useEffect(() => {
+    console.log('🔍 Current products state:', {
+      storeProductsLength: storeProducts.length,
+      productsLength: products.length,
+      productsPaginationTotal: productsPagination.total,
+      storeId,
+      sellerId
+    });
+  }, [storeProducts, products, productsPagination.total, storeId, sellerId]);
+  
   const loading = storeLoading || profileLoading;
   const error = storeError || profileError;
 

@@ -88,16 +88,29 @@ export async function getStoreProducts(
     .select('*, category:categories(name)', { count: 'exact' });
 
   // Buscar por store_id o seller_id (muchos productos solo tienen seller_id)
-  // Primero intentar por seller_id si está disponible (más confiable)
-  if (options.sellerId) {
+  // Intentar ambos si están disponibles
+  if (options.sellerId && storeId) {
+    // Si tenemos ambos, buscar por cualquiera de los dos (OR)
+    query = query.or(`seller_id.eq.${options.sellerId},store_id.eq.${storeId}`);
+  } else if (options.sellerId) {
+    // Solo seller_id si está disponible
     query = query.eq('seller_id', options.sellerId);
   } else if (storeId) {
     // Solo store_id si no hay sellerId
     query = query.eq('store_id', storeId);
   } else {
     // Si no hay storeId ni sellerId, retornar vacío
+    console.warn('⚠️ getStoreProducts: No storeId or sellerId provided');
     return { products: [], total: 0, total_pages: 0 };
   }
+  
+  console.log('📊 getStoreProducts query:', {
+    storeId,
+    sellerId: options.sellerId,
+    usingSellerId: !!options.sellerId,
+    usingStoreId: !!storeId,
+    usingBoth: !!(options.sellerId && storeId)
+  });
 
   if (options.status) {
     query = query.eq('status', options.status);
@@ -115,12 +128,20 @@ export async function getStoreProducts(
   const { data, error, count } = await query;
 
   if (error) {
-    console.error('Error fetching store products:', error);
+    console.error('❌ Error fetching store products:', error);
     return { products: [], total: 0, total_pages: 0 };
   }
 
   const total = count || 0;
   const total_pages = Math.ceil(total / limit);
+  
+  console.log('✅ getStoreProducts result:', {
+    productsFound: data?.length || 0,
+    total,
+    total_pages,
+    page,
+    limit
+  });
 
   return {
     products: data || [],
