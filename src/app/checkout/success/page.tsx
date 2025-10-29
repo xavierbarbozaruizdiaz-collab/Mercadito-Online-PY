@@ -36,6 +36,7 @@ function CheckoutSuccessContent() {
   }, [orderId]);
 
   async function loadOrder() {
+    if (!orderId) return; // Ya está verificado en useEffect, pero TypeScript necesita esto
     try {
       const { data, error } = await supabase
         .from('orders')

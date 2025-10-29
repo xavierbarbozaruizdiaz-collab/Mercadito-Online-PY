@@ -103,7 +103,7 @@ export default function CheckoutPage() {
       }
 
       // Crear orden usando la función de la base de datos
-      const { data, error } = await supabase.rpc('create_order_from_cart', {
+      const { data, error } = await (supabase as any).rpc('create_order_from_cart', {
         p_buyer_id: session.session.user.id,
         p_shipping_address: address,
         p_payment_method: paymentMethod,

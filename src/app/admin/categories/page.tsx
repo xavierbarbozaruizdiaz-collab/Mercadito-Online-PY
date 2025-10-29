@@ -25,12 +25,22 @@ export default function AdminCategories() {
     if (!name.trim()) return;
     setLoading(true); setMsg('');
     try {
-      const { data: sess } = await supabase.auth.getSession();
-      const uid = sess?.session?.user?.id ?? null;
-      const { error } = await supabase.from('categories').insert({
+      // Generar slug desde el nombre (convertir a minúsculas, espacios a guiones)
+      const slug = name.trim()
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '') // Remover acentos
+        .replace(/[^a-z0-9\s-]/g, '') // Remover caracteres especiales
+        .replace(/\s+/g, '-') // Espacios a guiones
+        .replace(/-+/g, '-') // Múltiples guiones a uno solo
+        .trim();
+      
+      const { error } = await (supabase as any).from('categories').insert({
         name: name.trim(),
-        created_by: uid,
-      });
+        slug: slug,
+        is_active: true,
+        sort_order: 0,
+      } as any);
       if (error) throw error;
       setName('');
       await load();

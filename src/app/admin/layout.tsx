@@ -31,7 +31,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           return;
         }
 
-        if (profile.role !== 'admin') {
+        const profileData = profile as { id: string; role: string } | null;
+        if (!profileData || profileData.role !== 'admin') {
           alert('Acceso restringido. No eres administrador.');
           window.location.href = '/';
           return;
