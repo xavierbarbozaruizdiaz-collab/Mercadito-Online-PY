@@ -78,15 +78,26 @@ export default function StoreProfilePage() {
   // Función para cargar productos de la tienda
   const loadStoreProducts = async (currentStoreId: string, page: number = 1, currentSellerId?: string) => {
     try {
-      console.log('Loading products for store:', currentStoreId, 'seller:', currentSellerId);
+      console.log('🛒 Loading products for store:', currentStoreId, 'seller:', currentSellerId);
+      
+      // Priorizar sellerId si está disponible
+      if (!currentSellerId && !currentStoreId) {
+        console.error('❌ No storeId or sellerId provided');
+        setStoreProducts([]);
+        return;
+      }
+      
       // No filtrar por status para incluir productos sin ese campo
-      const result = await getStoreProducts(currentStoreId, {
+      const result = await getStoreProducts(currentStoreId || '', {
         page,
         limit: 12,
         // No pasar status: 'active' - algunos productos pueden no tener ese campo
         sellerId: currentSellerId,
       });
-      console.log('Loaded products:', result.products?.length, 'total:', result.total);
+      
+      console.log('✅ Loaded products:', result.products?.length, 'total:', result.total);
+      console.log('📦 Products data:', result.products);
+      
       setStoreProducts(result.products || []);
       setProductsPagination({
         page,
@@ -95,7 +106,7 @@ export default function StoreProfilePage() {
         per_page: 12,
       });
     } catch (err) {
-      console.error('Error loading store products:', err);
+      console.error('❌ Error loading store products:', err);
       setStoreProducts([]);
     }
   };
@@ -107,6 +118,7 @@ export default function StoreProfilePage() {
       setStoreError(null);
       try {
         const storeData = await getStoreBySlug(storeSlug);
+        console.log('Store data loaded:', storeData);
         if (storeData) {
           setStore(storeData);
           if (storeData.id) {
@@ -114,11 +126,16 @@ export default function StoreProfilePage() {
           }
           if (storeData.seller_id) {
             setSellerId(storeData.seller_id);
-            // Cargar productos de la tienda específica, usando seller_id como fallback
-            await loadStoreProducts(storeData.id || '', 1, storeData.seller_id);
+            // Cargar productos usando seller_id (más confiable que store_id)
+            // Pasar storeId también pero seller_id tiene prioridad en la query
+            await loadStoreProducts(storeData.id || storeData.seller_id, 1, storeData.seller_id);
           } else if (storeData.id) {
             // Si no hay seller_id, intentar solo con store_id
+            console.warn('Store has no seller_id, trying with store_id only');
             await loadStoreProducts(storeData.id, 1);
+          } else {
+            console.error('Store has no id or seller_id');
+            setStoreError('Tienda sin datos válidos');
           }
         } else {
           setStoreError('Tienda no encontrada');
