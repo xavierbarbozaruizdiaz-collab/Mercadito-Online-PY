@@ -199,7 +199,7 @@ export function useStore() {
       setStoreLoading(true);
       setStoreError(null);
 
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('stores')
         .insert({
           seller_id: user.id,
@@ -231,7 +231,7 @@ export function useStore() {
       setStoreLoading(true);
       setStoreError(null);
 
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('stores')
         .update(updates)
         .eq('id', store.id)
@@ -303,7 +303,7 @@ export function useNotifications() {
   // Función para marcar notificación como leída
   const markAsRead = useCallback(async (notificationId: string) => {
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('notifications')
         .update({ is_read: true })
         .eq('id', notificationId);
@@ -326,7 +326,7 @@ export function useNotifications() {
     if (!user) return;
 
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('notifications')
         .update({ is_read: true })
         .eq('user_id', user.id)
@@ -370,7 +370,7 @@ export function useAnalytics() {
     pageUrl?: string
   ) => {
     try {
-      await supabase
+      await (supabase as any)
         .from('analytics_events')
         .insert({
           user_id: user?.id,

@@ -102,21 +102,21 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
     }
 
     return {
-      id: profile.id,
-      email: profile.email,
-      role: profile.role,
-      first_name: profile.first_name,
-      last_name: profile.last_name,
-      phone: profile.phone,
-      avatar_url: profile.avatar_url,
-      cover_url: profile.cover_url,
-      bio: profile.bio,
-      location: profile.location,
-      verified: profile.verified,
-      membership_level: profile.membership_level,
-      membership_expires_at: profile.membership_expires_at,
-      created_at: profile.created_at,
-      updated_at: profile.updated_at,
+      id: (profile as any).id,
+      email: (profile as any).email,
+      role: (profile as any).role,
+      first_name: (profile as any).first_name,
+      last_name: (profile as any).last_name,
+      phone: (profile as any).phone,
+      avatar_url: (profile as any).avatar_url,
+      cover_url: (profile as any).cover_url,
+      bio: (profile as any).bio,
+      location: (profile as any).location,
+      verified: (profile as any).verified,
+      membership_level: (profile as any).membership_level,
+      membership_expires_at: (profile as any).membership_expires_at,
+      created_at: (profile as any).created_at,
+      updated_at: (profile as any).updated_at,
     };
   } catch (error) {
     console.error('Error getting current user:', error);
@@ -138,7 +138,7 @@ export async function signUp(data: SignUpData) {
 
     if (authData.user) {
       // Crear perfil del usuario
-      const { error: profileError } = await supabase
+      const { error: profileError } = await (supabase as any)
         .from('profiles')
         .insert({
           id: authData.user.id,
@@ -162,11 +162,11 @@ export async function signUp(data: SignUpData) {
 }
 
 // Función para iniciar sesión
-export async function signIn(data: SignInData) {
+export async function signIn(credentials: SignInData) {
   try {
     const { data, error } = await supabase.auth.signInWithPassword({
-      email: data.email,
-      password: data.password,
+      email: credentials.email,
+      password: credentials.password,
     });
 
     return { data, error };
@@ -188,7 +188,7 @@ export async function signOut() {
 }
 
 // Función para actualizar el perfil del usuario
-export async function updateProfile(data: UpdateProfileData) {
+export async function updateProfile(profileData: UpdateProfileData) {
   try {
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     
@@ -196,9 +196,9 @@ export async function updateProfile(data: UpdateProfileData) {
       throw new Error('Usuario no autenticado');
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('profiles')
-      .update(data)
+      .update(profileData)
       .eq('id', user.id)
       .select()
       .single();
@@ -303,7 +303,7 @@ export async function createStore(storeData: {
       throw new Error('Solo los vendedores pueden crear tiendas');
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('stores')
       .insert({
         seller_id: user.id,

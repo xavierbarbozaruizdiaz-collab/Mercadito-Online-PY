@@ -11,8 +11,8 @@ import {
   ConversationParticipant, 
   Notification, 
   UserStatus,
-  ConversationSchema,
-  MessageSchema 
+  // ChatConversationSchema,
+  // MessageSchema 
 } from '@/types';
 
 // ============================================
@@ -51,7 +51,7 @@ export interface ChatFilters {
  */
 export async function createConversation(params: CreateConversationParams): Promise<Conversation | null> {
   try {
-    const { data, error } = await supabase.rpc('create_conversation', {
+    const { data, error } = await (supabase as any).rpc('create_conversation', {
       p_buyer_id: params.buyer_id,
       p_seller_id: params.seller_id,
       p_product_id: params.product_id || null,
@@ -147,8 +147,8 @@ export async function getUserConversations(
     // Calcular conteo de mensajes no leídos para cada conversación
     const conversationsWithUnread = await Promise.all(
       (data || []).map(async (conversation) => {
-        const unreadCount = await getUnreadMessageCount(conversation.id, userId);
-        return { ...conversation, unread_count: unreadCount };
+        const unreadCount = await getUnreadMessageCount((conversation as any).id, userId);
+        return { ...(conversation as any), unread_count: unreadCount };
       })
     );
 
@@ -164,7 +164,7 @@ export async function getUserConversations(
  */
 export async function sendMessage(params: SendMessageParams): Promise<Message | null> {
   try {
-    const { data, error } = await supabase.rpc('send_message', {
+    const { data, error } = await (supabase as any).rpc('send_message', {
       p_conversation_id: params.conversation_id,
       p_sender_id: params.sender_id,
       p_content: params.content,
@@ -252,7 +252,7 @@ export async function markMessagesAsRead(
   userId: string
 ): Promise<number> {
   try {
-    const { data, error } = await supabase.rpc('mark_messages_as_read', {
+    const { data, error } = await (supabase as any).rpc('mark_messages_as_read', {
       p_conversation_id: conversationId,
       p_user_id: userId,
     });
@@ -329,7 +329,7 @@ export async function getUserNotifications(
  */
 export async function markNotificationAsRead(notificationId: string): Promise<boolean> {
   try {
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from('notifications')
       .update({ 
         is_read: true, 

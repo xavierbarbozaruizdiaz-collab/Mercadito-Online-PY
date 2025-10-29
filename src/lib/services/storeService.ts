@@ -18,7 +18,15 @@ export type Product = Database['public']['Tables']['products']['Row'] & {
   category: { name: string } | null;
 };
 
-export type Review = Database['public']['Tables']['reviews']['Row'] & {
+export type Review = {
+  id: string;
+  buyer_id: string;
+  seller_id: string;
+  product_id: string | null;
+  rating: number;
+  comment: string | null;
+  created_at: string;
+  updated_at: string;
   buyer: { full_name: string; avatar_url: string | null };
 };
 
@@ -170,7 +178,7 @@ export async function getStoreStats(storeId: string): Promise<StoreStats | null>
       .eq('store_id', storeId);
 
     const averageRating = reviewsData && reviewsData.length > 0
-      ? reviewsData.reduce((sum, review) => sum + review.rating, 0) / reviewsData.length
+      ? reviewsData.reduce((sum, review: any) => sum + review.rating, 0) / reviewsData.length
       : 0;
 
     // Obtener tasa de respuesta (simulado por ahora)
@@ -283,7 +291,7 @@ export async function createStore(storeData: {
     linkedin?: string;
   };
 }): Promise<Store | null> {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('stores')
     .insert({
       ...storeData,
@@ -315,7 +323,7 @@ export async function updateStore(
   storeId: string,
   updates: Partial<Omit<Store, 'id' | 'owner_id' | 'created_at' | 'updated_at'>>
 ): Promise<Store | null> {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('stores')
     .update(updates)
     .eq('id', storeId)
@@ -336,7 +344,7 @@ export async function updateStore(
  * @returns True si se eliminó correctamente.
  */
 export async function deleteStore(storeId: string): Promise<boolean> {
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from('stores')
     .update({ is_active: false })
     .eq('id', storeId);

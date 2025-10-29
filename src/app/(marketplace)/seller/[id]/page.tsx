@@ -10,14 +10,13 @@ import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import { 
-  Card,
-  CardContent,
-  CardHeader,
+  Card, 
+  CardContent, 
+  CardHeader, 
   CardTitle,
   Button,
   Badge,
   Avatar,
-  Separator,
   LoadingSpinner,
   EmptyState,
   Pagination
@@ -105,8 +104,8 @@ export default function SellerProfilePage() {
   const handleShare = () => {
     if (navigator.share) {
       navigator.share({
-        title: `Perfil de ${profile?.full_name}`,
-        text: `Mira el perfil de ${profile?.full_name} en Mercadito Online PY`,
+        title: `Perfil de ${(profile as any)?.store_name || 'Vendedor'}`,
+        text: `Mira el perfil de ${(profile as any)?.store_name || 'este vendedor'} en Mercadito Online PY`,
         url: window.location.href,
       });
     } else {
@@ -149,11 +148,11 @@ export default function SellerProfilePage() {
             <div className="relative">
               <Avatar
                 src={profile.avatar_url}
-                fallback={profile.full_name.charAt(0).toUpperCase()}
+                fallback={(profile as any)?.full_name?.charAt(0)?.toUpperCase() || 'V'}
                 size="xl"
                 className="border-4 border-white shadow-lg"
               />
-              {profile.is_verified && (
+              {(profile as any)?.verified && (
                 <div className="absolute -bottom-2 -right-2 bg-blue-600 text-white rounded-full p-1">
                   <CheckCircle className="w-5 h-5" />
                 </div>
@@ -165,8 +164,8 @@ export default function SellerProfilePage() {
               <div className="flex flex-col md:flex-row md:items-center md:justify-between">
                 <div>
                   <h1 className="text-3xl font-bold text-gray-900 flex items-center">
-                    {profile.full_name}
-                    {profile.is_verified && (
+                    {(profile as any)?.full_name || 'Vendedor'}
+                    {(profile as any)?.verified && (
                       <Badge variant="success" size="sm" className="ml-2">
                         <Award className="w-3 h-3 mr-1" />
                         Verificado
@@ -177,18 +176,18 @@ export default function SellerProfilePage() {
                   <div className="flex items-center space-x-4 mt-2 text-gray-600">
                     <div className="flex items-center">
                       <Star className="w-4 h-4 text-yellow-500 mr-1" />
-                      <span className="font-medium">{profile.rating.toFixed(1)}</span>
-                      <span className="text-sm ml-1">({profile.total_reviews} reseñas)</span>
+                      <span className="font-medium">{(profile as any)?.rating?.toFixed(1) || '0.0'}</span>
+                      <span className="text-sm ml-1">({(profile as any)?.total_reviews || 0} reseñas)</span>
                     </div>
                     
                     <div className="flex items-center">
                       <Calendar className="w-4 h-4 mr-1" />
-                      <span className="text-sm">Miembro desde {new Date(profile.member_since).getFullYear()}</span>
+                      <span className="text-sm">Miembro desde {new Date((profile as any)?.member_since || Date.now()).getFullYear()}</span>
                     </div>
                     
                     <div className="flex items-center">
                       <Clock className="w-4 h-4 mr-1" />
-                      <span className="text-sm">Activo {new Date(profile.last_active).toLocaleDateString()}</span>
+                      <span className="text-sm">Activo {new Date((profile as any)?.last_active || Date.now()).toLocaleDateString()}</span>
                     </div>
                   </div>
 
@@ -277,34 +276,34 @@ export default function SellerProfilePage() {
                   </div>
                 )}
                 
-                {profile.website && (
+                {(profile as any)?.website && (
                   <div className="flex items-center text-gray-600">
                     <Globe className="w-4 h-4 mr-2" />
-                    <a href={profile.website} target="_blank" rel="noopener noreferrer" className="hover:text-blue-600">
+                    <a href={(profile as any)?.website} target="_blank" rel="noopener noreferrer" className="hover:text-blue-600">
                       Sitio web
                     </a>
                   </div>
                 )}
 
-                {profile.social_links && (
+                {(profile as any)?.social_links && (
                   <div className="flex items-center space-x-2">
-                    {profile.social_links.facebook && (
-                      <a href={profile.social_links.facebook} target="_blank" rel="noopener noreferrer">
+                    {(profile as any)?.social_links?.facebook && (
+                      <a href={(profile as any)?.social_links?.facebook} target="_blank" rel="noopener noreferrer">
                         <Facebook className="w-5 h-5 text-blue-600 hover:text-blue-700" />
                       </a>
                     )}
-                    {profile.social_links.instagram && (
-                      <a href={profile.social_links.instagram} target="_blank" rel="noopener noreferrer">
+                    {(profile as any)?.social_links?.instagram && (
+                      <a href={(profile as any)?.social_links?.instagram} target="_blank" rel="noopener noreferrer">
                         <Instagram className="w-5 h-5 text-pink-600 hover:text-pink-700" />
                       </a>
                     )}
-                    {profile.social_links.twitter && (
-                      <a href={profile.social_links.twitter} target="_blank" rel="noopener noreferrer">
+                    {(profile as any)?.social_links?.twitter && (
+                      <a href={(profile as any)?.social_links?.twitter} target="_blank" rel="noopener noreferrer">
                         <Twitter className="w-5 h-5 text-blue-400 hover:text-blue-500" />
                       </a>
                     )}
-                    {profile.social_links.linkedin && (
-                      <a href={profile.social_links.linkedin} target="_blank" rel="noopener noreferrer">
+                    {(profile as any)?.social_links?.linkedin && (
+                      <a href={(profile as any)?.social_links?.linkedin} target="_blank" rel="noopener noreferrer">
                         <Linkedin className="w-5 h-5 text-blue-700 hover:text-blue-800" />
                       </a>
                     )}
@@ -373,7 +372,7 @@ export default function SellerProfilePage() {
                         >
                           <div className="relative w-full h-48">
                             <Image
-                              src={product.cover_url || '/placeholder-product.png'}
+                              src={(product as any)?.cover_url || '/placeholder-product.png'}
                               alt={product.title}
                               fill
                               className="object-cover rounded-t-lg"
@@ -392,7 +391,7 @@ export default function SellerProfilePage() {
                               <span className="text-lg font-bold text-gray-900">
                                 Gs. {product.price.toLocaleString('es-PY')}
                               </span>
-                              <Badge variant="secondary" size="sm">
+                              <Badge variant="default" size="sm">
                                 {product.sale_type}
                               </Badge>
                             </div>
@@ -432,7 +431,7 @@ export default function SellerProfilePage() {
                           <CardContent className="p-4">
                             <div className="flex items-start space-x-3">
                               <Avatar
-                                src={review.buyer.avatar_url}
+                                src={review.buyer.avatar_url || undefined}
                                 fallback={review.buyer.full_name.charAt(0).toUpperCase()}
                                 size="md"
                               />
@@ -492,7 +491,7 @@ export default function SellerProfilePage() {
               <div className="space-y-6">
                 <Card>
                   <CardHeader>
-                    <CardTitle>Acerca de {profile.full_name}</CardTitle>
+                    <CardTitle>Acerca de {(profile as any)?.full_name || 'este vendedor'}</CardTitle>
                   </CardHeader>
                   <CardContent>
                     {profile.bio ? (
@@ -514,13 +513,13 @@ export default function SellerProfilePage() {
                     <div className="flex justify-between">
                       <span className="text-gray-600">Miembro desde</span>
                       <span className="font-medium">
-                        {new Date(profile.member_since).toLocaleDateString('es-PY')}
+                        {new Date((profile as any)?.member_since || Date.now()).toLocaleDateString('es-PY')}
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Última actividad</span>
                       <span className="font-medium">
-                        {new Date(profile.last_active).toLocaleDateString('es-PY')}
+                        {new Date((profile as any)?.last_active || Date.now()).toLocaleDateString('es-PY')}
                       </span>
                     </div>
                     <div className="flex justify-between">

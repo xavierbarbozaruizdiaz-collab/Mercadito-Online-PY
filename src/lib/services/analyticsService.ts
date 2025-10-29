@@ -75,7 +75,7 @@ class AnalyticsService {
       };
 
       // Enviar a Supabase
-      await supabase
+      await (supabase as any)
         .from('analytics_events')
         .insert(event);
 

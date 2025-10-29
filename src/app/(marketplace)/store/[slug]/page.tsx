@@ -10,14 +10,13 @@ import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import { 
-  Card,
-  CardContent,
-  CardHeader,
+  Card, 
+  CardContent, 
+  CardHeader, 
   CardTitle,
   Button,
   Badge,
   Avatar,
-  Separator,
   LoadingSpinner,
   EmptyState,
   Pagination

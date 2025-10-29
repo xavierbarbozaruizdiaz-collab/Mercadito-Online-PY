@@ -323,7 +323,7 @@ export default function SellersListPage() {
           {/* Avatar */}
           <div className="relative">
             <Avatar
-              src={seller.avatar_url}
+              src={seller.avatar_url || undefined}
               fallback={seller.full_name.charAt(0).toUpperCase()}
               size="xl"
               className="border-4 border-white shadow-lg"
@@ -396,7 +396,7 @@ export default function SellersListPage() {
           {/* Avatar */}
           <div className="relative">
             <Avatar
-              src={seller.avatar_url}
+              src={seller.avatar_url || undefined}
               fallback={seller.full_name.charAt(0).toUpperCase()}
               size="lg"
               className="border-2 border-white shadow-md"
@@ -516,10 +516,10 @@ export default function SellersListPage() {
 
             {/* Filtros */}
             <div className="flex flex-wrap items-center space-x-4">
-              <Select
+              <select
                 value={filters.location || ''}
-                onValueChange={(value) => handleFiltersChange({ location: value || undefined })}
-                placeholder="Ubicación"
+                onChange={(e) => handleFiltersChange({ location: e.target.value || undefined })}
+                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">Todas las ubicaciones</option>
                 <option value="asuncion">Asunción</option>
@@ -528,19 +528,19 @@ export default function SellersListPage() {
                 <option value="fernando-de-la-mora">Fernando de la Mora</option>
                 <option value="lambare">Lambaré</option>
                 <option value="san-lorenzo">San Lorenzo</option>
-              </Select>
+              </select>
 
-              <Select
+              <select
                 value={filters.min_rating?.toString() || ''}
-                onValueChange={(value) => handleFiltersChange({ min_rating: value ? Number(value) : undefined })}
-                placeholder="Calificación mínima"
+                onChange={(e) => handleFiltersChange({ min_rating: e.target.value ? Number(e.target.value) : undefined })}
+                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">Cualquier calificación</option>
                 <option value="4.5">4.5+ estrellas</option>
                 <option value="4.0">4.0+ estrellas</option>
                 <option value="3.5">3.5+ estrellas</option>
                 <option value="3.0">3.0+ estrellas</option>
-              </Select>
+              </select>
 
               <label className="flex items-center space-x-2">
                 <input
@@ -558,16 +558,17 @@ export default function SellersListPage() {
           <div className="flex items-center justify-between mt-4 pt-4 border-t">
             <div className="flex items-center space-x-4">
               <span className="text-sm text-gray-600">Ordenar por:</span>
-              <Select
+              <select
                 value={filters.sort_by || 'rating'}
-                onValueChange={(value) => handleFiltersChange({ sort_by: value as SellersFilters['sort_by'] })}
+                onChange={(e) => handleFiltersChange({ sort_by: e.target.value as SellersFilters['sort_by'] })}
+                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="rating">Calificación</option>
                 <option value="products">Productos</option>
                 <option value="sales">Ventas</option>
                 <option value="member_since">Miembro desde</option>
                 <option value="last_active">Última actividad</option>
-              </Select>
+              </select>
               
               <Button
                 variant="outline"
@@ -587,14 +588,14 @@ export default function SellersListPage() {
             <div className="flex items-center space-x-2">
               <span className="text-sm text-gray-600">Vista:</span>
               <Button
-                variant={viewMode === 'grid' ? 'default' : 'outline'}
+                variant={viewMode === 'grid' ? 'primary' : 'outline'}
                 size="sm"
                 onClick={() => setViewMode('grid')}
               >
                 <Grid className="w-4 h-4" />
               </Button>
               <Button
-                variant={viewMode === 'list' ? 'default' : 'outline'}
+                variant={viewMode === 'list' ? 'primary' : 'outline'}
                 size="sm"
                 onClick={() => setViewMode('list')}
               >

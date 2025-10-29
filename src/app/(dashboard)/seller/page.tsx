@@ -117,21 +117,21 @@ export default function SellerDashboard() {
 
         // Calcular estadísticas
         const totalProducts = products.length;
-        const activeProducts = products.filter(p => p.status === 'active').length;
+        const activeProducts = products.filter((p: any) => p.status === 'active').length;
         const totalOrders = orders.length;
-        const pendingOrders = orders.filter(o => o.status === 'pending').length;
-        const totalRevenue = orders.reduce((sum, order) => sum + order.total_amount, 0);
+        const pendingOrders = orders.filter((o: any) => o.status === 'pending').length;
+        const totalRevenue = orders.reduce((sum: number, order: any) => sum + order.total_amount, 0);
         
         const currentMonth = new Date().getMonth();
         const currentYear = new Date().getFullYear();
         const monthlyRevenue = orders
-          .filter(order => {
+          .filter((order: any) => {
             const orderDate = new Date(order.created_at);
             return orderDate.getMonth() === currentMonth && orderDate.getFullYear() === currentYear;
           })
-          .reduce((sum, order) => sum + order.total_amount, 0);
+          .reduce((sum: number, order: any) => sum + order.total_amount, 0);
 
-        const uniqueCustomers = new Set(orders.map(o => o.buyer_id)).size;
+        const uniqueCustomers = new Set(orders.map((o: any) => o.buyer_id)).size;
         const conversionRate = totalProducts > 0 ? (totalOrders / totalProducts) * 100 : 0;
 
         setStats({

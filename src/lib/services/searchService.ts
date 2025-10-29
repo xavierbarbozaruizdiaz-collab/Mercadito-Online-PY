@@ -283,9 +283,9 @@ export class SearchService {
       products?.forEach((product, index) => {
         suggestions.push({
           id: `product-${index}`,
-          text: product.title,
+          text: (product as any).title,
           type: 'product',
-          category: product.category?.name,
+          category: (product as any).category?.name,
         });
       });
 
@@ -293,7 +293,7 @@ export class SearchService {
       categories?.forEach((category, index) => {
         suggestions.push({
           id: `category-${index}`,
-          text: category.name,
+          text: (category as any).name,
           type: 'category',
         });
       });
@@ -302,9 +302,9 @@ export class SearchService {
       stores?.forEach((store, index) => {
         suggestions.push({
           id: `store-${index}`,
-          text: store.name,
+          text: (store as any).name,
           type: 'store',
-          location: store.location,
+          location: (store as any).location,
         });
       });
 
@@ -433,9 +433,9 @@ export class SearchService {
     try {
       // Obtener conteos
       const [productsResult, storesResult, categoriesResult] = await Promise.all([
-        supabase.from('products').select('id', { count: 'exact' }).eq('status', 'active'),
-        supabase.from('stores').select('id', { count: 'exact' }).eq('is_active', true),
-        supabase.from('categories').select('id', { count: 'exact' }).eq('is_active', true),
+        (supabase as any).from('products').select('id', { count: 'exact' }).eq('status', 'active'),
+        (supabase as any).from('stores').select('id', { count: 'exact' }).eq('is_active', true),
+        (supabase as any).from('categories').select('id', { count: 'exact' }).eq('is_active', true),
       ]);
 
       const totalProducts = productsResult.count || 0;
@@ -449,7 +449,7 @@ export class SearchService {
         .eq('status', 'active');
 
       const categoryCounts = popularCategories?.reduce((acc, item) => {
-        const categoryName = item.category?.name || 'Sin categoría';
+        const categoryName = (item as any).category?.name || 'Sin categoría';
         acc[categoryName] = (acc[categoryName] || 0) + 1;
         return acc;
       }, {} as Record<string, number>) || {};

@@ -599,73 +599,27 @@ export interface UserStatus {
 // SCHEMAS DE VALIDACIÓN PARA CHAT
 // ============================================
 
-export const ConversationSchema = z.object({
-  buyer_id: z.string().uuid(),
-  seller_id: z.string().uuid(),
-  product_id: z.string().uuid().optional(),
-  store_id: z.string().uuid().optional(),
-  subject: z.string().optional(),
-});
+// export const ChatConversationSchema = z.object({
+//   buyer_id: z.string().uuid(),
+//   seller_id: z.string().uuid(),
+//   product_id: z.string().uuid().optional(),
+//   store_id: z.string().uuid().optional(),
+//   subject: z.string().optional(),
+// });
 
-export const MessageSchema = z.object({
-  conversation_id: z.string().uuid(),
-  content: z.string().min(1).max(2000),
-  message_type: z.enum(['text', 'image', 'file', 'system']).default('text'),
-  metadata: z.record(z.any()).default({}),
-});
+// export const MessageSchema = z.object({
+//   conversation_id: z.string().uuid(),
+//   content: z.string().min(1).max(2000),
+//   message_type: z.enum(['text', 'image', 'file', 'system']).default('text'),
+//   metadata: z.record(z.any()).default({}),
+// });
 
-export const NotificationSchema = z.object({
-  user_id: z.string().uuid(),
-  type: z.enum(['message', 'order', 'review', 'system']),
-  title: z.string().min(1).max(100),
-  content: z.string().min(1).max(500),
-  data: z.record(z.any()).default({}),
-});
+// export const NotificationSchema = z.object({
+//   user_id: z.string().uuid(),
+//   type: z.enum(['message', 'order', 'review', 'system']),
+//   title: z.string().min(1).max(100),
+//   content: z.string().min(1).max(500),
+//   data: z.record(z.any()).default({}),
+// });
 
-export type {
-  // Re-exportar tipos principales para fácil acceso
-  Profile,
-  Store,
-  StoreWithProfile,
-  Category,
-  Product,
-  ProductWithDetails,
-  ProductVariant,
-  ProductImage,
-  Order,
-  OrderWithDetails,
-  OrderItem,
-  OrderItemWithProduct,
-  Payment,
-  Shipment,
-  Notification,
-  Message,
-  MessageWithUsers,
-  AnalyticsEvent,
-  Report,
-  Address,
-  DashboardStats,
-  ProductAnalytics,
-  StoreAnalytics,
-  AppSettings,
-  StoreSettings,
-  SearchFilters,
-  ApiResponse,
-  PaginatedResponse,
-  CreateProductForm,
-  UpdateProductForm,
-  CreateStoreForm,
-  UpdateStoreForm,
-  CreateOrderForm,
-  SelectOption,
-  TableColumn,
-  FormField,
-  
-  // Tipos de chat
-  Conversation,
-  ConversationParticipant,
-  UserStatus,
-  ConversationSchema,
-  MessageSchema,
-  NotificationSchema,
-};
+// Todos los tipos ya están exportados arriba con export interface/export type

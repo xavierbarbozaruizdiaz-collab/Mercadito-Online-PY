@@ -289,7 +289,7 @@ export default function SearchSuggestions({
   const getSuggestionBadgeColor = (type: SearchSuggestion['type']) => {
     switch (type) {
       case 'product':
-        return 'primary';
+        return 'default';
       case 'category':
         return 'info';
       case 'store':
@@ -297,9 +297,9 @@ export default function SearchSuggestions({
       case 'location':
         return 'warning';
       case 'trending':
-        return 'destructive';
+        return 'error';
       default:
-        return 'secondary';
+        return 'default';
     }
   };
 
@@ -357,7 +357,7 @@ export default function SearchSuggestions({
                   
                   <div className="flex items-center space-x-2">
                     {suggestion.count && (
-                      <Badge variant="secondary" size="sm">
+                      <Badge variant="default" size="sm">
                         {suggestion.count}
                       </Badge>
                     )}
@@ -406,7 +406,7 @@ export default function SearchSuggestions({
                 
                 <div className="flex items-center space-x-2">
                   {trend.count && (
-                    <Badge variant="secondary" size="sm">
+                    <Badge variant="default" size="sm">
                       {trend.count}
                     </Badge>
                   )}
@@ -447,7 +447,7 @@ export default function SearchSuggestions({
                 
                 <div className="flex items-center space-x-2">
                   {item.count && (
-                    <Badge variant="secondary" size="sm">
+                    <Badge variant="default" size="sm">
                       {item.count}
                     </Badge>
                   )}

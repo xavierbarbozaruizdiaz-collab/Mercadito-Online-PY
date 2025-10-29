@@ -119,7 +119,7 @@ export default function ProductCard({
       case 'usado':
         return 'info';
       default:
-        return 'secondary';
+        return 'default';
     }
   };
 
@@ -127,13 +127,13 @@ export default function ProductCard({
   const getSaleTypeBadgeColor = (saleType: string) => {
     switch (saleType) {
       case 'venta':
-        return 'primary';
+        return 'default';
       case 'subasta':
         return 'warning';
       case 'intercambio':
         return 'info';
       default:
-        return 'secondary';
+        return 'default';
     }
   };
 
@@ -160,7 +160,7 @@ export default function ProductCard({
               />
               {discount > 0 && (
                 <Badge 
-                  variant="destructive" 
+                  variant="error" 
                   size="sm" 
                   className="absolute -top-2 -right-2"
                 >
@@ -300,7 +300,7 @@ export default function ProductCard({
 
           {discount > 0 && (
             <Badge 
-              variant="destructive" 
+              variant="error" 
               size="sm" 
               className="absolute top-2 right-2"
             >

@@ -196,8 +196,6 @@ export default function AdvancedSearch({
             {/* Barra de búsqueda principal */}
             <SearchBar
               placeholder="Buscar productos, marcas, categorías..."
-              value={searchQuery}
-              onChange={handleQueryChange}
               onSearch={handleSearch}
               size="lg"
               className="w-full"
@@ -281,7 +279,7 @@ export default function AdvancedSearch({
       {showSuggestions && searchQuery.length > 2 && (
         <SearchSuggestions
           query={searchQuery}
-          onSuggestionClick={handleSuggestionClick}
+          onSuggestionClick={handleSuggestionClick as any}
           onTrendingClick={handleTrendingClick}
           showTrending={showTrending}
           showRecent={showRecent}

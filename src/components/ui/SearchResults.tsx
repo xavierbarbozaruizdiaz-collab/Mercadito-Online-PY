@@ -12,8 +12,7 @@ import {
   LoadingSpinner, 
   EmptyState,
   Button,
-  Badge,
-  Separator
+  Badge
 } from '@/components/ui';
 import { 
   Package, 
@@ -151,7 +150,6 @@ export default function SearchResults({
           onClick: () => window.location.reload(),
         }}
         icon={<Package className="w-16 h-16" />}
-        className={className}
       />
     );
   }
@@ -166,7 +164,6 @@ export default function SearchResults({
           onClick: () => window.location.href = '/search',
         }}
         icon={<Package className="w-16 h-16" />}
-        className={className}
       />
     );
   }
@@ -245,7 +242,6 @@ export default function SearchResults({
                     key={product.id}
                     product={product}
                     onClick={() => handleProductClick(product.id)}
-                    variant={viewMode}
                   />
                 ))}
               </div>
@@ -288,7 +284,6 @@ export default function SearchResults({
                     key={store.id}
                     store={store}
                     onClick={() => handleStoreClick(store.id)}
-                    variant={viewMode === 'list' ? 'compact' : 'default'}
                   />
                 ))}
               </div>

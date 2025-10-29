@@ -189,7 +189,7 @@ export default function SearchBar({
   const getSuggestionBadgeColor = (type: SearchSuggestion['type']) => {
     switch (type) {
       case 'product':
-        return 'primary';
+        return 'default';
       case 'category':
         return 'info';
       case 'store':
@@ -197,7 +197,7 @@ export default function SearchBar({
       case 'location':
         return 'warning';
       default:
-        return 'secondary';
+        return 'default';
     }
   };
 
@@ -207,7 +207,6 @@ export default function SearchBar({
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
           <Input
-            ref={inputRef}
             placeholder={placeholder}
             value={query}
             onChange={(e) => handleQueryChange(e.target.value)}
@@ -259,7 +258,7 @@ export default function SearchBar({
                 
                 <div className="flex items-center space-x-2">
                   {suggestion.count && (
-                    <Badge variant="secondary" size="sm">
+                    <Badge variant="default" size="sm">
                       {suggestion.count}
                     </Badge>
                   )}

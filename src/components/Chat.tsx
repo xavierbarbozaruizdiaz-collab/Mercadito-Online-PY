@@ -69,8 +69,8 @@ function MessageBubble({ message, isOwn, showAvatar = false, showTime = true }: 
     )}>
       {showAvatar && !isOwn && (
         <Avatar
-          src={message.sender?.avatar_url}
-          fallback={message.sender?.full_name?.charAt(0) || 'U'}
+          src={(message as any)?.sender?.avatar_url}
+          fallback={(message as any)?.sender?.full_name?.charAt(0) || 'U'}
           size="sm"
           className="flex-shrink-0"
         />
@@ -95,8 +95,8 @@ function MessageBubble({ message, isOwn, showAvatar = false, showTime = true }: 
       
       {showAvatar && isOwn && (
         <Avatar
-          src={message.sender?.avatar_url}
-          fallback={message.sender?.full_name?.charAt(0) || 'U'}
+          src={(message as any)?.sender?.avatar_url}
+          fallback={(message as any)?.sender?.full_name?.charAt(0) || 'U'}
           size="sm"
           className="flex-shrink-0"
         />
@@ -206,7 +206,7 @@ export default function Chat({ conversationId, onClose, className }: ChatProps) 
   const [showConversations, setShowConversations] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const typingTimeoutRef = useRef<NodeJS.Timeout>();
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Seleccionar conversación inicial
   useEffect(() => {
@@ -413,7 +413,6 @@ export default function Chat({ conversationId, onClose, className }: ChatProps) 
                 
                 <div className="flex-1 relative">
                   <Input
-                    ref={inputRef}
                     value={messageInput}
                     onChange={handleTyping}
                     onKeyPress={handleKeyPress}

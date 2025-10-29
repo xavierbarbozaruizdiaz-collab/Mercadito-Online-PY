@@ -4,6 +4,7 @@ import AddToCartButton from '@/components/AddToCartButton';
 import StartConversationButton from '@/components/StartConversationButton';
 import { Metadata } from 'next';
 import { generateProductStructuredData, generateBreadcrumbStructuredData } from '@/lib/structuredData';
+import { OptimizedImage } from '@/components/OptimizedImage';
 
 type Product = {
   id: string;
@@ -185,10 +186,13 @@ export default async function ProductPage(
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
           {/* Imagen del producto */}
           <div className="space-y-4">
-            <img
+            <OptimizedImage
               src={p.cover_url ?? 'https://placehold.co/800x600?text=Producto'}
               alt={p.title}
+              width={800}
+              height={600}
               className="w-full rounded-lg sm:rounded-xl object-cover"
+              priority={true}
             />
             
             {/* Información adicional */}
@@ -242,18 +246,8 @@ export default async function ProductPage(
             <div className="flex space-x-4">
               <AddToCartButton productId={p.id} />
               <StartConversationButton 
-                product={{
-                  id: p.id,
-                  title: p.title,
-                  description: p.description,
-                  price: Number(p.price),
-                  cover_url: p.cover_url,
-                  condition: p.condition,
-                  sale_type: p.sale_type,
-                  category_id: p.category_id,
-                  seller_id: p.seller_id,
-                  created_at: p.created_at,
-                }}
+                product={p as any}
+                sellerId={p.seller_id}
                 className="flex-1"
               />
             </div>

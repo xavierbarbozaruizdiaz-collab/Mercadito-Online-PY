@@ -78,7 +78,7 @@ export default function NotificationsPanel() {
         if (error) throw error;
 
         setNotifications(data || []);
-        setUnreadCount(data?.filter(n => !n.is_read).length || 0);
+        setUnreadCount(data?.filter((n: any) => !n.is_read).length || 0);
       } catch (err: any) {
         console.error('Error fetching notifications:', err.message);
         setError('No se pudieron cargar las notificaciones.');
@@ -115,7 +115,7 @@ export default function NotificationsPanel() {
 
   // Marcar notificación como leída
   const markAsRead = async (notificationId: string) => {
-    await supabase
+    await (supabase as any)
       .from('notifications')
       .update({ is_read: true })
       .eq('id', notificationId);
@@ -128,7 +128,7 @@ export default function NotificationsPanel() {
 
   // Marcar todas como leídas
   const markAllAsRead = async () => {
-    await supabase
+    await (supabase as any)
       .from('notifications')
       .update({ is_read: true })
       .eq('user_id', user?.id);

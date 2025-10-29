@@ -57,9 +57,9 @@ export default function NewProduct() {
     
     switch (field) {
       case 'title':
-        if (!value?.trim()) {
+        if (!String(value)?.trim()) {
           errors.title = 'El título es requerido';
-        } else if (value.trim().length < 3) {
+        } else if (String(value).trim().length < 3) {
           errors.title = 'El título debe tener al menos 3 caracteres';
         } else {
           delete errors.title;

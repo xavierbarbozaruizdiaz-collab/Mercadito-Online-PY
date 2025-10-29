@@ -43,7 +43,15 @@ export type Product = Database['public']['Tables']['products']['Row'] & {
   category: { name: string } | null;
 };
 
-export type Review = Database['public']['Tables']['reviews']['Row'] & {
+export type Review = {
+  id: string;
+  buyer_id: string;
+  seller_id: string;
+  product_id: string | null;
+  rating: number;
+  comment: string | null;
+  created_at: string;
+  updated_at: string;
   buyer: { full_name: string; avatar_url: string | null };
 };
 
@@ -94,7 +102,7 @@ export async function getSellerProfileById(sellerId: string): Promise<SellerProf
   }
 
   return {
-    ...profileData,
+    ...(profileData as any),
     store: storeData || {
       id: '',
       name: 'Sin tienda',
@@ -204,7 +212,7 @@ export async function getSellerReviews(
   const { data, error, count } = await supabase
     .from('reviews')
     .select('*, buyer:profiles(full_name, avatar_url)', { count: 'exact' })
-    .eq('store_id', storeData.id)
+    .eq('store_id', (storeData as any).id)
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1);
 
@@ -253,10 +261,10 @@ export async function getSellerStats(sellerId: string): Promise<SellerStats | nu
       const { data: reviewsData } = await supabase
         .from('reviews')
         .select('rating')
-        .eq('store_id', storeData.id);
+        .eq('store_id', (storeData as any).id);
 
       averageRating = reviewsData && reviewsData.length > 0
-        ? reviewsData.reduce((sum, review) => sum + review.rating, 0) / reviewsData.length
+        ? reviewsData.reduce((sum, review: any) => sum + review.rating, 0) / reviewsData.length
         : 0;
     }
 
@@ -351,9 +359,9 @@ export async function getSellers(
  */
 export async function updateSellerProfile(
   sellerId: string,
-  updates: Partial<Omit<SellerProfile, 'id' | 'created_at' | 'updated_at'>>
+  updates: Partial<Omit<SellerProfile, 'id' | 'created_at' | 'updated_at' | 'store'>>
 ): Promise<SellerProfile | null> {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('profiles')
     .update(updates)
     .eq('id', sellerId)
@@ -395,7 +403,7 @@ export async function createSellerStore(
   }
 ): Promise<SellerProfile | null> {
   // Crear la tienda
-  const { data: store, error: storeError } = await supabase
+  const { data: store, error: storeError } = await (supabase as any)
     .from('stores')
     .insert({
       owner_id: sellerId,

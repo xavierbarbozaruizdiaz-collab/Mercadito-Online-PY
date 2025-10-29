@@ -9,9 +9,9 @@ import {
   ProductWithDetails, 
   ProductVariant, 
   ProductImage, 
-  CreateProductFormData, 
-  UpdateProductFormData,
-  SearchFiltersFormData,
+  CreateProductForm, 
+  UpdateProductForm,
+  SearchFilters,
   PaginatedResponse 
 } from '@/types';
 
@@ -21,14 +21,14 @@ import {
 
 export interface ProductService {
   // Operaciones básicas
-  createProduct(data: CreateProductFormData): Promise<Product>;
-  updateProduct(id: string, data: UpdateProductFormData): Promise<Product>;
+  createProduct(data: CreateProductForm): Promise<Product>;
+  updateProduct(id: string, data: UpdateProductForm): Promise<Product>;
   deleteProduct(id: string): Promise<void>;
   getProduct(id: string): Promise<ProductWithDetails | null>;
   
   // Listados y búsquedas
-  getProducts(filters?: SearchFiltersFormData): Promise<PaginatedResponse<Product>>;
-  getProductsByStore(storeId: string, filters?: SearchFiltersFormData): Promise<PaginatedResponse<Product>>;
+  getProducts(filters?: SearchFilters): Promise<PaginatedResponse<Product>>;
+  getProductsByStore(storeId: string, filters?: SearchFilters): Promise<PaginatedResponse<Product>>;
   getFeaturedProducts(limit?: number): Promise<Product[]>;
   getRecentProducts(limit?: number): Promise<Product[]>;
   
@@ -62,7 +62,7 @@ export interface ProductService {
 class ProductServiceImpl implements ProductService {
   
   // Crear producto
-  async createProduct(data: CreateProductFormData): Promise<Product> {
+  async createProduct(data: CreateProductForm): Promise<Product> {
     try {
       // Obtener el usuario actual y su tienda
       const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -77,10 +77,10 @@ class ProductServiceImpl implements ProductService {
       if (storeError || !store) throw new Error('Tienda no encontrada');
 
       // Crear el producto
-      const { data: product, error: productError } = await supabase
+      const { data: product, error: productError } = await (supabase as any)
         .from('products')
         .insert({
-          store_id: store.id,
+          store_id: (store as any).id,
           title: data.title,
           description: data.description,
           price: data.price,
@@ -117,7 +117,7 @@ class ProductServiceImpl implements ProductService {
           is_default: variant.is_default,
         }));
 
-        const { error: variantsError } = await supabase
+        const { error: variantsError } = await (supabase as any)
           .from('product_variants')
           .insert(variants);
 
@@ -139,9 +139,9 @@ class ProductServiceImpl implements ProductService {
   }
 
   // Actualizar producto
-  async updateProduct(id: string, data: UpdateProductFormData): Promise<Product> {
+  async updateProduct(id: string, data: UpdateProductForm): Promise<Product> {
     try {
-      const { data: product, error } = await supabase
+      const { data: product, error } = await (supabase as any)
         .from('products')
         .update({
           title: data.title,
@@ -216,7 +216,7 @@ class ProductServiceImpl implements ProductService {
   }
 
   // Obtener productos con filtros
-  async getProducts(filters?: SearchFiltersFormData): Promise<PaginatedResponse<Product>> {
+  async getProducts(filters?: SearchFilters): Promise<PaginatedResponse<Product>> {
     try {
       const page = filters?.page || 1;
       const limit = filters?.limit || 20;
@@ -292,7 +292,7 @@ class ProductServiceImpl implements ProductService {
   }
 
   // Obtener productos por tienda
-  async getProductsByStore(storeId: string, filters?: SearchFiltersFormData): Promise<PaginatedResponse<Product>> {
+  async getProductsByStore(storeId: string, filters?: SearchFilters): Promise<PaginatedResponse<Product>> {
     try {
       const page = filters?.page || 1;
       const limit = filters?.limit || 20;
@@ -308,9 +308,6 @@ class ProductServiceImpl implements ProductService {
         .eq('store_id', storeId);
 
       // Aplicar filtros adicionales
-      if (filters?.status) {
-        query = query.eq('status', filters.status);
-      }
 
       if (filters?.query) {
         query = query.or(`title.ilike.%${filters.query}%,description.ilike.%${filters.query}%`);
@@ -393,7 +390,7 @@ class ProductServiceImpl implements ProductService {
   // Actualizar estado del producto
   async updateProductStatus(id: string, status: string): Promise<Product> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('products')
         .update({ status })
         .eq('id', id)
@@ -421,9 +418,9 @@ class ProductServiceImpl implements ProductService {
       if (fetchError) throw fetchError;
 
       // Actualizar al estado opuesto
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('products')
-        .update({ is_featured: !product.is_featured })
+        .update({ is_featured: !(product as any).is_featured })
         .eq('id', id)
         .select()
         .single();
@@ -439,7 +436,7 @@ class ProductServiceImpl implements ProductService {
   // Actualizar stock
   async updateStock(id: string, quantity: number): Promise<Product> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('products')
         .update({ stock_quantity: quantity })
         .eq('id', id)
@@ -466,9 +463,9 @@ class ProductServiceImpl implements ProductService {
 
       if (fetchError) throw fetchError;
 
-      const newQuantity = Math.max(0, product.stock_quantity - quantity);
+      const newQuantity = Math.max(0, (product as any).stock_quantity - quantity);
 
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('products')
         .update({ stock_quantity: newQuantity })
         .eq('id', id)
@@ -507,7 +504,7 @@ class ProductServiceImpl implements ProductService {
           .getPublicUrl(filePath);
 
         // Crear registro en la base de datos
-        const { data: imageData, error: imageError } = await supabase
+        const { data: imageData, error: imageError } = await (supabase as any)
           .from('product_images')
           .insert({
             product_id: productId,
@@ -543,7 +540,7 @@ class ProductServiceImpl implements ProductService {
       if (fetchError) throw fetchError;
 
       // Extraer el path del archivo de la URL
-      const url = new URL(image.url);
+      const url = new URL((image as any).url);
       const filePath = url.pathname.split('/').slice(-3).join('/'); // products/productId/filename
 
       // Eliminar archivo del storage
@@ -578,7 +575,7 @@ class ProductServiceImpl implements ProductService {
       }));
 
       for (const update of updates) {
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from('product_images')
           .update({
             sort_order: update.sort_order,
@@ -617,7 +614,7 @@ class ProductServiceImpl implements ProductService {
   // Actualizar variante de producto
   async updateProductVariant(variantId: string, variantData: any): Promise<ProductVariant> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('product_variants')
         .update(variantData)
         .eq('id', variantId)
@@ -673,7 +670,7 @@ class ProductServiceImpl implements ProductService {
       // Calcular métricas
       const totalViews = views?.length || 0;
       const totalOrders = orders?.length || 0;
-      const totalRevenue = orders?.reduce((sum, item) => sum + item.total_price, 0) || 0;
+      const totalRevenue = orders?.reduce((sum, item) => sum + (item as any).total_price, 0) || 0;
       const conversionRate = totalViews > 0 ? (totalOrders / totalViews) * 100 : 0;
 
       return {
@@ -693,7 +690,7 @@ class ProductServiceImpl implements ProductService {
   // Registrar vista del producto
   async trackProductView(productId: string): Promise<void> {
     try {
-      await supabase
+      await (supabase as any)
         .from('analytics_events')
         .insert({
           event_type: 'product_view',

@@ -3,7 +3,7 @@
 // Componente para estados vacíos
 // ============================================
 
-'use client';
+import React from 'react';
 
 import { Button } from '@/components/ui';
 import { LucideIcon } from 'lucide-react';
@@ -41,7 +41,7 @@ export default function EmptyState({
       {icon && (
         <div className="mb-4 text-gray-400">
           {typeof icon === 'function' ? (
-            <icon className="w-16 h-16" />
+            React.createElement(icon, { className: "w-16 h-16" })
           ) : (
             icon
           )}

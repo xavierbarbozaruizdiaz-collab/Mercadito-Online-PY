@@ -5,14 +5,14 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Chat from '@/components/Chat';
 import NotificationsPanel from '@/components/NotificationsPanel';
 import { Bell, MessageCircle, X } from 'lucide-react';
 import { Button } from '@/components/ui';
 
-export default function ChatPage() {
+function ChatContent() {
   const searchParams = useSearchParams();
   const conversationId = searchParams.get('conversation');
   const [showNotifications, setShowNotifications] = useState(false);
@@ -50,10 +50,25 @@ export default function ChatPage() {
       </div>
 
       {/* Notifications Panel */}
-      <NotificationsPanel
+      {/* <NotificationsPanel
         isOpen={showNotifications}
         onClose={() => setShowNotifications(false)}
-      />
+      /> */}
     </div>
+  );
+}
+
+export default function ChatPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Cargando chat...</p>
+        </div>
+      </div>
+    }>
+      <ChatContent />
+    </Suspense>
   );
 }
