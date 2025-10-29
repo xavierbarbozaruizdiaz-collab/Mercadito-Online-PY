@@ -126,7 +126,8 @@ export default function ProductsListClient() {
       // Esto ayuda a evitar errores en la primera carga
       await new Promise(resolve => setTimeout(resolve, 50));
 
-      // Query sin joins que pueden fallar - obtendremos seller/store después si es necesario
+      // Query básica sin joins complejos para evitar 400
+      // Obtenemos seller/store en queries separadas después
       let query = supabase
         .from('products')
         .select(`
@@ -142,7 +143,7 @@ export default function ProductsListClient() {
           store_id,
           created_at
         `)
-        .eq('status', 'active'); // Solo productos activos
+        .or('status.is.null,status.eq.active'); // Incluir productos sin status o activos
 
       // Filtro de búsqueda - se maneja desde el header ahora
       // Mantener por si se pasa desde URL params o prop
@@ -200,82 +201,70 @@ export default function ProductsListClient() {
         throw queryError;
       }
 
-      // Si hay productos, obtener información de sellers y stores por separado
+      // Si hay productos, obtener información de sellers y stores
       if (productsData && productsData.length > 0) {
-        // Obtener sellers únicos
         const sellerIds = [...new Set(productsData.map((p: any) => p.seller_id).filter(Boolean))] as string[];
         const storeIds = [...new Set(productsData.map((p: any) => p.store_id).filter(Boolean))] as string[];
         
-        // Obtener información de sellers (profiles)
+        // Obtener información de sellers (profiles) - campos existentes únicamente
         let sellersMap: Record<string, any> = {};
         if (sellerIds.length > 0) {
           try {
-            // Intentar obtener profiles directamente - usar campos que existen
             const { data: profilesData, error: profilesError } = await supabase
               .from('profiles')
-              .select('id, first_name, last_name, email, full_name')
+              .select('id, full_name, first_name, last_name, email')
               .in('id', sellerIds);
             
             if (!profilesError && profilesData) {
-              sellersMap = (profilesData as any[]).reduce((acc: Record<string, any>, profile: any) => {
-                acc[profile.id] = {
+              profilesData.forEach((profile: any) => {
+                sellersMap[profile.id] = {
                   ...profile,
-                  // Calcular nombre completo si no existe
                   display_name: profile.full_name || 
                     (profile.first_name || profile.last_name 
                       ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim()
                       : profile.email?.split('@')[0] || 'Vendedor')
                 };
-                return acc;
-              }, {} as Record<string, any>);
+              });
             }
-            
-            // Si algunos sellers no se encontraron, crear placeholder con el seller_id
-            sellerIds.forEach((id) => {
-              if (!sellersMap[id]) {
-                sellersMap[id] = {
-                  id: id,
-                  first_name: null,
-                  last_name: null,
-                  display_name: `Vendedor ${id.substring(0, 8)}`,
-                };
-              }
-            });
-          } catch (sellersErr) {
-            console.warn('Error loading sellers, using placeholders:', sellersErr);
-            // Si falla completamente, crear placeholders para todos
-            sellerIds.forEach((id) => {
-              sellersMap[id] = {
-                id: id,
-                first_name: null,
-                last_name: null,
-                display_name: `Vendedor`,
-              };
-            });
+          } catch (err) {
+            console.warn('Error loading sellers:', err);
           }
+          
+          // Placeholders para sellers no encontrados
+          sellerIds.forEach((id) => {
+            if (!sellersMap[id]) {
+              sellersMap[id] = {
+                id,
+                display_name: `Vendedor ${id.slice(0, 6)}`
+              };
+            }
+          });
         }
 
         // Obtener información de stores
         let storesMap: Record<string, any> = {};
         if (storeIds.length > 0) {
-          const { data: storesData } = await supabase
-            .from('stores')
-            .select('id, name, slug')
-            .in('id', storeIds);
-          
-          if (storesData) {
-            storesMap = (storesData as any[]).reduce((acc: Record<string, any>, store: any) => {
-              acc[store.id] = store;
-              return acc;
-            }, {} as Record<string, any>);
+          try {
+            const { data: storesData } = await supabase
+              .from('stores')
+              .select('id, name, slug')
+              .in('id', storeIds);
+            
+            if (storesData) {
+              storesData.forEach((store: any) => {
+                storesMap[store.id] = store;
+              });
+            }
+          } catch (err) {
+            console.warn('Error loading stores:', err);
           }
         }
 
-        // Enriquecer productos con información de sellers y stores
+        // Enriquecer productos
         const enrichedProducts = (productsData as any[]).map((product: any) => ({
           ...product,
-          seller: product.seller_id ? (sellersMap[product.seller_id] || null) : null,
-          store: product.store_id ? (storesMap[product.store_id] || null) : null,
+          seller: sellersMap[product.seller_id] || null,
+          store: storesMap[product.store_id] || null,
         }));
 
         setProducts(enrichedProducts);
@@ -541,16 +530,16 @@ export default function ProductsListClient() {
                         </Link>
                       ) : product.seller ? (
                         <Link
-                          href={`/seller/${product.seller.id}`}
+                          href={product.store?.slug ? `/store/${product.store.slug}` : `/seller/${product.seller.id}`}
                           onClick={(e) => e.stopPropagation()}
                           className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-600 hover:text-blue-800 hover:underline transition-colors cursor-pointer"
                         >
                           <span>👤</span>
                           <span>
-                            {product.seller.display_name || 
-                             (product.seller.first_name || product.seller.last_name 
+                            {product.seller?.display_name || 
+                             (product.seller?.first_name || product.seller?.last_name 
                               ? `${product.seller.first_name || ''} ${product.seller.last_name || ''}`.trim()
-                              : product.seller.full_name || product.seller.email?.split('@')[0] || 'Vendedor')}
+                              : product.seller?.full_name || product.seller?.email?.split('@')[0] || `Vendedor ${product.seller_id?.slice(0, 6) || ''}`)}
                           </span>
                         </Link>
                       ) : product.seller_id ? (
@@ -560,7 +549,7 @@ export default function ProductsListClient() {
                           className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-600 hover:text-blue-800 hover:underline transition-colors cursor-pointer"
                         >
                           <span>👤</span>
-                          <span>Ver tienda</span>
+                          <span>{`Vendedor ${product.seller_id.slice(0, 6)}`}</span>
                         </Link>
                       ) : null}
                     </div>
