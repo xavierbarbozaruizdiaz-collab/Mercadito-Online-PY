@@ -1,7 +1,7 @@
-import { createClient } from '@supabase/supabase-js';
+// ============================================
+// MERCADITO ONLINE PY - SUPABASE CLIENT (Re-export)
+// Re-exporta el cliente principal para mantener compatibilidad
+// ============================================
 
-// Configuración de Supabase
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://hqdatzhliaordlsqtjea.supabase.co';
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhxZGF0emhsaWFvcmRsc3F0amVhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE1MTk1NzQsImV4cCI6MjA3NzA5NTU3NH0.u1VFWCN4yHZ_v_bR4MNw5wt7jTPdfpIwjhDRYfQ5qRw';
-
-export const supabase = createClient(supabaseUrl, supabaseKey);
+// Re-exportar el cliente único desde supabase/client para evitar múltiples instancias
+export { supabase, supabaseAdmin } from './supabase/client';
