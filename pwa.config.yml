@@ -1,0 +1,74 @@
+# PWA Configuration
+# ============================================
+
+# App Information
+APP_INFO:
+  name: "Mercadito Online PY"
+  short_name: "Mercadito PY"
+  description: "Tu marketplace de confianza en Paraguay"
+  version: "1.0.0"
+  author: "Mercadito Online PY Team"
+
+# Display Settings
+DISPLAY_SETTINGS:
+  display: "standalone"
+  orientation: "portrait"
+  theme_color: "#3b82f6"
+  background_color: "#ffffff"
+  start_url: "/"
+
+# Icons Configuration
+ICONS:
+  sizes: [72, 96, 128, 144, 152, 192, 384, 512]
+  formats: ["png", "svg"]
+  purpose: ["any", "maskable"]
+  quality: 90
+
+# Service Worker
+SERVICE_WORKER:
+  enabled: true
+  cache_strategy: "stale_while_revalidate"
+  offline_fallback: true
+  background_sync: true
+  push_notifications: true
+
+# Offline Support
+OFFLINE_SUPPORT:
+  offline_page: "/offline"
+  cache_pages: true
+  cache_assets: true
+  cache_api_responses: true
+  offline_storage: true
+
+# Push Notifications
+PUSH_NOTIFICATIONS:
+  enabled: true
+  vapid_key: "${NEXT_PUBLIC_VAPID_KEY}"
+  notification_types:
+    - order_updates
+    - chat_messages
+    - product_reviews
+    - price_drops
+    - new_products
+
+# Installation
+INSTALLATION:
+  install_prompt: true
+  install_button: true
+  install_instructions: true
+  install_analytics: true
+
+# Performance
+PERFORMANCE:
+  lazy_loading: true
+  image_optimization: true
+  code_splitting: true
+  preloading: true
+  prefetching: true
+
+# Security
+SECURITY:
+  https_required: true
+  secure_context: true
+  content_security_policy: true
+  cross_origin_isolation: true

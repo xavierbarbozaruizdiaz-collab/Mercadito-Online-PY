@@ -29,6 +29,7 @@ import {
   User
 } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/utils';
+import { useWishlist } from '@/lib/hooks/useWishlist';
 
 // ============================================
 // TIPOS
@@ -76,8 +77,9 @@ export default function ProductCard({
   variant = 'grid',
   className = '',
 }: ProductCardProps) {
-  const [isLiked, setIsLiked] = useState(false);
+  const { isInWishlist, toggleWishlist } = useWishlist();
   const [isAddingToCart, setIsAddingToCart] = useState(false);
+  const isLiked = isInWishlist(product.id);
 
   // Manejar clic en la tarjeta
   const handleCardClick = () => {
@@ -93,9 +95,8 @@ export default function ProductCard({
   };
 
   // Manejar agregar a favoritos
-  const handleAddToFavorites = () => {
-    setIsLiked(!isLiked);
-    // Aquí iría la lógica para agregar/quitar de favoritos
+  const handleAddToFavorites = async () => {
+    await toggleWishlist(product.id);
   };
 
   // Manejar agregar al carrito

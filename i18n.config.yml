@@ -1,0 +1,80 @@
+# Internationalization Configuration
+# ============================================
+
+# Supported Languages
+SUPPORTED_LANGUAGES:
+  primary: "es-PY"
+  fallback: "es"
+  additional:
+    - "en-US"
+    - "pt-BR"
+    - "gu"
+
+# Locale Settings
+LOCALE_SETTINGS:
+  default_locale: "es-PY"
+  currency: "PYG"
+  date_format: "DD/MM/YYYY"
+  time_format: "24h"
+  number_format: "1.234,56"
+  timezone: "America/Asuncion"
+
+# Translation Management
+TRANSLATION_MANAGEMENT:
+  translation_files: true
+  namespace_separation: true
+  pluralization: true
+  interpolation: true
+  fallback_handling: true
+
+# Content Localization
+CONTENT_LOCALIZATION:
+  static_content: true
+  dynamic_content: true
+  user_generated_content: true
+  metadata: true
+  seo_content: true
+
+# RTL Support
+RTL_SUPPORT:
+  enabled: false
+  languages: []
+  css_handling: true
+  layout_adjustments: true
+
+# Date and Time
+DATE_TIME:
+  timezone_detection: true
+  automatic_conversion: true
+  user_preferences: true
+  server_timezone: "UTC"
+  client_timezone: "auto"
+
+# Number Formatting
+NUMBER_FORMATTING:
+  currency_formatting: true
+  decimal_separator: ","
+  thousands_separator: "."
+  currency_symbol: "Gs."
+  currency_position: "after"
+
+# Text Direction
+TEXT_DIRECTION:
+  default: "ltr"
+  rtl_languages: []
+  automatic_detection: true
+
+# Cultural Adaptation
+CULTURAL_ADAPTATION:
+  color_preferences: true
+  image_localization: true
+  cultural_sensitivity: true
+  regional_variations: true
+
+# Performance
+I18N_PERFORMANCE:
+  lazy_loading: true
+  code_splitting: true
+  bundle_optimization: true
+  caching: true
+  preloading: true

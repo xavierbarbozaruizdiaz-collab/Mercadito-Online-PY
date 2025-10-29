@@ -1,0 +1,92 @@
+# Deployment Configuration
+# ============================================
+
+# Environment Settings
+ENVIRONMENTS:
+  development:
+    url: "http://localhost:3000"
+    database: "local"
+    storage: "local"
+    analytics: false
+    monitoring: false
+  
+  staging:
+    url: "https://staging.mercadito-online-py.vercel.app"
+    database: "staging"
+    storage: "staging"
+    analytics: true
+    monitoring: true
+  
+  production:
+    url: "https://mercadito-online-py.vercel.app"
+    database: "production"
+    storage: "production"
+    analytics: true
+    monitoring: true
+
+# Build Configuration
+BUILD_CONFIG:
+  node_version: "18.x"
+  build_command: "npm run build"
+  install_command: "npm ci"
+  output_directory: ".next"
+  framework: "nextjs"
+  regions: ["iad1", "sfo1", "lhr1"]
+
+# Deployment Strategy
+DEPLOYMENT_STRATEGY:
+  type: "blue_green"
+  rollback_enabled: true
+  health_checks: true
+  canary_deployment: true
+  feature_flags: true
+
+# Pre-deployment Checks
+PRE_DEPLOYMENT_CHECKS:
+  build_tests: true
+  linting: true
+  type_checking: true
+  security_scan: true
+  dependency_check: true
+  performance_test: true
+
+# Post-deployment Actions
+POST_DEPLOYMENT_ACTIONS:
+  health_check: true
+  smoke_tests: true
+  performance_monitoring: true
+  error_monitoring: true
+  analytics_verification: true
+
+# Rollback Strategy
+ROLLBACK_STRATEGY:
+  automatic_rollback: true
+  rollback_triggers:
+    - error_rate > 5%
+    - response_time > 2000ms
+    - health_check_failure
+  rollback_timeout: "5m"
+
+# Monitoring
+MONITORING:
+  uptime_monitoring: true
+  performance_monitoring: true
+  error_monitoring: true
+  log_monitoring: true
+  alerting: true
+
+# Scaling
+SCALING:
+  auto_scaling: true
+  min_instances: 1
+  max_instances: 10
+  scale_up_threshold: 70%
+  scale_down_threshold: 30%
+
+# Security
+SECURITY:
+  https_enforcement: true
+  security_headers: true
+  csp_policy: true
+  rate_limiting: true
+  ddos_protection: true

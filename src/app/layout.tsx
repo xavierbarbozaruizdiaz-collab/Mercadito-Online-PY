@@ -6,6 +6,7 @@ import UserMenu from "@/components/UserMenu";
 import CartButton from "@/components/CartButton";
 import NotificationsPanel from "@/components/NotificationsPanel";
 import AnalyticsProvider from "@/components/AnalyticsProvider";
+import OfflineIndicator from "@/components/OfflineIndicator";
 import Link from "next/link";
 
 const geistSans = Geist({
@@ -161,6 +162,9 @@ export default function RootLayout({
           {/* Contenido de cada página */}
           {children}
         </AnalyticsProvider>
+        
+        {/* Indicador de estado offline */}
+        <OfflineIndicator />
         
         {/* Service Worker Registration */}
         <script
