@@ -28,8 +28,25 @@ export default function SignInPage() {
   async function signUp(e: React.FormEvent) {
     e.preventDefault();
     setMsg(null);
-    const { error } = await supabase.auth.signUp({ email, password });
-    setMsg(error ? `Error: ${error.message}` : 'Usuario creado. Revisá tu email si hace falta.');
+    const { data, error } = await supabase.auth.signUp({ email, password });
+    
+    if (error) {
+      setMsg(`Error: ${error.message}`);
+    } else {
+      setMsg('Usuario creado exitosamente. Revisá tu email de bienvenida.');
+      
+      // Enviar email de bienvenida (en segundo plano)
+      if (data.user?.email) {
+        fetch('/api/email/welcome', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: data.user.email,
+            userName: data.user.email.split('@')[0],
+          }),
+        }).catch(err => console.error('Error enviando email de bienvenida:', err));
+      }
+    }
   }
 
   return (

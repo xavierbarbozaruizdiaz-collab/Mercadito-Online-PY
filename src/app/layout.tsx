@@ -9,6 +9,11 @@ import AnalyticsProvider from "@/components/AnalyticsProvider";
 import OfflineIndicator from "@/components/OfflineIndicator";
 import Link from "next/link";
 
+// Cargar Sentry solo en cliente y si está configurado
+if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_SENTRY_DSN) {
+  import('@/sentry.client.config');
+}
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],

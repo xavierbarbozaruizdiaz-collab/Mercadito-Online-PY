@@ -112,6 +112,27 @@ export default function CheckoutPage() {
 
       if (error) throw error;
 
+      // Enviar email de confirmación (en segundo plano, no bloquea)
+      if (session.session.user.email) {
+        fetch('/api/email/order-confirmation', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: session.session.user.email,
+            orderNumber: data,
+            orderDetails: {
+              items: cartItems.map(item => ({
+                name: item.product.title,
+                quantity: item.quantity,
+                price: item.product.price * item.quantity,
+              })),
+              total: totalPrice,
+              shippingAddress: address,
+            },
+          }),
+        }).catch(err => console.error('Error enviando email:', err));
+      }
+
       // Redirigir a página de éxito
       router.push(`/checkout/success?orderId=${data}`);
 
