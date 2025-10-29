@@ -238,12 +238,13 @@ export async function getSellerReviews(
  */
 export async function getSellerStats(sellerId: string): Promise<SellerStats | null> {
   try {
-    // Obtener total de productos
+    // Obtener total de productos - no filtrar por status porque algunos productos pueden no tenerlo
+    // Solo contar productos que no estén explícitamente pausados o archivados si tienen status
     const { count: totalProducts } = await supabase
       .from('products')
       .select('*', { count: 'exact', head: true })
       .eq('seller_id', sellerId)
-      .eq('status', 'active');
+      .or('status.is.null,status.eq.active');
 
     // Obtener total de ventas (simulado por ahora)
     const totalSales = Math.floor(Math.random() * 1000) + 100;

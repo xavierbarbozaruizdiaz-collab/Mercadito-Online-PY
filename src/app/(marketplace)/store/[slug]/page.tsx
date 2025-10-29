@@ -79,10 +79,11 @@ export default function StoreProfilePage() {
   const loadStoreProducts = async (currentStoreId: string, page: number = 1, currentSellerId?: string) => {
     try {
       console.log('Loading products for store:', currentStoreId, 'seller:', currentSellerId);
+      // No filtrar por status para incluir productos sin ese campo
       const result = await getStoreProducts(currentStoreId, {
         page,
         limit: 12,
-        status: 'active',
+        // No pasar status: 'active' - algunos productos pueden no tener ese campo
         sellerId: currentSellerId,
       });
       console.log('Loaded products:', result.products?.length, 'total:', result.total);
