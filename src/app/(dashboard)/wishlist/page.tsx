@@ -6,9 +6,9 @@
 import { useWishlist } from '@/lib/hooks/useWishlist';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import { EmptyState } from '@/components/ui/EmptyState';
+import Button from '@/components/ui/Button';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import EmptyState from '@/components/ui/EmptyState';
 import { Heart, ShoppingCart, Trash2 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -24,9 +24,12 @@ export default function WishlistPage() {
     return (
       <div className="container mx-auto p-4 sm:p-6 lg:p-8">
         <EmptyState
-          message="Debes iniciar sesión para ver tu lista de favoritos"
-          actionLabel="Iniciar Sesión"
-          actionHref="/auth/login"
+          title="Inicia sesión para continuar"
+          description="Debes iniciar sesión para ver tu lista de favoritos"
+          action={{
+            label: "Iniciar Sesión",
+            onClick: () => window.location.href = '/auth/sign-in'
+          }}
         />
       </div>
     );
@@ -61,10 +64,12 @@ export default function WishlistPage() {
         <Card>
           <CardContent className="py-12">
             <EmptyState
-              message="No tienes productos en tu lista de favoritos"
+              title="No tienes productos en tu lista de favoritos"
               description="Agrega productos a tu lista de favoritos para guardarlos para más tarde"
-              actionLabel="Explorar Productos"
-              actionHref="/products"
+              action={{
+                label: "Explorar Productos",
+                onClick: () => window.location.href = '/'
+              }}
             />
           </CardContent>
         </Card>
@@ -114,8 +119,6 @@ export default function WishlistPage() {
                 <div className="flex gap-2">
                   <AddToCartButton
                     productId={product.id}
-                    className="flex-1"
-                    variant="primary"
                   />
                   <Button
                     variant="outline"

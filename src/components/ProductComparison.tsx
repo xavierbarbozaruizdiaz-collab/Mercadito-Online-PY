@@ -6,10 +6,10 @@
 import { Product } from '@/types';
 import {
   ProductComparisonService,
-  ProductComparison,
+  type ProductComparison,
 } from '@/lib/services/productComparisonService';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/Card';
-import { Button } from './ui/Button';
+import Button from './ui/Button';
 import { X, ShoppingCart } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -133,8 +133,6 @@ export default function ProductComparison({
                       <div className="flex flex-col gap-2 items-center">
                         <AddToCartButton
                           productId={product.id}
-                          className="w-full"
-                          size="sm"
                         />
                         <Link href={`/products/${product.id}`}>
                           <Button variant="outline" size="sm" className="w-full">

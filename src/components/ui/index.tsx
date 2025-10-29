@@ -7,110 +7,28 @@
 
 import React from 'react';
 import { cn } from '@/lib/utils';
+import { Card } from './Card';
+import ButtonDefault from './Button';
 
 // Componentes externos
 export { default as SearchBar } from './SearchBar';
 export { default as SearchResults } from './SearchResults';
 export { default as SearchSuggestions } from './SearchSuggestions';
 
+// Re-exportar componentes que usan default export
+export { default as EmptyState } from './EmptyState';
+export { default as LoadingSpinner } from './LoadingSpinner';
+export { default as Button } from './Button';
+
+// Re-exportar componentes con named exports de Card.tsx
+export { Card, CardHeader, CardContent, CardFooter, CardTitle } from './Card';
+
+// Re-exportar ProductCard con nombre específico para evitar conflictos
+export { ProductCardComponent as ProductCard } from './';
+
 // ============================================
-// COMPONENTES BASE
+// COMPONENTES BASE (definidos directamente aquí)
 // ============================================
-
-interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'destructive';
-  size?: 'sm' | 'md' | 'lg';
-  loading?: boolean;
-}
-
-export function Button({ 
-  className, 
-  variant = 'primary', 
-  size = 'md', 
-  loading = false,
-  children, 
-  disabled,
-  ...props 
-}: ButtonProps) {
-  const baseClasses = 'inline-flex items-center justify-center rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed';
-  
-  const variants = {
-    primary: 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500',
-    secondary: 'bg-gray-600 text-white hover:bg-gray-700 focus:ring-gray-500',
-    outline: 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 focus:ring-blue-500',
-    ghost: 'text-gray-700 hover:bg-gray-100 focus:ring-gray-500',
-    destructive: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500',
-  };
-  
-  const sizes = {
-    sm: 'px-3 py-1.5 text-sm',
-    md: 'px-4 py-2 text-sm',
-    lg: 'px-6 py-3 text-base',
-  };
-
-  return (
-    <button
-      className={cn(baseClasses, variants[variant], sizes[size], className)}
-      disabled={disabled || loading}
-      {...props}
-    >
-      {loading && (
-        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2" />
-      )}
-      {children}
-    </button>
-  );
-}
-
-interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
-  variant?: 'default' | 'outlined' | 'elevated';
-}
-
-export function Card({ className, variant = 'default', children, ...props }: CardProps) {
-  const variants = {
-    default: 'bg-white rounded-lg shadow-sm border',
-    outlined: 'bg-white rounded-lg border border-gray-200',
-    elevated: 'bg-white rounded-lg shadow-lg',
-  };
-
-  return (
-    <div className={cn(variants[variant], className)} {...props}>
-      {children}
-    </div>
-  );
-}
-
-export function CardHeader({ className, children, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return (
-    <div className={cn('p-6 pb-4', className)} {...props}>
-      {children}
-    </div>
-  );
-}
-
-export function CardTitle({ className, children, ...props }: React.HTMLAttributes<HTMLHeadingElement>) {
-  return (
-    <h3 className={cn('text-lg font-semibold text-gray-900', className)} {...props}>
-      {children}
-    </h3>
-  );
-}
-
-export function CardContent({ className, children, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return (
-    <div className={cn('p-6 pt-0', className)} {...props}>
-      {children}
-    </div>
-  );
-}
-
-export function CardFooter({ className, children, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return (
-    <div className={cn('p-6 pt-4 border-t', className)} {...props}>
-      {children}
-    </div>
-  );
-}
 
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;
@@ -291,7 +209,7 @@ interface ProductCardProps {
   onClick?: () => void;
 }
 
-export function ProductCard({ product, onClick }: ProductCardProps) {
+export function ProductCardComponent({ product, onClick }: ProductCardProps) {
   const conditionLabels = {
     new: 'Nuevo',
     like_new: 'Como nuevo',
@@ -305,8 +223,11 @@ export function ProductCard({ product, onClick }: ProductCardProps) {
     negotiable: 'Negociable',
   };
 
+  // Importar Card dinámicamente
+  const CardComponent = Card;
+
   return (
-    <Card 
+    <CardComponent 
       className="cursor-pointer hover:shadow-md transition-shadow"
       onClick={onClick}
     >
@@ -351,7 +272,7 @@ export function ProductCard({ product, onClick }: ProductCardProps) {
           <span>{new Date(product.created_at).toLocaleDateString('es-PY')}</span>
         </div>
       </div>
-    </Card>
+    </CardComponent>
   );
 }
 
@@ -411,9 +332,9 @@ export function StoreCard({ store, productCount, onClick }: StoreCardProps) {
           <Badge variant="success" size="sm">
             {productCount || 0} productos
           </Badge>
-          <Button variant="outline" size="sm">
+          <ButtonDefault variant="outline" size="sm">
             Ver Tienda
-          </Button>
+          </ButtonDefault>
         </div>
       </div>
     </Card>
@@ -519,9 +440,9 @@ export function SearchFilters({ filters, categories, onFiltersChange, onSearch }
         </div>
 
         <div className="flex justify-end">
-          <Button onClick={onSearch} className="w-full md:w-auto">
+          <ButtonDefault onClick={onSearch} className="w-full md:w-auto">
             Buscar Productos
-          </Button>
+          </ButtonDefault>
         </div>
       </div>
     </Card>
@@ -565,88 +486,39 @@ export function Pagination({ currentPage, totalPages, onPageChange }: Pagination
 
   return (
     <div className="flex items-center justify-center space-x-2">
-      <Button
+      <ButtonDefault
         variant="outline"
         size="sm"
         onClick={() => onPageChange(currentPage - 1)}
         disabled={currentPage === 1}
       >
         Anterior
-      </Button>
+      </ButtonDefault>
       
       {getVisiblePages().map((page, index) => (
         <React.Fragment key={index}>
           {page === '...' ? (
             <span className="px-3 py-2 text-gray-500">...</span>
           ) : (
-            <Button
+            <ButtonDefault
               variant={currentPage === page ? 'primary' : 'outline'}
               size="sm"
               onClick={() => onPageChange(page as number)}
             >
               {page}
-            </Button>
+            </ButtonDefault>
           )}
         </React.Fragment>
       ))}
       
-      <Button
+      <ButtonDefault
         variant="outline"
         size="sm"
         onClick={() => onPageChange(currentPage + 1)}
         disabled={currentPage === totalPages}
       >
         Siguiente
-      </Button>
-    </div>
-  );
-}
-
-interface LoadingSpinnerProps {
-  size?: 'sm' | 'md' | 'lg';
-  text?: string;
-}
-
-export function LoadingSpinner({ size = 'md', text }: LoadingSpinnerProps) {
-  const sizes = {
-    sm: 'w-4 h-4',
-    md: 'w-8 h-8',
-    lg: 'w-12 h-12',
-  };
-
-  return (
-    <div className="flex flex-col items-center justify-center space-y-2">
-      <div className={`animate-spin rounded-full border-b-2 border-blue-600 ${sizes[size]}`} />
-      {text && <p className="text-sm text-gray-600">{text}</p>}
-    </div>
-  );
-}
-
-interface EmptyStateProps {
-  title: string;
-  description: string;
-  action?: {
-    label: string;
-    onClick: () => void;
-  };
-  icon?: React.ReactNode;
-}
-
-export function EmptyState({ title, description, action, icon }: EmptyStateProps) {
-  return (
-    <div className="text-center py-12">
-      {icon && (
-        <div className="mx-auto w-16 h-16 text-gray-300 mb-4">
-          {icon}
-        </div>
-      )}
-      <h3 className="text-lg font-medium text-gray-900 mb-2">{title}</h3>
-      <p className="text-gray-600 mb-6">{description}</p>
-      {action && (
-        <Button onClick={action.onClick}>
-          {action.label}
-        </Button>
-      )}
+      </ButtonDefault>
     </div>
   );
 }

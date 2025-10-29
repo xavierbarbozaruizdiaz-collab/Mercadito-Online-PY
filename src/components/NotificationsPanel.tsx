@@ -21,21 +21,13 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { supabase } from '@/lib/supabase/client';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { es } from 'date-fns/locale';
+import type { Notification } from '@/lib/services/notificationService';
 
 // ============================================
 // TIPOS
 // ============================================
 
-interface Notification {
-  id: string;
-  user_id: string;
-  type: 'message' | 'order' | 'review' | 'system';
-  title: string;
-  content: string;
-  data?: Record<string, any>;
-  is_read: boolean;
-  created_at: string;
-}
+// Usar el tipo exportado del servicio
 
 // ============================================
 // COMPONENTE
@@ -196,7 +188,7 @@ export default function NotificationsPanel() {
                     onClick={() => markAsRead(notification.id)}
                   >
                     <div className="flex-shrink-0 mr-3">
-                      {notificationIcons[notification.type] || notificationIcons.system}
+                      {notificationIcons[notification.type as keyof typeof notificationIcons] || notificationIcons.system}
                     </div>
                     <div className="flex-1">
                       <h4 className="font-medium text-gray-900">{notification.title}</h4>

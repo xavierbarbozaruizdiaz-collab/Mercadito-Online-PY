@@ -6,11 +6,8 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { ReferralService, UserReferralCode, Referral } from '@/lib/services/referralService';
-import { Card, CardHeader, CardTitle, CardContent } from './ui/Card';
-import { Button } from './ui/Button';
-import { Input } from './ui/Input';
-import { Label } from './ui/Label';
-import { Badge } from './ui/Badge';
+import { Card, CardHeader, CardTitle, CardContent, Input, Badge } from './ui';
+import Button from './ui/Button';
 import { Gift, Users, DollarSign, Copy, Check, Share2 } from 'lucide-react';
 import LoadingSpinner from './ui/LoadingSpinner';
 import ShareButton from './ShareButton';
@@ -127,7 +124,7 @@ export default function ReferralProgram() {
 
             <div className="space-y-4">
               <div>
-                <Label htmlFor="referral-code">Tu código de referido</Label>
+                <label htmlFor="referral-code" className="block text-sm font-medium text-gray-700 mb-2">Tu código de referido</label>
                 <div className="flex gap-2 mt-2">
                   <Input
                     id="referral-code"
@@ -152,7 +149,7 @@ export default function ReferralProgram() {
               </div>
 
               <div>
-                <Label htmlFor="referral-link">Enlace de referido</Label>
+                <label htmlFor="referral-link" className="block text-sm font-medium text-gray-700 mb-2">Enlace de referido</label>
                 <div className="flex gap-2 mt-2">
                   <Input
                     id="referral-link"

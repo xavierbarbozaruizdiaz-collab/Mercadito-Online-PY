@@ -7,7 +7,7 @@ import { useState } from 'react';
 import { Heart } from 'lucide-react';
 import { useWishlist } from '@/lib/hooks/useWishlist';
 import { useAuth } from '@/lib/hooks/useAuth';
-import { Button } from './ui/Button';
+import { Button } from './ui';
 import { cn } from '@/lib/utils';
 
 interface WishlistButtonProps {

@@ -4,11 +4,6 @@ import { withSentryConfig } from "@sentry/nextjs";
 const nextConfig: NextConfig = {
   /* config options here */
   
-  // Habilitar instrumentation (para Sentry)
-  experimental: {
-    instrumentationHook: true,
-  },
-  
   // Headers de seguridad
   async headers() {
     return [
@@ -66,15 +61,6 @@ const nextConfig: NextConfig = {
   },
 };
 
-// Wrappear con Sentry solo si está configurado
-export default process.env.NEXT_PUBLIC_SENTRY_DSN
-  ? withSentryConfig(nextConfig, {
-      // Configuración de Sentry
-      silent: true,
-      org: process.env.SENTRY_ORG,
-      project: process.env.SENTRY_PROJECT,
-      widenClientFileUpload: true,
-      hideSourceMaps: true,
-      disableLogger: true,
-    })
-  : nextConfig;
+// Sentry está opcional - solo wrappear si está completamente configurado
+// Para habilitarlo, agrega NEXT_PUBLIC_SENTRY_DSN, SENTRY_ORG, y SENTRY_PROJECT
+export default nextConfig;

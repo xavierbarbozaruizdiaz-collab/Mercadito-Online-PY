@@ -6,7 +6,7 @@
 import { useEffect, useState } from 'react';
 import { ShippingService, Shipment, ShipmentEvent } from '@/lib/services/shippingService';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/Card';
-import { LoadingSpinner } from './ui/LoadingSpinner';
+import LoadingSpinner from './ui/LoadingSpinner';
 import { Package, MapPin, Clock, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
