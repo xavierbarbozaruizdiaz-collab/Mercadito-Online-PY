@@ -523,19 +523,23 @@ export default function ProductsListClient() {
                         <Link
                           href={`/store/${product.store.slug}`}
                           onClick={(e) => e.stopPropagation()}
-                          className="text-sm text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1 cursor-pointer"
+                          className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline transition-colors cursor-pointer"
                         >
                           <span>🏪</span>
-                          <span className="font-medium">{product.store.name}</span>
+                          <span>{product.store.name}</span>
                         </Link>
                       ) : product.seller ? (
                         <Link
                           href={`/seller/${product.seller.id}`}
-                          onClick={(e) => e.stopPropagation()}
-                          className="text-sm text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1 cursor-pointer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            window.location.href = `/seller/${product.seller.id}`;
+                          }}
+                          className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline transition-colors cursor-pointer"
                         >
                           <span>👤</span>
-                          <span className="font-medium">
+                          <span>
                             {product.seller.first_name || product.seller.last_name 
                               ? `${product.seller.first_name || ''} ${product.seller.last_name || ''}`.trim()
                               : product.seller.username || 'Vendedor'}

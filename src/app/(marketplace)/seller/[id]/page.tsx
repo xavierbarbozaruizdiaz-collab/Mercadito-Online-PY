@@ -1,123 +1,238 @@
 // ============================================
 // MERCADITO ONLINE PY - SELLER PROFILE PAGE
-// Página de perfil público de vendedor
+// Página de perfil público de vendedor estilo Facebook Marketplace
 // ============================================
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import Image from 'next/image';
 import Link from 'next/link';
-import { 
-  Card, 
-  CardContent, 
-  CardHeader, 
-  CardTitle,
-  Button,
-  Badge,
-  Avatar,
-  LoadingSpinner,
-  EmptyState,
-  Pagination
-} from '@/components/ui';
-import { useSellerProfile } from '@/lib/hooks/useSellerProfile';
+import { supabase } from '@/lib/supabaseClient';
 import { 
   Star,
   MapPin,
-  Phone,
-  Globe,
-  Facebook,
-  Instagram,
-  Twitter,
-  Linkedin,
-  Package,
-  TrendingUp,
-  Users,
+  Search,
+  Filter,
   MessageCircle,
-  Heart,
-  Share2,
+  Phone,
   Calendar,
-  Award,
-  Clock,
   CheckCircle,
-  XCircle
+  Package,
+  ShoppingBag,
+  TrendingUp,
+  Award,
+  X
 } from 'lucide-react';
 
-// ============================================
-// COMPONENTE PRINCIPAL
-// ============================================
+interface Profile {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  username: string | null;
+  avatar_url: string | null;
+  cover_url: string | null;
+  bio: string | null;
+  location: string | null;
+  phone: string | null;
+  verified: boolean;
+  created_at: string;
+  email?: string;
+}
+
+interface Product {
+  id: string;
+  title: string;
+  description: string | null;
+  price: number;
+  cover_url: string | null;
+  condition: string;
+  sale_type: string;
+  created_at: string;
+}
+
+interface Category {
+  id: string;
+  name: string;
+}
 
 export default function SellerProfilePage() {
   const params = useParams();
   const router = useRouter();
   const sellerId = params.id as string;
   
-  const [activeTab, setActiveTab] = useState<'products' | 'reviews' | 'about'>('products');
-  const [isFollowing, setIsFollowing] = useState(false);
-  const [isFavorited, setIsFavorited] = useState(false);
-
-  const {
-    profile,
-    stats,
-    products,
-    reviews,
-    loading,
-    error,
-    productsPagination,
-    reviewsPagination,
-    loadProducts,
-    loadReviews,
-  } = useSellerProfile({
-    sellerId,
-    autoLoad: true,
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  // Estado para búsqueda y filtros
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filters, setFilters] = useState({
+    category: '',
+    minPrice: '',
+    maxPrice: '',
+    condition: '',
+    saleType: '',
   });
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [rating, setRating] = useState(0);
+  const [totalReviews, setTotalReviews] = useState(0);
 
-  // Manejar cambio de página de productos
-  const handleProductsPageChange = (page: number) => {
-    loadProducts({ page });
-  };
+  // Cargar perfil del vendedor
+  useEffect(() => {
+    loadProfile();
+  }, [sellerId]);
 
-  // Manejar cambio de página de reseñas
-  const handleReviewsPageChange = (page: number) => {
-    loadReviews({ page });
-  };
-
-  // Manejar clic en producto
-  const handleProductClick = (productId: string) => {
-    router.push(`/products/${productId}`);
-  };
-
-  // Manejar seguir vendedor
-  const handleFollow = () => {
-    setIsFollowing(!isFollowing);
-    // En una implementación real, esto haría una llamada a la API
-  };
-
-  // Manejar agregar a favoritos
-  const handleFavorite = () => {
-    setIsFavorited(!isFavorited);
-    // En una implementación real, esto haría una llamada a la API
-  };
-
-  // Manejar compartir perfil
-  const handleShare = () => {
-    if (navigator.share) {
-      navigator.share({
-        title: `Perfil de ${(profile as any)?.store_name || 'Vendedor'}`,
-        text: `Mira el perfil de ${(profile as any)?.store_name || 'este vendedor'} en Mercadito Online PY`,
-        url: window.location.href,
-      });
-    } else {
-      navigator.clipboard.writeText(window.location.href);
-      // Mostrar notificación de copiado
+  // Cargar productos cuando cambian los filtros
+  useEffect(() => {
+    if (profile) {
+      loadProducts();
     }
-  };
+  }, [sellerId, filters, searchQuery]);
+
+  // Cargar categorías
+  useEffect(() => {
+    loadCategories();
+  }, []);
+
+  async function loadProfile() {
+    setLoading(true);
+    setError(null);
+
+    try {
+      // Obtener perfil del vendedor
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, username, avatar_url, cover_url, bio, location, phone, verified, created_at, email')
+        .eq('id', sellerId)
+        .single();
+
+      if (profileError) {
+        throw profileError;
+      }
+
+      if (!profileData) {
+        throw new Error('Vendedor no encontrado');
+      }
+
+      setProfile(profileData as Profile);
+
+      // Calcular calificación promedio (simulado por ahora)
+      const { data: reviewsData } = await supabase
+        .from('reviews')
+        .select('rating')
+        .eq('seller_id', sellerId);
+
+      if (reviewsData && reviewsData.length > 0) {
+        const avgRating = reviewsData.reduce((sum, r) => sum + (r.rating || 0), 0) / reviewsData.length;
+        setRating(avgRating);
+        setTotalReviews(reviewsData.length);
+      }
+    } catch (err: any) {
+      console.error('Error loading profile:', err);
+      setError(err.message || 'Error al cargar el perfil del vendedor');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function loadCategories() {
+    try {
+      const { data } = await supabase
+        .from('categories')
+        .select('id, name')
+        .order('name');
+      
+      if (data) {
+        setCategories(data);
+      }
+    } catch (err) {
+      console.error('Error loading categories:', err);
+    }
+  }
+
+  async function loadProducts() {
+    try {
+      let query = supabase
+        .from('products')
+        .select('id, title, description, price, cover_url, condition, sale_type, created_at')
+        .eq('seller_id', sellerId)
+        .eq('status', 'active');
+
+      // Aplicar búsqueda
+      if (searchQuery.trim()) {
+        query = query.or(`title.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%`);
+      }
+
+      // Aplicar filtros
+      if (filters.category) {
+        query = query.eq('category_id', filters.category);
+      }
+
+      if (filters.minPrice) {
+        query = query.gte('price', parseFloat(filters.minPrice));
+      }
+
+      if (filters.maxPrice) {
+        query = query.lte('price', parseFloat(filters.maxPrice));
+      }
+
+      if (filters.condition) {
+        query = query.eq('condition', filters.condition);
+      }
+
+      if (filters.saleType) {
+        query = query.eq('sale_type', filters.saleType);
+      }
+
+      const { data: productsData, error: productsError } = await query
+        .order('created_at', { ascending: false });
+
+      if (productsError) {
+        throw productsError;
+      }
+
+      setProducts(productsData || []);
+      setAllProducts(productsData || []);
+    } catch (err: any) {
+      console.error('Error loading products:', err);
+    }
+  }
+
+  function updateFilter(key: string, value: string) {
+    setFilters(prev => ({ ...prev, [key]: value }));
+  }
+
+  function clearFilters() {
+    setFilters({
+      category: '',
+      minPrice: '',
+      maxPrice: '',
+      condition: '',
+      saleType: '',
+    });
+    setSearchQuery('');
+  }
+
+  function getWhatsAppLink() {
+    if (!profile?.phone) return '#';
+    // Formatear número para WhatsApp (remover espacios, guiones, etc.)
+    const phone = profile.phone.replace(/\D/g, '');
+    return `https://wa.me/${phone}`;
+  }
+
+  const hasActiveFilters = Object.values(filters).some(v => v !== '') || searchQuery.trim() !== '';
 
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <LoadingSpinner size="lg" text="Cargando perfil del vendedor..." />
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Cargando perfil del vendedor...</p>
+        </div>
       </div>
     );
   }
@@ -125,416 +240,344 @@ export default function SellerProfilePage() {
   if (error || !profile) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <EmptyState
-          title="Vendedor no encontrado"
-          description="El perfil del vendedor que buscas no existe o ha sido eliminado."
-          action={{
-            label: 'Volver al inicio',
-            onClick: () => router.push('/'),
-          }}
-          icon={<Users className="w-16 h-16" />}
-        />
+        <div className="text-center">
+          <div className="text-6xl mb-4">😕</div>
+          <h2 className="text-xl font-medium text-gray-600 mb-2">Vendedor no encontrado</h2>
+          <p className="text-gray-500 mb-4">{error || 'El perfil que buscas no existe'}</p>
+          <Link
+            href="/"
+            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+          >
+            Volver al inicio
+          </Link>
+        </div>
       </div>
     );
   }
 
+  const sellerName = profile.first_name || profile.last_name
+    ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim()
+    : profile.username || 'Vendedor';
+
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header del perfil */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="flex flex-col md:flex-row items-start md:items-center space-y-4 md:space-y-0 md:space-x-6">
-            {/* Avatar */}
+      {/* Foto de Portada */}
+      <div className="relative h-64 sm:h-80 bg-gradient-to-br from-purple-400 to-blue-500">
+        {profile.cover_url ? (
+          <img
+            src={profile.cover_url}
+            alt={sellerName}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <div className="text-white text-center">
+              <Package className="w-16 h-16 mx-auto mb-2 opacity-50" />
+              <p className="text-lg opacity-75">Foto de Portada</p>
+            </div>
+          </div>
+        )}
+        
+        {/* Avatar y nombre superpuesto */}
+        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-4 sm:p-6">
+          <div className="max-w-7xl mx-auto flex items-end space-x-4">
             <div className="relative">
-              <Avatar
-                src={profile.avatar_url}
-                fallback={(profile as any)?.full_name?.charAt(0)?.toUpperCase() || 'V'}
-                size="xl"
-                className="border-4 border-white shadow-lg"
+              <img
+                src={profile.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(sellerName)}&background=6366f1&color=fff`}
+                alt={sellerName}
+                className="w-20 h-20 sm:w-24 sm:h-24 rounded-full border-4 border-white shadow-lg object-cover bg-white"
               />
-              {(profile as any)?.verified && (
-                <div className="absolute -bottom-2 -right-2 bg-blue-600 text-white rounded-full p-1">
+              {profile.verified && (
+                <div className="absolute -bottom-1 -right-1 bg-blue-600 text-white rounded-full p-1">
                   <CheckCircle className="w-5 h-5" />
                 </div>
               )}
             </div>
-
-            {/* Información principal */}
-            <div className="flex-1">
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between">
-                <div>
-                  <h1 className="text-3xl font-bold text-gray-900 flex items-center">
-                    {(profile as any)?.full_name || 'Vendedor'}
-                    {(profile as any)?.verified && (
-                      <Badge variant="success" size="sm" className="ml-2">
-                        <Award className="w-3 h-3 mr-1" />
-                        Verificado
-                      </Badge>
+            <div className="flex-1 text-white pb-2">
+              <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
+                {sellerName}
+                {profile.verified && (
+                  <span className="text-xs bg-blue-600 px-2 py-1 rounded-full flex items-center gap-1">
+                    <Award className="w-3 h-3" />
+                    Verificado
+                  </span>
+                )}
+              </h1>
+              <div className="flex flex-wrap items-center gap-4 mt-2 text-sm">
+                {rating > 0 && (
+                  <div className="flex items-center">
+                    <Star className="w-4 h-4 text-yellow-400 fill-yellow-400 mr-1" />
+                    <span className="font-medium">{rating.toFixed(1)}</span>
+                    {totalReviews > 0 && (
+                      <span className="ml-1 opacity-90">({totalReviews})</span>
                     )}
-                  </h1>
-                  
-                  <div className="flex items-center space-x-4 mt-2 text-gray-600">
-                    <div className="flex items-center">
-                      <Star className="w-4 h-4 text-yellow-500 mr-1" />
-                      <span className="font-medium">{(profile as any)?.rating?.toFixed(1) || '0.0'}</span>
-                      <span className="text-sm ml-1">({(profile as any)?.total_reviews || 0} reseñas)</span>
-                    </div>
-                    
-                    <div className="flex items-center">
-                      <Calendar className="w-4 h-4 mr-1" />
-                      <span className="text-sm">Miembro desde {new Date((profile as any)?.member_since || Date.now()).getFullYear()}</span>
-                    </div>
-                    
-                    <div className="flex items-center">
-                      <Clock className="w-4 h-4 mr-1" />
-                      <span className="text-sm">Activo {new Date((profile as any)?.last_active || Date.now()).toLocaleDateString()}</span>
-                    </div>
                   </div>
-
-                  {profile.location && (
-                    <div className="flex items-center mt-2 text-gray-600">
-                      <MapPin className="w-4 h-4 mr-1" />
-                      <span>{profile.location}</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Acciones */}
-                <div className="flex items-center space-x-2 mt-4 md:mt-0">
-                  <Button
-                    variant="outline"
-                    onClick={handleFollow}
-                    className={isFollowing ? 'bg-blue-600 text-white' : ''}
-                  >
-                    {isFollowing ? 'Siguiendo' : 'Seguir'}
-                  </Button>
-                  
-                  <Button
-                    variant="outline"
-                    onClick={handleFavorite}
-                    className={isFavorited ? 'text-red-500' : ''}
-                  >
-                    <Heart className={`w-4 h-4 ${isFavorited ? 'fill-current' : ''}`} />
-                  </Button>
-                  
-                  <Button variant="outline" onClick={handleShare}>
-                    <Share2 className="w-4 h-4" />
-                  </Button>
+                )}
+                {profile.location && (
+                  <div className="flex items-center">
+                    <MapPin className="w-4 h-4 mr-1" />
+                    <span>{profile.location}</span>
+                  </div>
+                )}
+                <div className="flex items-center">
+                  <Calendar className="w-4 h-4 mr-1" />
+                  <span>Miembro desde {new Date(profile.created_at).getFullYear()}</span>
                 </div>
               </div>
+            </div>
+            <div className="pb-2">
+              {profile.phone && (
+                <a
+                  href={getWhatsAppLink()}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition-colors font-medium"
+                >
+                  <MessageCircle className="w-5 h-5" />
+                  <span className="hidden sm:inline">WhatsApp</span>
+                </a>
+              )}
             </div>
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          {/* Sidebar */}
-          <div className="lg:col-span-1 space-y-6">
-            {/* Estadísticas */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <TrendingUp className="w-5 h-5 mr-2" />
-                  Estadísticas
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {stats && (
-                  <>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Productos</span>
-                      <span className="font-medium">{stats.total_products}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Ventas</span>
-                      <span className="font-medium">{stats.total_sales}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Calificación</span>
-                      <span className="font-medium">{stats.average_rating.toFixed(1)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Respuesta</span>
-                      <span className="font-medium">{stats.response_rate}%</span>
-                    </div>
-                  </>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Información de contacto */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Información de Contacto</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {profile.phone && (
-                  <div className="flex items-center text-gray-600">
-                    <Phone className="w-4 h-4 mr-2" />
-                    <span>{profile.phone}</span>
-                  </div>
-                )}
-                
-                {(profile as any)?.website && (
-                  <div className="flex items-center text-gray-600">
-                    <Globe className="w-4 h-4 mr-2" />
-                    <a href={(profile as any)?.website} target="_blank" rel="noopener noreferrer" className="hover:text-blue-600">
-                      Sitio web
-                    </a>
-                  </div>
-                )}
-
-                {(profile as any)?.social_links && (
-                  <div className="flex items-center space-x-2">
-                    {(profile as any)?.social_links?.facebook && (
-                      <a href={(profile as any)?.social_links?.facebook} target="_blank" rel="noopener noreferrer">
-                        <Facebook className="w-5 h-5 text-blue-600 hover:text-blue-700" />
-                      </a>
-                    )}
-                    {(profile as any)?.social_links?.instagram && (
-                      <a href={(profile as any)?.social_links?.instagram} target="_blank" rel="noopener noreferrer">
-                        <Instagram className="w-5 h-5 text-pink-600 hover:text-pink-700" />
-                      </a>
-                    )}
-                    {(profile as any)?.social_links?.twitter && (
-                      <a href={(profile as any)?.social_links?.twitter} target="_blank" rel="noopener noreferrer">
-                        <Twitter className="w-5 h-5 text-blue-400 hover:text-blue-500" />
-                      </a>
-                    )}
-                    {(profile as any)?.social_links?.linkedin && (
-                      <a href={(profile as any)?.social_links?.linkedin} target="_blank" rel="noopener noreferrer">
-                        <Linkedin className="w-5 h-5 text-blue-700 hover:text-blue-800" />
-                      </a>
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Botón de contacto */}
-            <Button className="w-full" size="lg">
-              <MessageCircle className="w-4 h-4 mr-2" />
-              Contactar Vendedor
-            </Button>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {/* Buscador y Filtros */}
+        <div className="bg-white rounded-lg border shadow-sm p-4 sm:p-6 mb-6">
+          {/* Buscador */}
+          <div className="relative mb-4">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <input
+              type="text"
+              placeholder="Buscar productos de este vendedor..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
           </div>
 
-          {/* Contenido principal */}
-          <div className="lg:col-span-3">
-            {/* Tabs */}
-            <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg mb-6">
+          {/* Filtros - Acordeón */}
+          <div>
+            <div className="flex items-center justify-between mb-4">
               <button
-                onClick={() => setActiveTab('products')}
-                className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-                  activeTab === 'products'
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
+                onClick={() => setFiltersOpen(!filtersOpen)}
+                className="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-blue-600 transition-colors"
               >
-                <Package className="w-4 h-4 inline mr-2" />
-                Productos ({productsPagination.total})
+                <Filter className="w-4 h-4" />
+                <span>Filtros</span>
+                {hasActiveFilters && (
+                  <span className="ml-1 px-1.5 py-0.5 text-xs bg-blue-100 text-blue-700 rounded-full">
+                    {Object.values(filters).filter(v => v !== '').length + (searchQuery ? 1 : 0)}
+                  </span>
+                )}
               </button>
-              <button
-                onClick={() => setActiveTab('reviews')}
-                className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-                  activeTab === 'reviews'
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                <Star className="w-4 h-4 inline mr-2" />
-                Reseñas ({reviewsPagination.total})
-              </button>
-              <button
-                onClick={() => setActiveTab('about')}
-                className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-                  activeTab === 'about'
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                <Users className="w-4 h-4 inline mr-2" />
-                Acerca de
-              </button>
+              {hasActiveFilters && (
+                <button
+                  onClick={clearFilters}
+                  className="text-sm text-blue-600 hover:text-blue-800 underline"
+                >
+                  Limpiar
+                </button>
+              )}
             </div>
 
-            {/* Contenido de las tabs */}
-            {activeTab === 'products' && (
-              <div className="space-y-6">
-                {products.length > 0 ? (
-                  <>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {products.map((product) => (
-                        <Card
-                          key={product.id}
-                          className="cursor-pointer hover:shadow-md transition-shadow"
-                          onClick={() => handleProductClick(product.id)}
-                        >
-                          <div className="relative w-full h-48">
-                            <Image
-                              src={(product as any)?.cover_url || '/placeholder-product.png'}
-                              alt={product.title}
-                              fill
-                              className="object-cover rounded-t-lg"
-                            />
-                            <div className="absolute top-2 left-2">
-                              <Badge variant="info" size="sm">
-                                {product.condition}
-                              </Badge>
-                            </div>
-                          </div>
-                          <CardContent className="p-4">
-                            <h3 className="font-semibold text-gray-900 line-clamp-2 mb-2">
-                              {product.title}
-                            </h3>
-                            <div className="flex items-center justify-between">
-                              <span className="text-lg font-bold text-gray-900">
-                                Gs. {product.price.toLocaleString('es-PY')}
-                              </span>
-                              <Badge variant="default" size="sm">
-                                {product.sale_type}
-                              </Badge>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-
-                    {/* Paginación de productos */}
-                    {productsPagination.total_pages > 1 && (
-                      <div className="flex justify-center">
-                        <Pagination
-                          currentPage={productsPagination.page}
-                          totalPages={productsPagination.total_pages}
-                          onPageChange={handleProductsPageChange}
-                        />
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <EmptyState
-                    title="No hay productos"
-                    description="Este vendedor aún no ha publicado productos."
-                    icon={<Package className="w-16 h-16" />}
-                  />
-                )}
+            <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 transition-all duration-300 overflow-hidden ${
+              filtersOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0 hidden'
+            }`}>
+              {/* Categoría */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Categoría
+                </label>
+                <select
+                  value={filters.category}
+                  onChange={(e) => updateFilter('category', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 text-sm"
+                >
+                  <option value="">Todas</option>
+                  {categories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </option>
+                  ))}
+                </select>
               </div>
-            )}
 
-            {activeTab === 'reviews' && (
-              <div className="space-y-6">
-                {reviews.length > 0 ? (
-                  <>
-                    <div className="space-y-4">
-                      {reviews.map((review) => (
-                        <Card key={review.id}>
-                          <CardContent className="p-4">
-                            <div className="flex items-start space-x-3">
-                              <Avatar
-                                src={review.buyer.avatar_url || undefined}
-                                fallback={review.buyer.full_name.charAt(0).toUpperCase()}
-                                size="md"
-                              />
-                              <div className="flex-1">
-                                <div className="flex items-center justify-between mb-2">
-                                  <h4 className="font-medium text-gray-900">
-                                    {review.buyer.full_name}
-                                  </h4>
-                                  <div className="flex items-center">
-                                    {[...Array(5)].map((_, i) => (
-                                      <Star
-                                        key={i}
-                                        className={`w-4 h-4 ${
-                                          i < review.rating
-                                            ? 'text-yellow-500 fill-current'
-                                            : 'text-gray-300'
-                                        }`}
-                                      />
-                                    ))}
-                                  </div>
-                                </div>
-                                {review.comment && (
-                                  <p className="text-gray-600 mb-2">{review.comment}</p>
-                                )}
-                                <p className="text-sm text-gray-500">
-                                  {new Date(review.created_at).toLocaleDateString('es-PY')}
-                                </p>
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-
-                    {/* Paginación de reseñas */}
-                    {reviewsPagination.total_pages > 1 && (
-                      <div className="flex justify-center">
-                        <Pagination
-                          currentPage={reviewsPagination.page}
-                          totalPages={reviewsPagination.total_pages}
-                          onPageChange={handleReviewsPageChange}
-                        />
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <EmptyState
-                    title="No hay reseñas"
-                    description="Este vendedor aún no tiene reseñas de compradores."
-                    icon={<Star className="w-16 h-16" />}
-                  />
-                )}
+              {/* Precio Mínimo */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Precio Mín.
+                </label>
+                <input
+                  type="number"
+                  placeholder="0"
+                  value={filters.minPrice}
+                  onChange={(e) => updateFilter('minPrice', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 text-sm"
+                />
               </div>
-            )}
 
-            {activeTab === 'about' && (
-              <div className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Acerca de {(profile as any)?.full_name || 'este vendedor'}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {profile.bio ? (
-                      <p className="text-gray-600 leading-relaxed">{profile.bio}</p>
-                    ) : (
-                      <p className="text-gray-500 italic">
-                        Este vendedor aún no ha agregado una biografía.
-                      </p>
-                    )}
-                  </CardContent>
-                </Card>
-
-                {/* Información adicional */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Información del Vendedor</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Miembro desde</span>
-                      <span className="font-medium">
-                        {new Date((profile as any)?.member_since || Date.now()).toLocaleDateString('es-PY')}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Última actividad</span>
-                      <span className="font-medium">
-                        {new Date((profile as any)?.last_active || Date.now()).toLocaleDateString('es-PY')}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Estado</span>
-                      <Badge variant="success" size="sm">
-                        <CheckCircle className="w-3 h-3 mr-1" />
-                        Activo
-                      </Badge>
-                    </div>
-                  </CardContent>
-                </Card>
+              {/* Precio Máximo */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Precio Máx.
+                </label>
+                <input
+                  type="number"
+                  placeholder="Sin límite"
+                  value={filters.maxPrice}
+                  onChange={(e) => updateFilter('maxPrice', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 text-sm"
+                />
               </div>
-            )}
+
+              {/* Condición */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Condición
+                </label>
+                <select
+                  value={filters.condition}
+                  onChange={(e) => updateFilter('condition', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 text-sm"
+                >
+                  <option value="">Todas</option>
+                  <option value="nuevo">Nuevo</option>
+                  <option value="usado_como_nuevo">Usado como nuevo</option>
+                  <option value="usado">Usado</option>
+                </select>
+              </div>
+
+              {/* Tipo de Venta */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Tipo
+                </label>
+                <select
+                  value={filters.saleType}
+                  onChange={(e) => updateFilter('saleType', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 text-sm"
+                >
+                  <option value="">Todos</option>
+                  <option value="direct">Directa</option>
+                  <option value="auction">Subasta</option>
+                </select>
+              </div>
+            </div>
           </div>
         </div>
+
+        {/* Estadísticas Rápidas */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+          <div className="bg-white rounded-lg border p-4 text-center">
+            <Package className="w-6 h-6 text-blue-500 mx-auto mb-2" />
+            <div className="text-2xl font-bold text-gray-900">{products.length}</div>
+            <div className="text-sm text-gray-600">Productos</div>
+          </div>
+          <div className="bg-white rounded-lg border p-4 text-center">
+            <Star className="w-6 h-6 text-yellow-500 mx-auto mb-2" />
+            <div className="text-2xl font-bold text-gray-900">{rating > 0 ? rating.toFixed(1) : '0.0'}</div>
+            <div className="text-sm text-gray-600">Calificación</div>
+          </div>
+          <div className="bg-white rounded-lg border p-4 text-center">
+            <TrendingUp className="w-6 h-6 text-green-500 mx-auto mb-2" />
+            <div className="text-2xl font-bold text-gray-900">{totalReviews}</div>
+            <div className="text-sm text-gray-600">Reseñas</div>
+          </div>
+          <div className="bg-white rounded-lg border p-4 text-center">
+            <CheckCircle className="w-6 h-6 text-purple-500 mx-auto mb-2" />
+            <div className="text-2xl font-bold text-gray-900">{profile.verified ? 'Sí' : 'No'}</div>
+            <div className="text-sm text-gray-600">Verificado</div>
+          </div>
+        </div>
+
+        {/* Productos */}
+        {products.length > 0 ? (
+          <>
+            <div className="mb-4">
+              <p className="text-gray-600">
+                {products.length} producto{products.length !== 1 ? 's' : ''} encontrado{products.length !== 1 ? 's' : ''}
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {products.map((product) => (
+                <Link
+                  key={product.id}
+                  href={`/products/${product.id}`}
+                  className="bg-white rounded-lg shadow-sm border overflow-hidden hover:shadow-md transition-shadow"
+                >
+                  <div className="relative h-48 bg-gray-100">
+                    {product.cover_url ? (
+                      <img
+                        src={product.cover_url}
+                        alt={product.title}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-gray-400 text-4xl">
+                        📦
+                      </div>
+                    )}
+                    <div className="absolute top-2 left-2">
+                      <span className={`px-2 py-1 text-xs rounded-full ${
+                        product.condition === 'nuevo' 
+                          ? 'bg-green-100 text-green-800' 
+                          : product.condition === 'usado_como_nuevo'
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : 'bg-gray-100 text-gray-800'
+                      }`}>
+                        {product.condition === 'nuevo' ? 'Nuevo' : 
+                         product.condition === 'usado_como_nuevo' ? 'Usado como nuevo' : 'Usado'}
+                      </span>
+                    </div>
+                    <div className="absolute top-2 right-2">
+                      <span className={`px-2 py-1 text-xs rounded-full ${
+                        product.sale_type === 'auction' 
+                          ? 'bg-purple-100 text-purple-800' 
+                          : 'bg-blue-100 text-blue-800'
+                      }`}>
+                        {product.sale_type === 'auction' ? 'Subasta' : 'Directa'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="p-4">
+                    <h3 className="font-semibold text-lg mb-2 line-clamp-2 text-gray-900">
+                      {product.title}
+                    </h3>
+                    {product.description && (
+                      <p className="text-gray-600 text-sm mb-3 line-clamp-2">
+                        {product.description}
+                      </p>
+                    )}
+                    <div className="flex justify-between items-center">
+                      <p className="text-xl font-bold text-green-600">
+                        {product.price.toLocaleString('es-PY')} Gs.
+                      </p>
+                      <span className="text-sm text-gray-500">
+                        Ver →
+                      </span>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </>
+        ) : (
+          <div className="text-center py-12 bg-white rounded-lg border">
+            <div className="text-6xl mb-4">📦</div>
+            <h2 className="text-xl font-medium text-gray-600 mb-2">
+              No se encontraron productos
+            </h2>
+            <p className="text-gray-500">
+              {hasActiveFilters
+                ? 'Intenta ajustar los filtros de búsqueda'
+                : 'Este vendedor aún no ha publicado productos'}
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
