@@ -73,6 +73,7 @@ export default function StoresPage() {
 
   useEffect(() => {
     loadStores();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters]);
 
   async function loadCategories() {
