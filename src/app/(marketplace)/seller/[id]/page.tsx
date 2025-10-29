@@ -144,12 +144,12 @@ export default function SellerProfilePage() {
         }
       }
 
-      // Contar productos activos
+      // Contar productos - incluir productos sin status o con status activo
       const { count } = await supabase
         .from('products')
         .select('*', { count: 'exact', head: true })
         .eq('seller_id', sellerId)
-        .eq('status', 'active');
+        .or('status.is.null,status.eq.active');
       
       setTotalProducts(count || 0);
     } catch (err: any) {
@@ -181,7 +181,8 @@ export default function SellerProfilePage() {
         .from('products')
         .select('id, title, description, price, cover_url, condition, sale_type, created_at')
         .eq('seller_id', sellerId)
-        .eq('status', 'active');
+        // No filtrar por status - incluir productos sin status o con status activo
+        .or('status.is.null,status.eq.active');
 
       // Aplicar búsqueda
       if (searchQuery.trim()) {
