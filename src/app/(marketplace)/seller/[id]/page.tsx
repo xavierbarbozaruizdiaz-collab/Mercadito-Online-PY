@@ -120,16 +120,19 @@ export default function SellerProfilePage() {
 
       setProfile(profileData as Profile);
 
-      // Calcular calificación promedio (simulado por ahora)
+      // Calcular calificación promedio
       const { data: reviewsData } = await supabase
         .from('reviews')
         .select('rating')
         .eq('seller_id', sellerId);
 
       if (reviewsData && reviewsData.length > 0) {
-        const avgRating = reviewsData.reduce((sum, r) => sum + (r.rating || 0), 0) / reviewsData.length;
-        setRating(avgRating);
-        setTotalReviews(reviewsData.length);
+        const ratings = reviewsData.map((r: any) => r.rating || 0).filter((r: number) => r > 0);
+        if (ratings.length > 0) {
+          const avgRating = ratings.reduce((sum: number, r: number) => sum + r, 0) / ratings.length;
+          setRating(avgRating);
+          setTotalReviews(ratings.length);
+        }
       }
     } catch (err: any) {
       console.error('Error loading profile:', err);
