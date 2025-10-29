@@ -26,17 +26,17 @@ import {
 
 interface Profile {
   id: string;
-  first_name: string | null;
-  last_name: string | null;
-  username: string | null;
-  avatar_url: string | null;
-  cover_url: string | null;
-  bio: string | null;
-  location: string | null;
-  phone: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+  avatar_url?: string | null;
+  cover_url?: string | null;
+  bio?: string | null;
+  location?: string | null;
+  phone?: string | null;
   verified: boolean;
   created_at: string;
   email?: string;
+  full_name?: string | null; // Puede existir si se calcula
 }
 
 interface Product {
@@ -107,14 +107,20 @@ export default function SellerProfilePage() {
 
     try {
       // Obtener perfil del vendedor
+      // Usar select('*') para obtener todos los campos disponibles y evitar errores con campos que no existen
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name, username, avatar_url, cover_url, bio, location, phone, verified, created_at, email')
+        .select('*')
         .eq('id', sellerId)
         .single();
 
       if (profileError) {
-        throw profileError;
+        console.error('Error fetching profile:', profileError);
+        // Si es un error de RLS o perfil no encontrado, mostrar mensaje amigable
+        if (profileError.code === 'PGRST116' || profileError.message?.includes('No rows')) {
+          throw new Error('Vendedor no encontrado');
+        }
+        throw new Error(`Error al cargar el perfil: ${profileError.message}`);
       }
 
       if (!profileData) {
@@ -294,9 +300,11 @@ export default function SellerProfilePage() {
     );
   }
 
-  const sellerName = profile.first_name || profile.last_name
-    ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim()
-    : profile.username || 'Vendedor';
+  // Construir nombre del vendedor usando los campos disponibles
+  const sellerName = profile.full_name 
+    || (profile.first_name || profile.last_name
+      ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim()
+      : profile.email?.split('@')[0] || 'Vendedor');
 
   return (
     <div className="min-h-screen bg-gray-50">
