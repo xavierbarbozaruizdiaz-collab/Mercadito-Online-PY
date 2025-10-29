@@ -88,15 +88,12 @@ export async function getStoreProducts(
     .select('*, category:categories(name)', { count: 'exact' });
 
   // Buscar por store_id o seller_id (muchos productos solo tienen seller_id)
-  if (storeId && options.sellerId) {
-    // Si tenemos ambos, buscar por cualquiera de los dos
-    query = query.or(`store_id.eq.${storeId},seller_id.eq.${options.sellerId}`);
-  } else if (storeId) {
-    // Solo store_id
-    query = query.eq('store_id', storeId);
-  } else if (options.sellerId) {
-    // Solo seller_id (fallback)
+  // Primero intentar por seller_id si está disponible (más confiable)
+  if (options.sellerId) {
     query = query.eq('seller_id', options.sellerId);
+  } else if (storeId) {
+    // Solo store_id si no hay sellerId
+    query = query.eq('store_id', storeId);
   } else {
     // Si no hay storeId ni sellerId, retornar vacío
     return { products: [], total: 0, total_pages: 0 };
