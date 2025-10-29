@@ -165,12 +165,28 @@ class ErrorMonitoringService {
 
   private async sendErrorReport(errorReport: ErrorReport): Promise<void> {
     try {
+      // Adaptar el reporte para que no incluya 'context' si no existe en la tabla
+      const adaptedReport: any = {
+        error_type: errorReport.error_type,
+        error_message: errorReport.error_message,
+        error_stack: errorReport.error_stack || null,
+        page_url: errorReport.url,
+        user_id: errorReport.user_id || null,
+        session_id: errorReport.session_id || this.sessionId,
+        user_agent: errorReport.user_agent,
+        timestamp: errorReport.timestamp || new Date().toISOString(),
+        // No incluir 'context' si la columna no existe en la tabla
+      };
+
       const { error } = await (supabase as any)
         .from('error_logs')
-        .insert(errorReport);
+        .insert(adaptedReport);
 
       if (error) {
-        console.error('Failed to send error report:', error);
+        // Solo log en desarrollo, no romper la app
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('Failed to send error report:', error);
+        }
       } else {
         // Remover de la cola si se envió exitosamente
         this.errorQueue = this.errorQueue.filter(
@@ -178,7 +194,10 @@ class ErrorMonitoringService {
         );
       }
     } catch (err) {
-      console.error('Error sending error report:', err);
+      // Silencioso en producción
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('Error sending error report:', err);
+      }
     }
   }
 

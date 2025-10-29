@@ -35,16 +35,33 @@ export function OptimizedImage({
   const [imageError, setImageError] = useState(false);
   const imageOptimizer = ImageOptimizer.getInstance();
 
-  // Generar URL optimizada
-  const optimizedSrc = imageOptimizer.generateOptimizedUrl(src, {
-    width,
-    height,
-    quality,
-    device
-  });
+  // Si la URL contiene Cloudinary pero no está configurado, usar la URL original o Supabase
+  let optimizedSrc = src;
+  
+  try {
+    optimizedSrc = imageOptimizer.generateOptimizedUrl(src, {
+      width,
+      height,
+      quality,
+      device
+    });
+    
+    // Si la URL generada contiene Cloudinary pero no está configurado en next.config, usar original
+    if (optimizedSrc.includes('res.cloudinary.com/your-cloud') || optimizedSrc.includes('res.cloudinary.com') && !process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME) {
+      // Usar directamente la URL original o transformarla con Supabase si es posible
+      if (src.includes('supabase.co/storage')) {
+        optimizedSrc = src; // Supabase maneja las transformaciones
+      } else {
+        optimizedSrc = src; // Usar URL original
+      }
+    }
+  } catch (err) {
+    // Si falla la optimización, usar URL original
+    optimizedSrc = src;
+  }
 
-  // Generar srcset si no se proporciona sizes
-  const srcSet = sizes ? undefined : imageOptimizer.generateSrcSet(src);
+  // Generar srcset si no se proporciona sizes y no hay error
+  const srcSet = sizes ? undefined : (imageError ? undefined : imageOptimizer.generateSrcSet(src));
   const sizesAttr = sizes || imageOptimizer.generateSizes();
 
   if (imageError) {

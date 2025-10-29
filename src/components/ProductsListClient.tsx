@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 
 type Product = { 
@@ -12,7 +13,20 @@ type Product = {
   condition: string;
   sale_type: string;
   category_id: string;
+  seller_id: string;
+  store_id: string | null;
   created_at: string;
+  seller?: {
+    id: string;
+    first_name: string | null;
+    last_name: string | null;
+    username: string | null;
+  } | null;
+  store?: {
+    id: string;
+    name: string;
+    slug: string;
+  } | null;
 };
 
 type Category = { id: string; name: string };
@@ -28,12 +42,13 @@ type FilterOptions = {
 };
 
 export default function ProductsListClient() {
+  const searchParams = useSearchParams();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<FilterOptions>({
-    search: '',
+    search: searchParams?.get('q') || '',
     category: '',
     minPrice: '',
     maxPrice: '',
@@ -41,6 +56,15 @@ export default function ProductsListClient() {
     saleType: '',
     sortBy: 'date_desc'
   });
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  
+  // Actualizar búsqueda cuando cambia la URL
+  useEffect(() => {
+    const urlQuery = searchParams?.get('q') || '';
+    if (urlQuery !== filters.search) {
+      setFilters(prev => ({ ...prev, search: urlQuery }));
+    }
+  }, [searchParams, filters.search]);
 
   // Cargar categorías con manejo de errores mejorado
   useEffect(() => {
@@ -112,11 +136,16 @@ export default function ProductsListClient() {
           condition,
           sale_type,
           category_id,
-          created_at
+          seller_id,
+          store_id,
+          created_at,
+          seller:profiles!products_seller_id_fkey(id, first_name, last_name, username),
+          store:stores!products_store_id_fkey(id, name, slug)
         `)
         .eq('status', 'active'); // Solo productos activos
 
-      // Filtro de búsqueda
+      // Filtro de búsqueda - se maneja desde el header ahora
+      // Mantener por si se pasa desde URL params o prop
       if (filters.search.trim()) {
         query = query.or(`title.ilike.%${filters.search}%,description.ilike.%${filters.search}%`);
       }
@@ -208,24 +237,16 @@ export default function ProductsListClient() {
 
   return (
     <div className="max-w-7xl mx-auto">
-      {/* Header con búsqueda */}
+      {/* Botón para ir a página de tiendas */}
       <div className="mb-6 sm:mb-8">
-        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-4 sm:mb-6">
-          {/* Búsqueda principal */}
-          <div className="flex-1">
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Buscar productos..."
-                value={filters.search}
-                onChange={(e) => updateFilter('search', e.target.value)}
-                className="w-full px-3 sm:px-4 py-2 sm:py-3 pl-10 sm:pl-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base"
-              />
-              <div className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm sm:text-base">
-                🔍
-              </div>
-            </div>
-          </div>
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-center justify-between mb-4 sm:mb-6">
+          <a
+            href="/stores"
+            className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors text-sm sm:text-base font-medium flex items-center gap-2"
+          >
+            <span>🏪</span>
+            <span>Ver Todas las Tiendas</span>
+          </a>
 
           {/* Ordenamiento */}
           <div className="sm:w-48">
@@ -243,10 +264,18 @@ export default function ProductsListClient() {
           </div>
         </div>
 
-        {/* Filtros avanzados */}
+        {/* Filtros avanzados - Acordeón */}
         <div className="bg-white rounded-lg border p-3 sm:p-4">
           <div className="flex items-center justify-between mb-3 sm:mb-4">
-            <h3 className="font-semibold text-gray-700 text-sm sm:text-base">Filtros</h3>
+            <button
+              onClick={() => setFiltersOpen(!filtersOpen)}
+              className="flex items-center gap-2 font-semibold text-gray-700 text-sm sm:text-base hover:text-blue-600 transition-colors"
+            >
+              <span>Filtros</span>
+              <span className={`transform transition-transform ${filtersOpen ? 'rotate-180' : ''}`}>
+                ▼
+              </span>
+            </button>
             {hasActiveFilters && (
               <button
                 onClick={clearFilters}
@@ -257,7 +286,9 @@ export default function ProductsListClient() {
             )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
+          <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 transition-all duration-300 overflow-hidden ${
+            filtersOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0 hidden'
+          }`}>
             {/* Categoría */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Categoría</label>
@@ -404,6 +435,36 @@ export default function ProductsListClient() {
                   {product.description && (
                     <p className="text-gray-600 text-sm mb-3 line-clamp-2">{product.description}</p>
                   )}
+                  
+                  {/* Información del vendedor/tienda */}
+                  {(product.store || product.seller) && (
+                    <div className="mb-3 pb-3 border-b">
+                      {product.store ? (
+                        <a
+                          href={`/store/${product.store.slug}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-sm text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
+                        >
+                          <span>🏪</span>
+                          <span className="font-medium">{product.store.name}</span>
+                        </a>
+                      ) : product.seller ? (
+                        <a
+                          href={`/seller/${product.seller.id}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-sm text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
+                        >
+                          <span>👤</span>
+                          <span className="font-medium">
+                            {product.seller.first_name || product.seller.last_name 
+                              ? `${product.seller.first_name || ''} ${product.seller.last_name || ''}`.trim()
+                              : product.seller.username || 'Vendedor'}
+                          </span>
+                        </a>
+                      ) : null}
+                    </div>
+                  )}
+                  
                   <div className="flex justify-between items-center">
                     <p className="text-xl font-bold text-green-600">
                       {product.price.toLocaleString('es-PY')} Gs.

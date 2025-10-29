@@ -4,6 +4,27 @@ import { withSentryConfig } from "@sentry/nextjs";
 const nextConfig: NextConfig = {
   /* config options here */
   
+  // Configuración de imágenes
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'hqdatzhliaordlsqtjea.supabase.co',
+        pathname: '/storage/v1/object/public/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'res.cloudinary.com',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'placehold.co',
+        pathname: '/**',
+      },
+    ],
+  },
+  
   // Headers de seguridad
   async headers() {
     return [

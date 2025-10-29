@@ -7,6 +7,7 @@ import CartButton from "@/components/CartButton";
 import NotificationsPanel from "@/components/NotificationsPanel";
 import AnalyticsProvider from "@/components/AnalyticsProvider";
 import OfflineIndicator from "@/components/OfflineIndicator";
+import SearchBar from "@/components/SearchBar";
 import Link from "next/link";
 
 // Sentry se carga automáticamente via instrumentation.ts
@@ -150,10 +151,13 @@ export default function RootLayout({
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <AnalyticsProvider>
           {/* Header global */}
-          <header className="flex items-center justify-between px-4 py-3 border-b bg-white sticky top-0 z-50">
-            <Link href="/" className="text-lg sm:text-xl font-bold truncate hover:text-blue-600 transition-colors">
+          <header className="flex items-center justify-between px-4 py-3 border-b bg-white sticky top-0 z-50 gap-4">
+            <Link href="/" className="text-lg sm:text-xl font-bold truncate hover:text-blue-600 transition-colors whitespace-nowrap">
               🛒 Mercadito Online PY
             </Link>
+            <div className="flex items-center gap-2 sm:gap-4 flex-1 max-w-2xl mx-4">
+              <SearchBar />
+            </div>
             <div className="flex items-center gap-2 sm:gap-4">
               <NotificationsPanel />
               <CartButton />
