@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import AdminRoleAssigner from '@/components/AdminRoleAssigner';
+// import AdminRoleAssigner from '@/components/AdminRoleAssigner'; // Temporalmente comentado
 
 type Product = {
   id: string;
@@ -176,10 +176,10 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Admin Role Assigner */}
-      <div className="mt-8">
+      {/* Admin Role Assigner - Temporalmente comentado para debug */}
+      {/* <div className="mt-8">
         <AdminRoleAssigner />
-      </div>
+      </div> */}
     </main>
   );
 }
