@@ -103,10 +103,8 @@ export async function getStoreProducts(
 
   if (options.status) {
     query = query.eq('status', options.status);
-  } else {
-    // Por defecto solo mostrar activos
-    query = query.eq('status', 'active');
   }
+  // No filtrar por status si no se especifica, algunos productos pueden no tener ese campo
 
   if (options.category_id) {
     query = query.eq('category_id', options.category_id);
