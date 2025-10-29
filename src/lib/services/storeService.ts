@@ -11,7 +11,7 @@ import { Database } from '@/types/database';
 // ============================================
 
 export type Store = Database['public']['Tables']['stores']['Row'] & {
-  profiles: { full_name: string; avatar_url: string | null } | null;
+  profiles: { id: string; first_name?: string | null; last_name?: string | null; email?: string | null; avatar_url: string | null } | null;
 };
 
 export type Product = Database['public']['Tables']['products']['Row'] & {
