@@ -309,19 +309,27 @@ export default function ProductReviews({
                     {review.buyer?.avatar_url ? (
                       <Image
                         src={review.buyer.avatar_url}
-                        alt={review.buyer.full_name}
+                        alt={(review.buyer.first_name || review.buyer.last_name 
+                          ? `${review.buyer.first_name || ''} ${review.buyer.last_name || ''}`.trim()
+                          : review.buyer.email?.split('@')[0] || 'Usuario')}
                         width={40}
                         height={40}
                         className="rounded-full"
                       />
                     ) : (
                       <span className="text-sm font-medium">
-                        {review.buyer?.full_name?.charAt(0).toUpperCase()}
+                        {((review.buyer?.first_name || review.buyer?.last_name 
+                          ? `${review.buyer.first_name || ''} ${review.buyer.last_name || ''}`.trim()
+                          : review.buyer?.email?.split('@')[0] || 'U').charAt(0).toUpperCase()}
                       </span>
                     )}
                   </div>
                   <div>
-                    <div className="font-medium">{review.buyer?.full_name || 'Usuario'}</div>
+                    <div className="font-medium">
+                      {(review.buyer?.first_name || review.buyer?.last_name 
+                        ? `${review.buyer.first_name || ''} ${review.buyer.last_name || ''}`.trim()
+                        : review.buyer?.email?.split('@')[0] || 'Usuario')}
+                    </div>
                     <div className="flex items-center gap-2 text-sm text-gray-500">
                       {review.is_verified_purchase && (
                         <span className="flex items-center gap-1 text-green-600">

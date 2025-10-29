@@ -211,7 +211,7 @@ export async function getSellerReviews(
 
   const { data, error, count } = await supabase
     .from('reviews')
-    .select('*, buyer:profiles(full_name, avatar_url)', { count: 'exact' })
+    .select('*, buyer:profiles(id, first_name, last_name, email, avatar_url)', { count: 'exact' })
     .eq('store_id', (storeData as any).id)
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1);
@@ -316,7 +316,8 @@ export async function getSellers(
   }
 
   if (options.search) {
-    query = query.ilike('full_name', `%${options.search}%`);
+    // full_name no existe como columna, buscar en first_name y last_name
+    query = query.or(`first_name.ilike.%${options.search}%,last_name.ilike.%${options.search}%`);
   }
 
   if (options.location) {

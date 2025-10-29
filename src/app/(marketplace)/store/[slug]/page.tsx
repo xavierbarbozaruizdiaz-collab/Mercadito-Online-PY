@@ -568,13 +568,17 @@ export default function StoreProfilePage() {
                             <div className="flex items-start space-x-3">
                               <Avatar
                                 src={review.buyer.avatar_url}
-                                fallback={review.buyer.full_name.charAt(0).toUpperCase()}
+                                fallback={((review.buyer.first_name || review.buyer.last_name 
+                                  ? `${review.buyer.first_name || ''} ${review.buyer.last_name || ''}`.trim()
+                                  : review.buyer.email?.split('@')[0] || 'U').charAt(0).toUpperCase()}
                                 size="md"
                               />
                               <div className="flex-1">
                                 <div className="flex items-center justify-between mb-2">
                                   <h4 className="font-medium text-gray-900">
-                                    {review.buyer.full_name}
+                                    {(review.buyer.first_name || review.buyer.last_name 
+                                      ? `${review.buyer.first_name || ''} ${review.buyer.last_name || ''}`.trim()
+                                      : review.buyer.email?.split('@')[0] || 'Usuario')}
                                   </h4>
                                   <div className="flex items-center">
                                     {[...Array(5)].map((_, i) => (

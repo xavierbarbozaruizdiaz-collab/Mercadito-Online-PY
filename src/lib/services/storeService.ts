@@ -27,7 +27,7 @@ export type Review = {
   comment: string | null;
   created_at: string;
   updated_at: string;
-  buyer: { full_name: string; avatar_url: string | null };
+  buyer: { id: string; first_name?: string | null; last_name?: string | null; email?: string | null; avatar_url: string | null };
 };
 
 export interface StoreStats {
@@ -151,7 +151,7 @@ export async function getStoreReviews(
 
   const { data, error, count } = await supabase
     .from('reviews')
-    .select('*, buyer:profiles(full_name, avatar_url)', { count: 'exact' })
+    .select('*, buyer:profiles(id, first_name, last_name, email, avatar_url)', { count: 'exact' })
     .eq('store_id', storeId)
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1);
@@ -237,7 +237,7 @@ export async function getStores(
 
   let query = supabase
     .from('stores')
-    .select('*, profiles(full_name, avatar_url)', { count: 'exact' });
+    .select('*, profiles(id, first_name, last_name, email, avatar_url)', { count: 'exact' });
 
   // Aplicar filtros
   if (options.active_only !== false) {
@@ -319,7 +319,7 @@ export async function createStore(storeData: {
       total_products: 0,
       total_sales: 0,
     })
-    .select('*, profiles(full_name, avatar_url)')
+    .select('*, profiles(id, first_name, last_name, email, avatar_url)')
     .single();
 
   if (error) {
@@ -344,7 +344,7 @@ export async function updateStore(
     .from('stores')
     .update(updates)
     .eq('id', storeId)
-    .select('*, profiles(full_name, avatar_url)')
+    .select('*, profiles(id, first_name, last_name, email, avatar_url)')
     .single();
 
   if (error) {

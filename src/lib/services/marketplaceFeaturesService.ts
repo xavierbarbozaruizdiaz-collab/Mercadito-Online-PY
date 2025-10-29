@@ -125,7 +125,7 @@ export class MarketplaceFeaturesService {
         .from('product_questions')
         .select(`
           *,
-          asker:profiles!product_questions_user_id_fkey(id, full_name)
+          asker:profiles!product_questions_user_id_fkey(id, first_name, last_name, email)
         `)
         .eq('product_id', productId)
         .eq('is_public', true)

@@ -210,9 +210,10 @@ export default function ProductsListClient() {
         let sellersMap: Record<string, any> = {};
         if (sellerIds.length > 0) {
           try {
+            // NO usar full_name - no existe como columna, solo first_name, last_name, email
             const { data: profilesData, error: profilesError } = await supabase
               .from('profiles')
-              .select('id, full_name, first_name, last_name, email')
+              .select('id, first_name, last_name, email')
               .in('id', sellerIds);
             
             if (!profilesError && profilesData) {
