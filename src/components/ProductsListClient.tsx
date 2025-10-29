@@ -210,15 +210,22 @@ export default function ProductsListClient() {
         let sellersMap: Record<string, any> = {};
         if (sellerIds.length > 0) {
           try {
-            // Intentar obtener profiles directamente
+            // Intentar obtener profiles directamente - usar campos que existen
             const { data: profilesData, error: profilesError } = await supabase
               .from('profiles')
-              .select('id, first_name, last_name, username, email')
+              .select('id, first_name, last_name, email, full_name')
               .in('id', sellerIds);
             
             if (!profilesError && profilesData) {
               sellersMap = (profilesData as any[]).reduce((acc: Record<string, any>, profile: any) => {
-                acc[profile.id] = profile;
+                acc[profile.id] = {
+                  ...profile,
+                  // Calcular nombre completo si no existe
+                  display_name: profile.full_name || 
+                    (profile.first_name || profile.last_name 
+                      ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim()
+                      : profile.email?.split('@')[0] || 'Vendedor')
+                };
                 return acc;
               }, {} as Record<string, any>);
             }
@@ -230,7 +237,7 @@ export default function ProductsListClient() {
                   id: id,
                   first_name: null,
                   last_name: null,
-                  username: `Vendedor ${id.substring(0, 8)}`,
+                  display_name: `Vendedor ${id.substring(0, 8)}`,
                 };
               }
             });
@@ -242,7 +249,7 @@ export default function ProductsListClient() {
                 id: id,
                 first_name: null,
                 last_name: null,
-                username: `Vendedor`,
+                display_name: `Vendedor`,
               };
             });
           }
@@ -540,9 +547,10 @@ export default function ProductsListClient() {
                         >
                           <span>👤</span>
                           <span>
-                            {product.seller.first_name || product.seller.last_name 
+                            {product.seller.display_name || 
+                             (product.seller.first_name || product.seller.last_name 
                               ? `${product.seller.first_name || ''} ${product.seller.last_name || ''}`.trim()
-                              : product.seller.username || 'Vendedor'}
+                              : product.seller.full_name || product.seller.email?.split('@')[0] || 'Vendedor')}
                           </span>
                         </Link>
                       ) : product.seller_id ? (

@@ -4,7 +4,7 @@
 // ============================================
 
 import { useState, useEffect, useCallback } from 'react';
-import { getSellerProfileById, SellerProfile, Review, SellerStats } from '@/lib/services/sellerProfileService';
+import { getSellerProfileById, getSellerProducts, SellerProfile, Review, SellerStats } from '@/lib/services/sellerProfileService';
 import { Product } from '@/types';
 
 // ============================================
@@ -73,11 +73,27 @@ export function useSellerProfile(options?: UseSellerProfileOptions): UseSellerPr
       setProfile(profileData);
       
       if (profileData) {
-        // Cargar productos y reseñas iniciales
-        await Promise.all([
-          loadProducts({ page: 1 }),
-          loadReviews({ page: 1 }),
-        ]);
+        // Cargar productos directamente con sellerId
+        try {
+          const result = await getSellerProducts(sellerId, {
+            page: 1,
+            limit: 12,
+            status: 'active',
+          });
+          setProducts(result.products || []);
+          setProductsPagination({
+            page: 1,
+            total_pages: result.total_pages,
+            total: result.total,
+            per_page: 12,
+          });
+        } catch (productsErr) {
+          console.error('Error loading products:', productsErr);
+          setProducts([]);
+        }
+        
+        // Cargar reseñas iniciales (mantener mock por ahora si no hay servicio)
+        // await loadReviews({ page: 1 });
       }
     } catch (err) {
       console.error('Error loading seller profile:', err);
@@ -96,136 +112,30 @@ export function useSellerProfile(options?: UseSellerProfileOptions): UseSellerPr
     const limit = options.limit || 12;
     
     try {
-      // Simular llamada a la API
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Datos simulados de productos
-      const mockProducts: Product[] = [
-        {
-          id: '1',
-          title: 'iPhone 15 Pro Max',
-          description: 'El iPhone más avanzado con cámara de 48MP y chip A17 Pro.',
-          price: 4500000,
-          cover_url: '/placeholder-product.png',
-          condition: 'new',
-          sale_type: 'fixed',
-          category_id: '1',
-          store_id: profile.store.id,
-          seller_id: profile.id,
-          status: 'active',
-          stock_quantity: 5,
-          tags: ['iPhone', 'Apple', 'Smartphone'],
-          is_featured: true,
-          created_at: '2024-01-20',
-          updated_at: '2024-01-20',
-        },
-        {
-          id: '2',
-          title: 'Samsung Galaxy S24 Ultra',
-          description: 'Smartphone premium con S Pen y cámara de 200MP.',
-          price: 4200000,
-          cover_url: '/placeholder-product.png',
-          condition: 'new',
-          sale_type: 'fixed',
-          category_id: '1',
-          store_id: profile.store.id,
-          seller_id: profile.id,
-          status: 'active',
-          stock_quantity: 3,
-          tags: ['Samsung', 'Galaxy', 'Smartphone'],
-          is_featured: false,
-          created_at: '2024-01-18',
-          updated_at: '2024-01-18',
-        },
-        {
-          id: '3',
-          title: 'MacBook Air M3',
-          description: 'Laptop ultradelgada con chip M3 y pantalla de 13 pulgadas.',
-          price: 5500000,
-          cover_url: '/placeholder-product.png',
-          condition: 'new',
-          sale_type: 'fixed',
-          category_id: '2',
-          store_id: profile.store.id,
-          seller_id: profile.id,
-          status: 'active',
-          stock_quantity: 3,
-          tags: ['Samsung', 'Galaxy', 'Smartphone'],
-          is_featured: false,
-          created_at: '2024-01-15',
-          updated_at: '2024-01-15',
-        },
-        {
-          id: '4',
-          title: 'AirPods Pro 2',
-          description: 'Auriculares inalámbricos con cancelación de ruido activa.',
-          price: 850000,
-          cover_url: '/placeholder-product.png',
-          condition: 'new',
-          sale_type: 'fixed',
-          category_id: '3',
-          store_id: profile.store.id,
-          seller_id: profile.id,
-          status: 'active',
-          stock_quantity: 3,
-          tags: ['Samsung', 'Galaxy', 'Smartphone'],
-          is_featured: false,
-          created_at: '2024-01-12',
-          updated_at: '2024-01-12',
-        },
-        {
-          id: '5',
-          title: 'PlayStation 5 Slim',
-          description: 'Consola de videojuegos de nueva generación.',
-          price: 3200000,
-          cover_url: '/placeholder-product.png',
-          condition: 'new',
-          sale_type: 'fixed',
-          category_id: '4',
-          store_id: profile.store.id,
-          seller_id: profile.id,
-          status: 'active',
-          stock_quantity: 3,
-          tags: ['Samsung', 'Galaxy', 'Smartphone'],
-          is_featured: false,
-          created_at: '2024-01-10',
-          updated_at: '2024-01-10',
-        },
-        {
-          id: '6',
-          title: 'iPad Pro 12.9"',
-          description: 'Tablet profesional con chip M2 y pantalla Liquid Retina XDR.',
-          price: 4800000,
-          cover_url: '/placeholder-product.png',
-          condition: 'new',
-          sale_type: 'fixed',
-          category_id: '2',
-          store_id: profile.store.id,
-          seller_id: profile.id,
-          status: 'active',
-          stock_quantity: 3,
-          tags: ['Samsung', 'Galaxy', 'Smartphone'],
-          is_featured: false,
-          created_at: '2024-01-08',
-          updated_at: '2024-01-08',
-        },
-      ];
+      // Cargar productos reales desde la base de datos
+      const result = await getSellerProducts(profile.id, {
+        page,
+        limit,
+        status: 'active',
+      });
 
-      // Aplicar paginación
-      const startIndex = (page - 1) * limit;
-      const endIndex = startIndex + limit;
-      const paginatedProducts = mockProducts.slice(startIndex, endIndex);
-
-      setProducts(paginatedProducts);
+      setProducts(result.products || []);
       setProductsPagination({
         page,
-        total_pages: Math.ceil(mockProducts.length / limit),
-        total: mockProducts.length,
+        total_pages: result.total_pages,
+        total: result.total,
         per_page: limit,
       });
       
     } catch (err) {
       console.error('Error loading products:', err);
+      setProducts([]);
+      setProductsPagination({
+        page: 1,
+        total_pages: 0,
+        total: 0,
+        per_page: limit,
+      });
     }
   }, [profile]);
 
@@ -347,6 +257,8 @@ export function useSellerProfile(options?: UseSellerProfileOptions): UseSellerPr
       setLoading(false);
     }
   }, [options?.sellerId, options?.autoLoad, loadProfile]);
+
+  // Nota: Los productos ya se cargan en loadProfile, no necesitamos cargarlos de nuevo aquí
 
   // Calcular estadísticas
   useEffect(() => {
