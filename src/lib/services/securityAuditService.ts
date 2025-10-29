@@ -2,6 +2,7 @@
 // Servicio para auditoría de seguridad
 
 import { supabase } from '@/lib/supabaseClient';
+import { normalizeRpcList } from '@/lib/supabase/rpc';
 
 export interface SecurityAuditResult {
   table_name: string;
@@ -29,7 +30,7 @@ export class SecurityAuditService {
       const { data, error } = await supabase.rpc('audit_security_status');
 
       if (error) throw error;
-      return (data || []) as SecurityAuditResult[];
+      return normalizeRpcList<SecurityAuditResult>(data);
     } catch (error) {
       console.error('Error getting security status:', error);
       return [];

@@ -202,7 +202,7 @@ export class SellerAnalyticsService {
       } as any);
 
       if (error) throw error;
-      return (data || []) as RepeatCustomer[];
+      return normalizeRpcList<RepeatCustomer>(data);
     } catch (error) {
       console.error('Error getting repeat customers:', error);
       return [];

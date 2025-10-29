@@ -97,7 +97,7 @@ export class ShippingService {
 
       if (error) throw error;
 
-      return (data || []) as ShipmentEvent[];
+      return normalizeRpcList<ShipmentEvent>(data);
     } catch (error) {
       console.error('Error getting shipment tracking:', error);
       return [];
