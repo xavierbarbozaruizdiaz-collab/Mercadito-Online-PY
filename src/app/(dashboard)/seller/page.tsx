@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { useAuth, useStore, useRole } from '@/lib/hooks/useAuth';
 import { supabase } from '@/lib/supabase/client';
 import { formatCurrency, formatNumber, formatDate } from '@/lib/utils';
+import SellerAnalytics from '@/components/SellerAnalytics';
 import { 
   Package, 
   Plus, 
@@ -307,7 +308,16 @@ export default function SellerDashboard() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Dashboard Analítico Avanzado */}
+        <div className="mt-8">
+          <div className="mb-4">
+            <h2 className="text-xl font-semibold text-gray-900">Análisis Detallado</h2>
+            <p className="text-gray-600">Estadísticas y métricas avanzadas de tu negocio</p>
+          </div>
+          <SellerAnalytics periodDays={30} />
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-8">
           {/* Productos Recientes */}
           <div className="bg-white rounded-lg shadow-sm border">
             <div className="px-6 py-4 border-b">

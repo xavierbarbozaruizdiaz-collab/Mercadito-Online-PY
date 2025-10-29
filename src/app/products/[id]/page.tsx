@@ -2,6 +2,10 @@ import { supabase } from '@/lib/supabaseClient';
 import Link from 'next/link';
 import AddToCartButton from '@/components/AddToCartButton';
 import StartConversationButton from '@/components/StartConversationButton';
+import ProductReviews from '@/components/ProductReviews';
+import ProductQandA from '@/components/ProductQandA';
+import PriceAlertButton from '@/components/PriceAlertButton';
+import PriceHistoryChart from '@/components/PriceHistoryChart';
 import { Metadata } from 'next';
 import { generateProductStructuredData, generateBreadcrumbStructuredData } from '@/lib/structuredData';
 import { OptimizedImage } from '@/components/OptimizedImage';
@@ -16,6 +20,7 @@ type Product = {
   sale_type: string;
   category_id: string | null;
   seller_id: string;
+  store_id?: string | null;
   created_at: string;
 };
 
@@ -113,6 +118,7 @@ export default async function ProductPage(
       sale_type,
       category_id,
       seller_id,
+      store_id,
       created_at,
       categories (
         id,
@@ -252,6 +258,14 @@ export default async function ProductPage(
               />
             </div>
 
+            {/* Alerta de precio */}
+            <div className="mt-4">
+              <PriceAlertButton 
+                productId={p.id} 
+                currentPrice={Number(p.price)}
+              />
+            </div>
+
             {/* Información del vendedor */}
             <div className="bg-gray-50 rounded-lg p-4">
               <h3 className="font-semibold mb-2">Información del vendedor</h3>
@@ -261,6 +275,25 @@ export default async function ProductPage(
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Marketplace Features Avanzadas */}
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+        {/* Historial de precios */}
+        <PriceHistoryChart 
+          productId={p.id} 
+          currentPrice={Number(p.price)}
+        />
+
+        {/* Preguntas y respuestas */}
+        <ProductQandA
+          productId={p.id}
+          sellerId={p.seller_id}
+          currentUserId={undefined}
+        />
+
+        {/* Reseñas del producto */}
+        <ProductReviews productId={p.id} storeId={p.store_id || undefined} />
       </div>
       </main>
     </>

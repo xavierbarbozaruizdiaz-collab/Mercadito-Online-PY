@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import CouponInput from '@/components/CouponInput';
+import { CouponValidationResult } from '@/lib/services/couponService';
 
 type CartItem = {
   id: string;
@@ -41,6 +43,7 @@ export default function CheckoutPage() {
   });
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'transfer' | 'card'>('cash');
   const [notes, setNotes] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState<CouponValidationResult | null>(null);
 
   useEffect(() => {
     loadCartItems();
@@ -120,7 +123,9 @@ export default function CheckoutPage() {
   }
 
   const totalItems = cartItems.reduce((sum, item) => sum + item.quantity, 0);
-  const totalPrice = cartItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
+  const subtotal = cartItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
+  const discountAmount = appliedCoupon?.valid ? appliedCoupon.discount_amount : 0;
+  const totalPrice = Math.max(0, subtotal - discountAmount);
 
   if (loading) {
     return (
@@ -297,7 +302,7 @@ export default function CheckoutPage() {
           <div className="lg:col-span-1">
             <div className="bg-white rounded-lg shadow-sm border p-6 sticky top-4">
               <h2 className="text-xl font-semibold mb-4">Resumen del pedido</h2>
-              <div className="space-y-3">
+              <div className="space-y-3 mb-4">
                 {cartItems.map((item) => (
                   <div key={item.id} className="flex justify-between text-sm">
                     <span>{item.product.title} x{item.quantity}</span>
@@ -307,8 +312,26 @@ export default function CheckoutPage() {
                 <hr />
                 <div className="flex justify-between">
                   <span>Subtotal ({totalItems} productos)</span>
-                  <span>{totalPrice.toLocaleString('es-PY')} Gs.</span>
+                  <span>{subtotal.toLocaleString('es-PY')} Gs.</span>
                 </div>
+                
+                {/* Cupón de descuento */}
+                <div className="space-y-2">
+                  <CouponInput
+                    orderAmount={subtotal}
+                    onCouponApplied={setAppliedCoupon}
+                    onCouponRemoved={() => setAppliedCoupon(null)}
+                    appliedCoupon={appliedCoupon}
+                  />
+                </div>
+
+                {discountAmount > 0 && (
+                  <div className="flex justify-between text-green-600">
+                    <span>Descuento</span>
+                    <span>-{discountAmount.toLocaleString('es-PY')} Gs.</span>
+                  </div>
+                )}
+
                 <div className="flex justify-between">
                   <span>Envío</span>
                   <span className="text-green-600">Gratis</span>

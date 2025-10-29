@@ -68,17 +68,11 @@ export default function NotificationsPanel() {
       setLoading(true);
       setError(null);
       try {
-        const { data, error } = await supabase
-          .from('notifications')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(20); // Limitar a las 20 más recientes
-
-        if (error) throw error;
-
-        setNotifications(data || []);
-        setUnreadCount(data?.filter((n: any) => !n.is_read).length || 0);
+        const { NotificationService } = await import('@/lib/services/notificationService');
+        const result = await NotificationService.getUserNotifications(user.id, { limit: 20 });
+        
+        setNotifications(result.notifications);
+        setUnreadCount(result.notifications.filter((n) => !n.is_read).length);
       } catch (err: any) {
         console.error('Error fetching notifications:', err.message);
         setError('No se pudieron cargar las notificaciones.');
@@ -115,34 +109,36 @@ export default function NotificationsPanel() {
 
   // Marcar notificación como leída
   const markAsRead = async (notificationId: string) => {
-    await (supabase as any)
-      .from('notifications')
-      .update({ is_read: true })
-      .eq('id', notificationId);
-
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === notificationId ? { ...n, is_read: true } : n))
-    );
-    setUnreadCount((prev) => Math.max(0, prev - 1));
+    try {
+      const { NotificationService } = await import('@/lib/services/notificationService');
+      await NotificationService.markAsRead(notificationId);
+      
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === notificationId ? { ...n, is_read: true } : n))
+      );
+      setUnreadCount((prev) => Math.max(0, prev - 1));
+    } catch (err) {
+      console.error('Error marking as read:', err);
+    }
   };
 
   // Marcar todas como leídas
   const markAllAsRead = async () => {
-    await (supabase as any)
-      .from('notifications')
-      .update({ is_read: true })
-      .eq('user_id', user?.id);
-
-    setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
-    setUnreadCount(0);
+    if (!user) return;
+    
+    try {
+      const { NotificationService } = await import('@/lib/services/notificationService');
+      await NotificationService.markAllAsRead(user.id);
+      
+      setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+      setUnreadCount(0);
+    } catch (err) {
+      console.error('Error marking all as read:', err);
+    }
   };
 
   const togglePanel = () => {
     setIsOpen(!isOpen);
-    if (isOpen && unreadCount > 0) {
-      // Opcional: marcar todas como leídas al cerrar el panel
-      // markAllAsRead();
-    }
   };
 
   if (!user) {
