@@ -27,12 +27,25 @@ export interface Profile {
   role: UserRole;
   first_name?: string;
   last_name?: string;
+  full_name?: string;
   phone?: string;
   avatar_url?: string;
   cover_url?: string;
   bio?: string;
   location?: string;
   verified: boolean;
+  is_verified?: boolean;
+  rating?: number;
+  total_reviews?: number;
+  member_since?: string;
+  last_active?: string;
+  website?: string;
+  social_links?: {
+    facebook?: string;
+    instagram?: string;
+    twitter?: string;
+    linkedin?: string;
+  };
   membership_level: MembershipLevel;
   membership_expires_at?: string;
   created_at: string;
@@ -42,6 +55,7 @@ export interface Profile {
 export interface Store {
   id: string;
   seller_id: string;
+  owner_id?: string;
   name: string;
   slug: string;
   description?: string;
@@ -50,9 +64,22 @@ export interface Store {
   location?: string;
   contact_email?: string;
   contact_phone?: string;
-  social_links: Record<string, string>;
-  settings: Record<string, any>;
+  phone?: string;
+  email?: string;
+  website?: string;
+  rating?: number;
+  total_reviews?: number;
+  total_products?: number;
+  total_sales?: number;
+  is_verified?: boolean;
   is_active: boolean;
+  social_links?: {
+    facebook?: string;
+    instagram?: string;
+    twitter?: string;
+    linkedin?: string;
+  };
+  settings: Record<string, any>;
   created_at: string;
   updated_at: string;
 }
@@ -105,6 +132,7 @@ export interface ProductImage {
 export interface Product {
   id: string;
   store_id: string;
+  seller_id?: string;
   title: string;
   description?: string;
   price: number;
@@ -126,6 +154,7 @@ export interface Product {
   seo_title?: string;
   seo_description?: string;
   is_featured: boolean;
+  cover_url?: string;
   created_at: string;
   updated_at: string;
 }
@@ -282,6 +311,26 @@ export interface Report {
   data: Record<string, any>;
   filters?: Record<string, any>;
   generated_at: string;
+}
+
+// ============================================
+// RESEÑAS Y COMENTARIOS
+// ============================================
+
+export interface Review {
+  id: string;
+  product_id: string;
+  buyer_id: string;
+  store_id: string;
+  rating: number;
+  comment?: string;
+  created_at: string;
+  updated_at: string;
+  buyer?: {
+    id: string;
+    full_name: string;
+    avatar_url?: string | null;
+  };
 }
 
 // ============================================
@@ -497,6 +546,82 @@ export interface FormField {
 // EXPORTACIONES PRINCIPALES
 // ============================================
 
+// ============================================
+// TIPOS DE CHAT
+// ============================================
+
+export interface Conversation {
+  id: string;
+  buyer_id: string;
+  seller_id: string;
+  product_id?: string;
+  store_id?: string;
+  subject?: string;
+  status: 'active' | 'closed' | 'archived';
+  last_message_at: string;
+  created_at: string;
+  updated_at: string;
+  
+  // Relaciones
+  buyer?: Profile;
+  seller?: Profile;
+  product?: Product;
+  store?: Store;
+  participants?: ConversationParticipant[];
+  messages?: Message[];
+  unread_count?: number;
+}
+
+export interface ConversationParticipant {
+  id: string;
+  conversation_id: string;
+  user_id: string;
+  role: 'buyer' | 'seller' | 'admin';
+  joined_at: string;
+  last_seen_at: string;
+  is_active: boolean;
+  
+  // Relaciones
+  user?: Profile;
+  conversation?: Conversation;
+}
+
+export interface UserStatus {
+  user_id: string;
+  status: 'online' | 'away' | 'busy' | 'offline';
+  last_seen_at: string;
+  is_typing: boolean;
+  typing_in_conversation_id?: string;
+  updated_at: string;
+}
+
+// ============================================
+// SCHEMAS DE VALIDACIÓN PARA CHAT
+// ============================================
+
+export const ConversationSchema = z.object({
+  buyer_id: z.string().uuid(),
+  seller_id: z.string().uuid(),
+  product_id: z.string().uuid().optional(),
+  store_id: z.string().uuid().optional(),
+  subject: z.string().optional(),
+});
+
+export const MessageSchema = z.object({
+  conversation_id: z.string().uuid(),
+  content: z.string().min(1).max(2000),
+  message_type: z.enum(['text', 'image', 'file', 'system']).default('text'),
+  metadata: z.record(z.any()).default({}),
+});
+
+export const NotificationSchema = z.object({
+  user_id: z.string().uuid(),
+  type: z.enum(['message', 'order', 'review', 'system']),
+  title: z.string().min(1).max(100),
+  content: z.string().min(1).max(500),
+  data: z.record(z.any()).default({}),
+});
+
 export type {
   // Re-exportar tipos principales para fácil acceso
   Profile,
@@ -535,4 +660,12 @@ export type {
   SelectOption,
   TableColumn,
   FormField,
+  
+  // Tipos de chat
+  Conversation,
+  ConversationParticipant,
+  UserStatus,
+  ConversationSchema,
+  MessageSchema,
+  NotificationSchema,
 };

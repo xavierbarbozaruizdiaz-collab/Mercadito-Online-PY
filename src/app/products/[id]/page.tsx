@@ -1,6 +1,9 @@
 import { supabase } from '@/lib/supabaseClient';
 import Link from 'next/link';
 import AddToCartButton from '@/components/AddToCartButton';
+import StartConversationButton from '@/components/StartConversationButton';
+import { Metadata } from 'next';
+import { generateProductStructuredData, generateBreadcrumbStructuredData } from '@/lib/structuredData';
 
 type Product = {
   id: string;
@@ -21,6 +24,76 @@ type Category = {
 };
 
 export const revalidate = 0; // sin cache en dev
+
+// Función para generar metadatos dinámicos
+export async function generateMetadata(
+  props: { params: Promise<{ id: string }> }
+): Promise<Metadata> {
+  const { id } = await props.params;
+  
+  try {
+    const { data: product } = await supabase
+      .from('products')
+      .select(`
+        title,
+        description,
+        price,
+        cover_url,
+        condition,
+        sale_type,
+        categories (name)
+      `)
+      .eq('id', id)
+      .single();
+
+    if (!product) {
+      return {
+        title: 'Producto no encontrado | Mercadito Online PY',
+        description: 'El producto que buscas no está disponible.',
+      };
+    }
+
+    const category = product.categories?.[0]?.name || 'General';
+    const price = Number(product.price).toLocaleString('es-PY');
+    
+    return {
+      title: `${product.title} | Mercadito Online PY`,
+      description: product.description || `Compra ${product.title} por ${price} Gs. ${category} - Mercadito Online PY`,
+      keywords: [
+        product.title,
+        category,
+        'comprar',
+        'venta',
+        'Paraguay',
+        'Mercadito Online PY',
+        product.condition,
+        product.sale_type === 'auction' ? 'subasta' : 'venta directa'
+      ],
+      openGraph: {
+        title: product.title,
+        description: product.description || `Compra ${product.title} por ${price} Gs.`,
+        images: product.cover_url ? [product.cover_url] : [],
+        type: 'website',
+        locale: 'es_PY',
+        siteName: 'Mercadito Online PY',
+      },
+      twitter: {
+        card: 'summary_large_image',
+        title: product.title,
+        description: product.description || `Compra ${product.title} por ${price} Gs.`,
+        images: product.cover_url ? [product.cover_url] : [],
+      },
+      alternates: {
+        canonical: `https://mercadito-online-py.vercel.app/products/${id}`,
+      },
+    };
+  } catch (error) {
+    return {
+      title: 'Error | Mercadito Online PY',
+      description: 'Error al cargar el producto.',
+    };
+  }
+}
 
 export default async function ProductPage(
   props: { params: Promise<{ id: string }> } // 👈 en Next 15 params es Promise
@@ -66,9 +139,47 @@ export default async function ProductPage(
   // Obtener la primera categoría (debería ser solo una)
   const category = p.categories && p.categories.length > 0 ? p.categories[0] : null;
 
+  // Generar structured data
+  const productStructuredData = generateProductStructuredData({
+    id: p.id,
+    title: p.title,
+    description: p.description || '',
+    price: Number(p.price),
+    currency: 'PYG',
+    image: p.cover_url || '',
+    condition: p.condition,
+    availability: 'InStock',
+    seller: {
+      name: 'Vendedor Verificado',
+      url: `https://mercadito-online-py.vercel.app/store/seller-${p.seller_id}`,
+    },
+    category: category?.name || 'General',
+  });
+
+  const breadcrumbStructuredData = generateBreadcrumbStructuredData([
+    { name: 'Inicio', url: 'https://mercadito-online-py.vercel.app/' },
+    { name: category?.name || 'Productos', url: `https://mercadito-online-py.vercel.app/search?category=${category?.id || ''}` },
+    { name: p.title, url: `https://mercadito-online-py.vercel.app/products/${p.id}` },
+  ]);
+
   return (
-    <main className="min-h-screen bg-gray-50 p-4 sm:p-8">
-      <Link href="/" className="underline text-sm">← Volver</Link>
+    <>
+      {/* Structured Data */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(productStructuredData),
+        }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(breadcrumbStructuredData),
+        }}
+      />
+      
+      <main className="min-h-screen bg-gray-50 p-4 sm:p-8">
+        <Link href="/" className="underline text-sm">← Volver</Link>
 
       <div className="bg-white rounded-lg sm:rounded-2xl shadow p-4 sm:p-6 mt-3">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
@@ -128,7 +239,24 @@ export default async function ProductPage(
               </div>
             </div>
 
-            <AddToCartButton productId={p.id} />
+            <div className="flex space-x-4">
+              <AddToCartButton productId={p.id} />
+              <StartConversationButton 
+                product={{
+                  id: p.id,
+                  title: p.title,
+                  description: p.description,
+                  price: Number(p.price),
+                  cover_url: p.cover_url,
+                  condition: p.condition,
+                  sale_type: p.sale_type,
+                  category_id: p.category_id,
+                  seller_id: p.seller_id,
+                  created_at: p.created_at,
+                }}
+                className="flex-1"
+              />
+            </div>
 
             {/* Información del vendedor */}
             <div className="bg-gray-50 rounded-lg p-4">
@@ -140,6 +268,7 @@ export default async function ProductPage(
           </div>
         </div>
       </div>
-    </main>
+      </main>
+    </>
   );
 }
