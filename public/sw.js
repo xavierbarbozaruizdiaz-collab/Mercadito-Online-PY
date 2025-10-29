@@ -3,17 +3,18 @@
 // Service Worker para PWA y caching offline
 // ============================================
 
-const CACHE_NAME = 'mercadito-online-py-v1';
-const STATIC_CACHE_NAME = 'mercadito-static-v1';
-const DYNAMIC_CACHE_NAME = 'mercadito-dynamic-v1';
+const CACHE_NAME = 'mercadito-online-py-v2';
+const STATIC_CACHE_NAME = 'mercadito-static-v2';
+const DYNAMIC_CACHE_NAME = 'mercadito-dynamic-v2';
 
-// Archivos estáticos para cache
+// Archivos estáticos para cache (solo archivos que sabemos que existen)
 const STATIC_FILES = [
   '/',
-  '/manifest.json',
-  '/offline.html',
-  '/icons/icon-192x192.png',
-  '/icons/icon-512x512.png',
+  // Removidos archivos que pueden no existir:
+  // '/manifest.json', // Se genera dinámicamente
+  // '/offline.html', // Puede no existir
+  // '/icons/icon-192x192.png', // Puede no existir
+  // '/icons/icon-512x512.png', // Puede no existir
 ];
 
 // Rutas que siempre deben ir a la red
@@ -42,7 +43,16 @@ self.addEventListener('install', (event) => {
     caches.open(STATIC_CACHE_NAME)
       .then((cache) => {
         console.log('Service Worker: Caching static files');
-        return cache.addAll(STATIC_FILES);
+        // Cachear archivos uno por uno para manejar errores individualmente
+        return Promise.allSettled(
+          STATIC_FILES.map(url => 
+            cache.add(url).catch(err => {
+              console.warn(`Service Worker: Failed to cache ${url}:`, err.message);
+              // Continuar aunque falle algún archivo
+              return null;
+            })
+          )
+        );
       })
       .then(() => {
         console.log('Service Worker: Installed successfully');
@@ -50,6 +60,8 @@ self.addEventListener('install', (event) => {
       })
       .catch((error) => {
         console.error('Service Worker: Installation failed', error);
+        // Continuar aunque falle la instalación
+        return self.skipWaiting();
       })
   );
 });
@@ -93,13 +105,24 @@ self.addEventListener('fetch', (event) => {
     return;
   }
   
+  // No interceptar requests POST, PUT, DELETE, etc. (solo GET)
+  // Solo cachear requests GET
+  if (request.method !== 'GET') {
+    return; // Dejar que el navegador maneje requests no-GET normalmente
+  }
+  
   // Estrategia basada en la ruta
-  if (isNetworkFirstRoute(url.pathname)) {
-    event.respondWith(networkFirstStrategy(request));
-  } else if (isCacheFirstRoute(url.pathname)) {
-    event.respondWith(cacheFirstStrategy(request));
-  } else {
-    event.respondWith(staleWhileRevalidateStrategy(request));
+  try {
+    if (isNetworkFirstRoute(url.pathname)) {
+      event.respondWith(networkFirstStrategy(request));
+    } else if (isCacheFirstRoute(url.pathname)) {
+      event.respondWith(cacheFirstStrategy(request));
+    } else {
+      event.respondWith(staleWhileRevalidateStrategy(request));
+    }
+  } catch (error) {
+    console.error('Service Worker: Fetch handler error:', error);
+    // Si hay error, dejar que el navegador maneje el request normalmente
   }
 });
 
@@ -109,12 +132,25 @@ self.addEventListener('fetch', (event) => {
 
 // Network First: Para datos dinámicos
 async function networkFirstStrategy(request) {
+  // Solo cachear requests GET
+  const canCache = request.method === 'GET';
+  
   try {
     const networkResponse = await fetch(request);
     
-    if (networkResponse.ok) {
-      const cache = await caches.open(DYNAMIC_CACHE_NAME);
-      cache.put(request, networkResponse.clone());
+    if (networkResponse.ok && canCache) {
+      try {
+        const cache = await caches.open(DYNAMIC_CACHE_NAME);
+        // Solo cachear si es una respuesta cacheable
+        if (request.method === 'GET' && networkResponse.status === 200) {
+          cache.put(request, networkResponse.clone()).catch(err => {
+            console.warn('Service Worker: Failed to cache response:', err.message);
+          });
+        }
+      } catch (cacheError) {
+        // No fallar si no se puede cachear
+        console.warn('Service Worker: Cache error (non-fatal):', cacheError.message);
+      }
     }
     
     return networkResponse;
@@ -126,9 +162,12 @@ async function networkFirstStrategy(request) {
       return cachedResponse;
     }
     
-    // Si es una página HTML, mostrar página offline
-    if (request.headers.get('accept').includes('text/html')) {
-      return caches.match('/offline.html');
+    // Si es una página HTML, intentar mostrar página offline (si existe)
+    if (request.headers.get('accept')?.includes('text/html')) {
+      const offlinePage = await caches.match('/offline.html');
+      if (offlinePage) {
+        return offlinePage;
+      }
     }
     
     throw error;
@@ -137,6 +176,11 @@ async function networkFirstStrategy(request) {
 
 // Cache First: Para recursos estáticos
 async function cacheFirstStrategy(request) {
+  // Solo cachear requests GET
+  if (request.method !== 'GET') {
+    return fetch(request);
+  }
+  
   const cachedResponse = await caches.match(request);
   
   if (cachedResponse) {
@@ -146,9 +190,16 @@ async function cacheFirstStrategy(request) {
   try {
     const networkResponse = await fetch(request);
     
-    if (networkResponse.ok) {
-      const cache = await caches.open(DYNAMIC_CACHE_NAME);
-      cache.put(request, networkResponse.clone());
+    if (networkResponse.ok && networkResponse.status === 200) {
+      try {
+        const cache = await caches.open(DYNAMIC_CACHE_NAME);
+        cache.put(request, networkResponse.clone()).catch(err => {
+          console.warn('Service Worker: Failed to cache response:', err.message);
+        });
+      } catch (cacheError) {
+        // No fallar si no se puede cachear
+        console.warn('Service Worker: Cache error (non-fatal):', cacheError.message);
+      }
     }
     
     return networkResponse;
@@ -160,12 +211,20 @@ async function cacheFirstStrategy(request) {
 
 // Stale While Revalidate: Para contenido mixto
 async function staleWhileRevalidateStrategy(request) {
+  // Solo cachear requests GET
+  if (request.method !== 'GET') {
+    return fetch(request);
+  }
+  
   const cache = await caches.open(DYNAMIC_CACHE_NAME);
   const cachedResponse = await cache.match(request);
   
   const fetchPromise = fetch(request).then((networkResponse) => {
-    if (networkResponse.ok) {
-      cache.put(request, networkResponse.clone());
+    if (networkResponse.ok && networkResponse.status === 200) {
+      // Cachear en background sin bloquear la respuesta
+      cache.put(request, networkResponse.clone()).catch(err => {
+        console.warn('Service Worker: Failed to cache response:', err.message);
+      });
     }
     return networkResponse;
   }).catch(() => {
@@ -203,7 +262,22 @@ self.addEventListener('message', (event) => {
     case 'CACHE_URLS':
       event.waitUntil(
         caches.open(DYNAMIC_CACHE_NAME)
-          .then(cache => cache.addAll(payload.urls))
+          .then(cache => {
+            // Cachear URLs una por una para manejar errores
+            return Promise.allSettled(
+              payload.urls
+                .filter(url => url && typeof url === 'string')
+                .map(url => 
+                  cache.add(url).catch(err => {
+                    console.warn(`Service Worker: Failed to cache ${url}:`, err.message);
+                    return null;
+                  })
+                )
+            );
+          })
+          .catch(err => {
+            console.error('Service Worker: CACHE_URLS error:', err);
+          })
       );
       break;
       
