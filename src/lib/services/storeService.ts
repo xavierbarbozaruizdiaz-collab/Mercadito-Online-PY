@@ -47,9 +47,10 @@ export interface StoreStats {
  * @returns La tienda con su información completa.
  */
 export async function getStoreBySlug(storeSlug: string): Promise<Store | null> {
+  // Obtener store por slug - solo campos necesarios para evitar 400 Bad Request
   const { data, error } = await supabase
     .from('stores')
-    .select('*, profiles(full_name, avatar_url)')
+    .select('id, name, slug, seller_id, description, cover_image_url, logo_url, location, is_active, created_at, updated_at')
     .eq('slug', storeSlug)
     .eq('is_active', true)
     .single();
