@@ -75,6 +75,7 @@ export async function getStoreProducts(
     limit?: number;
     status?: string;
     category_id?: string;
+    sellerId?: string; // Agregar sellerId como opción
   } = {}
 ): Promise<{ products: Product[]; total: number; total_pages: number }> {
   const page = options.page || 1;
@@ -83,11 +84,23 @@ export async function getStoreProducts(
 
   let query = supabase
     .from('products')
-    .select('*, category:categories(name)', { count: 'exact' })
-    .eq('store_id', storeId);
+    .select('*, category:categories(name)', { count: 'exact' });
+
+  // Buscar por store_id si está disponible, sino por seller_id
+  if (storeId) {
+    query = query.or(`store_id.eq.${storeId}${options.sellerId ? `,seller_id.eq.${options.sellerId}` : ''}`);
+  } else if (options.sellerId) {
+    query = query.eq('seller_id', options.sellerId);
+  } else {
+    // Si no hay storeId ni sellerId, retornar vacío
+    return { products: [], total: 0, total_pages: 0 };
+  }
 
   if (options.status) {
     query = query.eq('status', options.status);
+  } else {
+    // Por defecto solo mostrar activos
+    query = query.eq('status', 'active');
   }
 
   if (options.category_id) {

@@ -76,13 +76,16 @@ export default function StoreProfilePage() {
   });
 
   // Función para cargar productos de la tienda
-  const loadStoreProducts = async (currentStoreId: string, page: number = 1) => {
+  const loadStoreProducts = async (currentStoreId: string, page: number = 1, currentSellerId?: string) => {
     try {
+      console.log('Loading products for store:', currentStoreId, 'seller:', currentSellerId);
       const result = await getStoreProducts(currentStoreId, {
         page,
         limit: 12,
         status: 'active',
+        sellerId: currentSellerId,
       });
+      console.log('Loaded products:', result.products?.length, 'total:', result.total);
       setStoreProducts(result.products || []);
       setProductsPagination({
         page,
@@ -107,11 +110,14 @@ export default function StoreProfilePage() {
           setStore(storeData);
           if (storeData.id) {
             setStoreId(storeData.id);
-            // Cargar productos de la tienda específica
-            await loadStoreProducts(storeData.id, 1);
           }
           if (storeData.seller_id) {
             setSellerId(storeData.seller_id);
+            // Cargar productos de la tienda específica, usando seller_id como fallback
+            await loadStoreProducts(storeData.id || '', 1, storeData.seller_id);
+          } else if (storeData.id) {
+            // Si no hay seller_id, intentar solo con store_id
+            await loadStoreProducts(storeData.id, 1);
           }
         } else {
           setStoreError('Tienda no encontrada');
