@@ -141,16 +141,22 @@ export default function StoresPage() {
         
         let sellersMap: Record<string, any> = {};
         if (sellerIds.length > 0) {
-          const { data: sellersData } = await supabase
-            .from('profiles')
-            .select('id, first_name, last_name')
-            .in('id', sellerIds);
-          
-          if (sellersData) {
-            sellersMap = (sellersData as any[]).reduce((acc: Record<string, any>, seller: any) => {
-              acc[seller.id] = seller;
-              return acc;
-            }, {} as Record<string, any>);
+          try {
+            const { data: sellersData, error: sellersError } = await supabase
+              .from('profiles')
+              .select('id, first_name, last_name')
+              .in('id', sellerIds);
+            
+            // Si hay error, simplemente continuar sin sellers (no crítico)
+            if (!sellersError && sellersData) {
+              sellersMap = (sellersData as any[]).reduce((acc: Record<string, any>, seller: any) => {
+                acc[seller.id] = seller;
+                return acc;
+              }, {} as Record<string, any>);
+            }
+          } catch (sellersErr) {
+            // Si falla, continuar sin sellers - no es crítico
+            console.warn('No se pudo cargar información de vendedores:', sellersErr);
           }
         }
 
@@ -159,7 +165,7 @@ export default function StoresPage() {
           seller: store.seller_id ? (sellersMap[store.seller_id] || null) : null,
         }));
 
-        setStores(enrichedStores);
+        setStores(enrichedStores as Store[]);
       } else {
         setStores([]);
       }
