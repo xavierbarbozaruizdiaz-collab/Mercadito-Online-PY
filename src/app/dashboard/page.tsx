@@ -22,7 +22,10 @@ export default function Dashboard() {
     (async () => {
       try {
         const { data: session } = await supabase.auth.getSession();
-        if (!session?.session?.user?.id) return;
+        if (!session?.session?.user?.id) {
+          setLoading(false);
+          return;
+        }
 
         const { data, error } = await supabase
           .from('products')
@@ -64,7 +67,7 @@ export default function Dashboard() {
 
       // 3. Eliminar imágenes del storage
       if (images && images.length > 0) {
-        const fileNames = images.map(img => {
+        const fileNames = images.map((img: { url: string }) => {
           const url = img.url;
           const match = url.match(/products\/([^\/]+)\/(.+)$/);
           return match ? `${match[1]}/${match[2]}` : null;
