@@ -157,9 +157,9 @@ class ErrorMonitoringService {
       this.sendErrorReport(errorReport);
     }
 
-    // Log en consola para desarrollo
-    if (process.env.NODE_ENV === 'development') {
-      console.error('Error Report:', errorReport);
+    // Log en consola para desarrollo (solo si no es un error de webpack)
+    if (process.env.NODE_ENV === 'development' && !errorReport.error_message?.includes('reading \'call\'')) {
+      console.warn('Error Report:', errorReport);
     }
   }
 
