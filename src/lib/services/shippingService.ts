@@ -2,6 +2,7 @@
 // Servicio para gestionar envíos y tracking
 
 import { supabase } from '@/lib/supabase/client';
+import { normalizeRpcList, normalizeRpcResult } from '@/lib/supabase/rpc';
 
 export type Carrier = 
   | 'correo_paraguayo'
