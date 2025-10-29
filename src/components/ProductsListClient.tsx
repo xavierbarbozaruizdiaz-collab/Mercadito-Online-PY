@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { supabase } from '@/lib/supabaseClient';
 
 type Product = { 
@@ -205,19 +206,41 @@ export default function ProductsListClient() {
         const sellerIds = [...new Set(productsData.map((p: any) => p.seller_id).filter(Boolean))] as string[];
         const storeIds = [...new Set(productsData.map((p: any) => p.store_id).filter(Boolean))] as string[];
         
-        // Obtener información de profiles (vendedores)
+        // Obtener información de stores (que tienen seller_id que referencia profiles)
+        // Primero obtener stores que tienen seller_id = sellerIds
         let sellersMap: Record<string, any> = {};
         if (sellerIds.length > 0) {
-          const { data: sellersData } = await supabase
+          // Intentar obtener profiles directamente (puede fallar si seller_id apunta a auth.users)
+          const { data: profilesData, error: profilesError } = await supabase
             .from('profiles')
             .select('id, first_name, last_name, username')
             .in('id', sellerIds);
           
-          if (sellersData) {
-            sellersMap = (sellersData as any[]).reduce((acc: Record<string, any>, seller: any) => {
-              acc[seller.id] = seller;
+          if (!profilesError && profilesData) {
+            sellersMap = (profilesData as any[]).reduce((acc: Record<string, any>, profile: any) => {
+              acc[profile.id] = profile;
               return acc;
             }, {} as Record<string, any>);
+          } else {
+            // Si falla, intentar obtener desde stores que tienen seller_id
+            const { data: storesWithSellers } = await supabase
+              .from('stores')
+              .select('seller_id, name')
+              .in('seller_id', sellerIds);
+            
+            if (storesWithSellers) {
+              // Mapear seller_id a nombre de tienda como fallback
+              (storesWithSellers as any[]).forEach((store: any) => {
+                if (!sellersMap[store.seller_id]) {
+                  sellersMap[store.seller_id] = {
+                    id: store.seller_id,
+                    first_name: null,
+                    last_name: null,
+                    username: store.name,
+                  };
+                }
+              });
+            }
           }
         }
 
@@ -315,30 +338,36 @@ export default function ProductsListClient() {
         </div>
 
         {/* Filtros avanzados - Acordeón */}
-        <div className="bg-white rounded-lg border p-3 sm:p-4">
-          <div className="flex items-center justify-between mb-3 sm:mb-4">
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+          <div className="flex items-center justify-between p-3">
             <button
               onClick={() => setFiltersOpen(!filtersOpen)}
-              className="flex items-center gap-2 font-semibold text-gray-700 text-sm sm:text-base hover:text-blue-600 transition-colors"
+              className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 transition-colors font-medium"
             >
+              <svg className={`w-4 h-4 transition-transform ${filtersOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
               <span>Filtros</span>
-              <span className={`transform transition-transform ${filtersOpen ? 'rotate-180' : ''}`}>
-                ▼
-              </span>
+              {hasActiveFilters && (
+                <span className="ml-1 px-1.5 py-0.5 text-xs bg-blue-100 text-blue-700 rounded-full">
+                  {Object.values(filters).filter(v => v !== '' && v !== 'date_desc').length}
+                </span>
+              )}
             </button>
             {hasActiveFilters && (
               <button
                 onClick={clearFilters}
-                className="text-xs sm:text-sm text-blue-600 hover:text-blue-800 underline"
+                className="text-xs text-blue-600 hover:text-blue-800 hover:underline"
               >
-                Limpiar filtros
+                Limpiar
               </button>
             )}
           </div>
 
-          <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 transition-all duration-300 overflow-hidden ${
+          <div className={`px-3 pb-3 transition-all duration-300 overflow-hidden border-t border-gray-100 ${
             filtersOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0 hidden'
           }`}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 pt-3">
             {/* Categoría */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Categoría</label>
@@ -408,6 +437,7 @@ export default function ProductsListClient() {
                 <option value="auction">Subasta</option>
               </select>
             </div>
+          </div>
           </div>
         </div>
       </div>
@@ -490,19 +520,19 @@ export default function ProductsListClient() {
                   {(product.store || product.seller) && (
                     <div className="mb-3 pb-3 border-b">
                       {product.store ? (
-                        <a
+                        <Link
                           href={`/store/${product.store.slug}`}
                           onClick={(e) => e.stopPropagation()}
-                          className="text-sm text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
+                          className="text-sm text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1 cursor-pointer"
                         >
                           <span>🏪</span>
                           <span className="font-medium">{product.store.name}</span>
-                        </a>
+                        </Link>
                       ) : product.seller ? (
-                        <a
+                        <Link
                           href={`/seller/${product.seller.id}`}
                           onClick={(e) => e.stopPropagation()}
-                          className="text-sm text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
+                          className="text-sm text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1 cursor-pointer"
                         >
                           <span>👤</span>
                           <span className="font-medium">
@@ -510,7 +540,7 @@ export default function ProductsListClient() {
                               ? `${product.seller.first_name || ''} ${product.seller.last_name || ''}`.trim()
                               : product.seller.username || 'Vendedor'}
                           </span>
-                        </a>
+                        </Link>
                       ) : null}
                     </div>
                   )}
