@@ -206,41 +206,45 @@ export default function ProductsListClient() {
         const sellerIds = [...new Set(productsData.map((p: any) => p.seller_id).filter(Boolean))] as string[];
         const storeIds = [...new Set(productsData.map((p: any) => p.store_id).filter(Boolean))] as string[];
         
-        // Obtener información de stores (que tienen seller_id que referencia profiles)
-        // Primero obtener stores que tienen seller_id = sellerIds
+        // Obtener información de sellers (profiles)
         let sellersMap: Record<string, any> = {};
         if (sellerIds.length > 0) {
-          // Intentar obtener profiles directamente (puede fallar si seller_id apunta a auth.users)
-          const { data: profilesData, error: profilesError } = await supabase
-            .from('profiles')
-            .select('id, first_name, last_name, username')
-            .in('id', sellerIds);
-          
-          if (!profilesError && profilesData) {
-            sellersMap = (profilesData as any[]).reduce((acc: Record<string, any>, profile: any) => {
-              acc[profile.id] = profile;
-              return acc;
-            }, {} as Record<string, any>);
-          } else {
-            // Si falla, intentar obtener desde stores que tienen seller_id
-            const { data: storesWithSellers } = await supabase
-              .from('stores')
-              .select('seller_id, name')
-              .in('seller_id', sellerIds);
+          try {
+            // Intentar obtener profiles directamente
+            const { data: profilesData, error: profilesError } = await supabase
+              .from('profiles')
+              .select('id, first_name, last_name, username, email')
+              .in('id', sellerIds);
             
-            if (storesWithSellers) {
-              // Mapear seller_id a nombre de tienda como fallback
-              (storesWithSellers as any[]).forEach((store: any) => {
-                if (!sellersMap[store.seller_id]) {
-                  sellersMap[store.seller_id] = {
-                    id: store.seller_id,
-                    first_name: null,
-                    last_name: null,
-                    username: store.name,
-                  };
-                }
-              });
+            if (!profilesError && profilesData) {
+              sellersMap = (profilesData as any[]).reduce((acc: Record<string, any>, profile: any) => {
+                acc[profile.id] = profile;
+                return acc;
+              }, {} as Record<string, any>);
             }
+            
+            // Si algunos sellers no se encontraron, crear placeholder con el seller_id
+            sellerIds.forEach((id) => {
+              if (!sellersMap[id]) {
+                sellersMap[id] = {
+                  id: id,
+                  first_name: null,
+                  last_name: null,
+                  username: `Vendedor ${id.substring(0, 8)}`,
+                };
+              }
+            });
+          } catch (sellersErr) {
+            console.warn('Error loading sellers, using placeholders:', sellersErr);
+            // Si falla completamente, crear placeholders para todos
+            sellerIds.forEach((id) => {
+              sellersMap[id] = {
+                id: id,
+                first_name: null,
+                last_name: null,
+                username: `Vendedor`,
+              };
+            });
           }
         }
 
@@ -531,12 +535,8 @@ export default function ProductsListClient() {
                       ) : product.seller ? (
                         <Link
                           href={`/seller/${product.seller.id}`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            e.preventDefault();
-                            window.location.href = `/seller/${product.seller.id}`;
-                          }}
-                          className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline transition-colors cursor-pointer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-600 hover:text-blue-800 hover:underline transition-colors cursor-pointer"
                         >
                           <span>👤</span>
                           <span>
@@ -544,6 +544,15 @@ export default function ProductsListClient() {
                               ? `${product.seller.first_name || ''} ${product.seller.last_name || ''}`.trim()
                               : product.seller.username || 'Vendedor'}
                           </span>
+                        </Link>
+                      ) : product.seller_id ? (
+                        <Link
+                          href={`/seller/${product.seller_id}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-600 hover:text-blue-800 hover:underline transition-colors cursor-pointer"
+                        >
+                          <span>👤</span>
+                          <span>Ver tienda</span>
                         </Link>
                       ) : null}
                     </div>
