@@ -204,12 +204,45 @@ class ErrorMonitoringService {
 
   private async sendPerformanceReport(performanceReport: PerformanceReport): Promise<void> {
     try {
+      // Adaptar el formato del reporte al schema de la tabla performance_metrics
+      const adaptedReport: any = {
+        page_url: performanceReport.url,
+        session_id: performanceReport.session_id || this.sessionId,
+        user_id: performanceReport.user_id || this.userId || null,
+        timestamp: performanceReport.timestamp || new Date().toISOString(),
+      };
+
+      // Mapear métricas según el tipo
+      switch (performanceReport.metric_name) {
+        case 'page_load_time':
+          adaptedReport.page_load_time = Math.round(performanceReport.metric_value);
+          break;
+        case 'first_contentful_paint':
+          adaptedReport.first_contentful_paint = Math.round(performanceReport.metric_value);
+          break;
+        case 'largest_contentful_paint':
+          adaptedReport.largest_contentful_paint = Math.round(performanceReport.metric_value);
+          break;
+        case 'cumulative_layout_shift':
+          adaptedReport.cumulative_layout_shift = performanceReport.metric_value;
+          break;
+        case 'first_input_delay':
+          adaptedReport.first_input_delay = Math.round(performanceReport.metric_value);
+          break;
+        default:
+          // Si no es una métrica conocida, no enviar (silenciosamente)
+          return;
+      }
+
       const { error } = await (supabase as any)
         .from('performance_metrics')
-        .insert(performanceReport);
+        .insert(adaptedReport);
 
       if (error) {
-        console.error('Failed to send performance report:', error);
+        // Solo log en desarrollo, no romper la app
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('Failed to send performance report:', error);
+        }
       } else {
         // Remover de la cola si se envió exitosamente
         this.performanceQueue = this.performanceQueue.filter(
@@ -217,7 +250,10 @@ class ErrorMonitoringService {
         );
       }
     } catch (err) {
-      console.error('Error sending performance report:', err);
+      // Silencioso en producción, solo log en desarrollo
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('Error sending performance report:', err);
+      }
     }
   }
 

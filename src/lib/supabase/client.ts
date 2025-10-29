@@ -97,7 +97,46 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
       .eq('id', user.id)
       .single();
 
-    if (profileError || !profile) {
+    // Si hay error y no es 404, loguear pero no fallar silenciosamente
+    if (profileError) {
+      // Error 500 sugiere problema de RLS, reintentar una vez
+      if (profileError.code === 'PGRST500' || profileError.message?.includes('500')) {
+        console.warn('Profile query returned 500, retrying...');
+        // Reintentar una vez después de un breve delay
+        await new Promise(resolve => setTimeout(resolve, 100));
+        const { data: retryProfile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+        if (retryProfile) {
+          // Usar el resultado del reintento
+          const profile = retryProfile;
+          return {
+            id: (profile as any).id,
+            email: (profile as any).email || user.email,
+            role: (profile as any).role || 'buyer',
+            first_name: (profile as any).first_name,
+            last_name: (profile as any).last_name,
+            phone: (profile as any).phone,
+            avatar_url: (profile as any).avatar_url,
+            cover_url: (profile as any).cover_url,
+            bio: (profile as any).bio,
+            location: (profile as any).location,
+            verified: (profile as any).verified,
+            membership_level: (profile as any).membership_level,
+            membership_expires_at: (profile as any).membership_expires_at,
+            created_at: (profile as any).created_at,
+            updated_at: (profile as any).updated_at,
+          };
+        }
+      }
+      // Si sigue fallando o es otro error, retornar null
+      console.warn('Could not load profile:', profileError.message);
+      return null;
+    }
+
+    if (!profile) {
       return null;
     }
 

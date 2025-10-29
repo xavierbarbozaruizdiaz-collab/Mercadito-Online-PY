@@ -28,8 +28,18 @@ export function useNetworkStatus(): UseNetworkStatusReturn {
         (navigator as any).mozConnection ||
         (navigator as any).webkitConnection;
 
+      // Usar navigator.onLine como indicador primario
+      // Si dice offline pero la conexión existe, confiar en la conexión
+      let isReallyOnline = navigator.onLine;
+      
+      // Si navigator dice offline pero tenemos información de conexión activa, confiar en eso
+      if (!navigator.onLine && connection && connection.effectiveType) {
+        // Si hay información de conexión, probablemente está online pero el navegador lo detectó mal
+        isReallyOnline = true;
+      }
+
       const newStatus: UseNetworkStatusReturn = {
-        isOnline: navigator.onLine,
+        isOnline: isReallyOnline,
         isSlowConnection: false,
       };
 

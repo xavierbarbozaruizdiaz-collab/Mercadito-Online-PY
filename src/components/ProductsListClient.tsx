@@ -42,18 +42,49 @@ export default function ProductsListClient() {
     sortBy: 'date_desc'
   });
 
-  // Cargar categorías
+  // Cargar categorías con manejo de errores mejorado
   useEffect(() => {
-    (async () => {
-      const { data, error } = await supabase
-        .from('categories')
-        .select('id, name')
-        .order('name', { ascending: true });
-      
-      if (!error && data) {
-        setCategories(data);
+    let mounted = true;
+    let retries = 0;
+    const maxRetries = 3;
+
+    const loadCategories = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('categories')
+          .select('id, name')
+          .order('name', { ascending: true });
+        
+        if (error) {
+          console.error('Error loading categories:', error);
+          // Si es error 500, reintentar hasta 3 veces
+          if (error.code === 'PGRST500' || error.message?.includes('500') || error.message?.includes('internal')) {
+            if (retries < maxRetries && mounted) {
+              retries++;
+              setTimeout(loadCategories, 1000 * retries); // Backoff exponencial
+              return;
+            }
+          }
+          // Si es otro error o ya se intentó 3 veces, continuar sin categorías
+          return;
+        }
+        
+        if (mounted && data) {
+          setCategories(data);
+        }
+      } catch (err) {
+        console.error('Unexpected error loading categories:', err);
+        // Continuar sin categorías, no bloquear la app
       }
-    })();
+    };
+
+    // Esperar un poco para asegurar que Supabase está inicializado
+    const timer = setTimeout(loadCategories, 100);
+    
+    return () => {
+      mounted = false;
+      clearTimeout(timer);
+    };
   }, []);
 
   // Cargar productos con filtros
@@ -66,6 +97,10 @@ export default function ProductsListClient() {
     setError(null);
 
     try {
+      // Esperar un poco para asegurar que la sesión de Supabase está lista
+      // Esto ayuda a evitar errores en la primera carga
+      await new Promise(resolve => setTimeout(resolve, 50));
+
       let query = supabase
         .from('products')
         .select(`
@@ -78,7 +113,8 @@ export default function ProductsListClient() {
           sale_type,
           category_id,
           created_at
-        `);
+        `)
+        .eq('status', 'active'); // Solo productos activos
 
       // Filtro de búsqueda
       if (filters.search.trim()) {
@@ -135,7 +171,16 @@ export default function ProductsListClient() {
       setProducts(data || []);
 
     } catch (err: any) {
-      setError(err.message);
+      console.error('Error loading products:', err);
+      // Mensaje de error más amigable
+      const errorMessage = err?.message || 'Error al cargar productos. Por favor, inténtalo de nuevo.';
+      setError(errorMessage);
+      // Intentar nuevamente después de 3 segundos si es un error de red
+      if (errorMessage.includes('network') || errorMessage.includes('fetch')) {
+        setTimeout(() => {
+          loadProducts();
+        }, 3000);
+      }
     } finally {
       setLoading(false);
     }
