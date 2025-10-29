@@ -45,9 +45,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       .eq('status', 'active')
       .order('updated_at', { ascending: false });
 
-    const productPages = (products || []).map((product) => ({
+    const productPages = (products || []).map((product: any) => ({
       url: `${baseUrl}/products/${product.id}`,
-      lastModified: new Date(product.updated_at),
+      lastModified: new Date(product.updated_at || product.created_at),
       changeFrequency: 'weekly' as const,
       priority: 0.7,
     }));
@@ -59,9 +59,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       .eq('is_active', true)
       .order('updated_at', { ascending: false });
 
-    const storePages = (stores || []).map((store) => ({
+    const storePages = (stores || []).map((store: any) => ({
       url: `${baseUrl}/store/${store.slug}`,
-      lastModified: new Date(store.updated_at),
+      lastModified: new Date(store.updated_at || new Date()),
       changeFrequency: 'weekly' as const,
       priority: 0.6,
     }));
