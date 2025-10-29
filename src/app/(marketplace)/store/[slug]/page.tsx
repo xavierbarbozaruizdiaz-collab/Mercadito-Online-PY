@@ -118,23 +118,32 @@ export default function StoreProfilePage() {
       setStoreError(null);
       try {
         const storeData = await getStoreBySlug(storeSlug);
-        console.log('Store data loaded:', storeData);
+        console.log('🏪 Store data loaded:', storeData);
         if (storeData) {
           setStore(storeData);
-          if (storeData.id) {
-            setStoreId(storeData.id);
+          
+          // Asegurar que tenemos un storeId válido (usar id si existe, sino seller_id)
+          const validStoreId = storeData.id || storeData.seller_id || null;
+          const validSellerId = storeData.seller_id || null;
+          
+          if (validStoreId) {
+            setStoreId(validStoreId);
           }
-          if (storeData.seller_id) {
-            setSellerId(storeData.seller_id);
-            // Cargar productos usando seller_id (más confiable que store_id)
-            // Pasar storeId también pero seller_id tiene prioridad en la query
-            await loadStoreProducts(storeData.id || storeData.seller_id, 1, storeData.seller_id);
-          } else if (storeData.id) {
+          if (validSellerId) {
+            setSellerId(validSellerId);
+          }
+          
+          // Si tenemos seller_id, usarlo para cargar productos (más confiable)
+          if (validSellerId) {
+            console.log('🔄 Loading products with seller_id:', validSellerId, 'storeId:', validStoreId);
+            // Si storeId está vacío, usar seller_id también como storeId
+            await loadStoreProducts(validStoreId || validSellerId, 1, validSellerId);
+          } else if (validStoreId) {
             // Si no hay seller_id, intentar solo con store_id
-            console.warn('Store has no seller_id, trying with store_id only');
-            await loadStoreProducts(storeData.id, 1);
+            console.warn('⚠️ Store has no seller_id, trying with store_id only:', validStoreId);
+            await loadStoreProducts(validStoreId, 1);
           } else {
-            console.error('Store has no id or seller_id');
+            console.error('❌ Store has no id or seller_id');
             setStoreError('Tienda sin datos válidos');
           }
         } else {
@@ -185,8 +194,10 @@ export default function StoreProfilePage() {
 
   // Manejar cambio de página de productos
   const handleProductsPageChange = (page: number) => {
-    if (storeId) {
-      loadStoreProducts(storeId, page);
+    // Usar storeId si existe, sino sellerId como fallback
+    const validId = storeId || sellerId;
+    if (validId) {
+      loadStoreProducts(validId, page, sellerId || undefined);
     }
   };
 
