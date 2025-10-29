@@ -177,12 +177,16 @@ export default function SellerProfilePage() {
 
   async function loadProducts() {
     try {
+      console.log('🛒 Loading products for seller:', sellerId);
+      
       let query = supabase
         .from('products')
         .select('id, title, description, price, cover_url, condition, sale_type, created_at')
         .eq('seller_id', sellerId)
         // No filtrar por status - incluir productos sin status o con status activo
         .or('status.is.null,status.eq.active');
+      
+      console.log('📊 Query configured for seller:', sellerId);
 
       // Aplicar búsqueda
       if (searchQuery.trim()) {
