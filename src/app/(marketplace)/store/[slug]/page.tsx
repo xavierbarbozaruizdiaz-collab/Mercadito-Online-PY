@@ -22,7 +22,7 @@ import {
   Pagination
 } from '@/components/ui';
 import { useSellerProfile } from '@/lib/hooks/useSellerProfile';
-import { getStoreBySlug } from '@/lib/services/storeService';
+import { getStoreBySlug, getStoreProducts } from '@/lib/services/storeService';
 import { 
   Star,
   MapPin,
@@ -63,18 +63,56 @@ export default function StoreProfilePage() {
   const [isFollowing, setIsFollowing] = useState(false);
   const [isFavorited, setIsFavorited] = useState(false);
   const [sellerId, setSellerId] = useState<string | null>(null);
+  const [storeId, setStoreId] = useState<string | null>(null);
+  const [store, setStore] = useState<any>(null);
+  const [storeProducts, setStoreProducts] = useState<any[]>([]);
   const [storeLoading, setStoreLoading] = useState(true);
   const [storeError, setStoreError] = useState<string | null>(null);
+  const [productsPagination, setProductsPagination] = useState({
+    page: 1,
+    total_pages: 1,
+    total: 0,
+    per_page: 12,
+  });
 
-  // Obtener el sellerId desde el storeSlug
+  // Función para cargar productos de la tienda
+  const loadStoreProducts = async (currentStoreId: string, page: number = 1) => {
+    try {
+      const result = await getStoreProducts(currentStoreId, {
+        page,
+        limit: 12,
+        status: 'active',
+      });
+      setStoreProducts(result.products || []);
+      setProductsPagination({
+        page,
+        total_pages: result.total_pages,
+        total: result.total,
+        per_page: 12,
+      });
+    } catch (err) {
+      console.error('Error loading store products:', err);
+      setStoreProducts([]);
+    }
+  };
+
+  // Obtener el storeId y sellerId desde el storeSlug
   useEffect(() => {
-    async function loadStoreAndGetSellerId() {
+    async function loadStoreAndGetIds() {
       setStoreLoading(true);
       setStoreError(null);
       try {
         const storeData = await getStoreBySlug(storeSlug);
-        if (storeData && storeData.seller_id) {
-          setSellerId(storeData.seller_id);
+        if (storeData) {
+          setStore(storeData);
+          if (storeData.id) {
+            setStoreId(storeData.id);
+            // Cargar productos de la tienda específica
+            await loadStoreProducts(storeData.id, 1);
+          }
+          if (storeData.seller_id) {
+            setSellerId(storeData.seller_id);
+          }
         } else {
           setStoreError('Tienda no encontrada');
         }
@@ -87,34 +125,34 @@ export default function StoreProfilePage() {
     }
 
     if (storeSlug) {
-      loadStoreAndGetSellerId();
+      loadStoreAndGetIds();
     }
   }, [storeSlug]);
 
   const { 
     profile, 
-    products, 
     reviews,
     stats,
     loading: profileLoading, 
     error: profileError,
-    productsPagination,
     reviewsPagination,
-    loadProducts,
     loadReviews,
   } = useSellerProfile({
     sellerId: sellerId || undefined,
     autoLoad: !!sellerId,
   });
 
-  const store = profile?.store || null;
+  // Usar productos de la tienda en lugar de productos del seller
+  const products = storeProducts;
   
   const loading = storeLoading || profileLoading;
   const error = storeError || profileError;
 
   // Manejar cambio de página de productos
   const handleProductsPageChange = (page: number) => {
-    loadProducts({ page });
+    if (storeId) {
+      loadStoreProducts(storeId, page);
+    }
   };
 
   // Manejar cambio de página de reseñas
