@@ -2,6 +2,7 @@
 // Servicio completo para gestión de notificaciones
 
 import { supabase } from '@/lib/supabaseClient';
+import { normalizeRpcResult } from '@/lib/supabase/rpc';
 
 export interface Notification {
   id: string;
@@ -229,7 +230,7 @@ export class NotificationService {
       } as any);
 
       if (error) throw error;
-      return (data && data[0]) ? (data[0] as NotificationPreferences) : null;
+      return normalizeRpcResult<NotificationPreferences>(data);
     } catch (error) {
       console.error('Error getting notification preferences:', error);
       return null;
@@ -274,7 +275,7 @@ export class NotificationService {
       } as any);
 
       if (error) throw error;
-      return (data && data[0]) ? (data[0] as NotificationStats) : null;
+      return normalizeRpcResult<NotificationStats>(data);
     } catch (error) {
       console.error('Error getting notification stats:', error);
       return null;
@@ -302,7 +303,7 @@ export class NotificationService {
       } as any);
 
       if (error) throw error;
-      return (data && data[0]) ? data[0] : null;
+      return normalizeRpcResult(data);
     } catch (error) {
       console.error('Error checking should send notification:', error);
       return null;

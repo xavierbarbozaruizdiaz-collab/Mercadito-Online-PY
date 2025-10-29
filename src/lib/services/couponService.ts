@@ -2,6 +2,7 @@
 // Servicio para gestión de cupones y descuentos
 
 import { supabase } from '@/lib/supabaseClient';
+import { normalizeRpcResult } from '@/lib/supabase/rpc';
 
 export interface Coupon {
   id: string;
@@ -94,7 +95,7 @@ export class CouponService {
 
       if (error) throw error;
 
-      const result = data && data[0] ? data[0] : null;
+      const result = normalizeRpcResult(data);
       if (!result) {
         return {
           valid: false,
@@ -201,7 +202,7 @@ export class CouponService {
 
       if (error) throw error;
 
-      const result = data && data[0] ? data[0] : null;
+      const result = normalizeRpcResult(data);
       if (!result) {
         return {
           valid: false,

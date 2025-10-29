@@ -2,6 +2,7 @@
 // Servicio para analytics avanzados de vendedores
 
 import { supabase } from '@/lib/supabaseClient';
+import { normalizeRpcResult, normalizeRpcList } from '@/lib/supabase/rpc';
 
 export interface SalesStats {
   total_orders: number;
@@ -70,7 +71,7 @@ export class SellerAnalyticsService {
       } as any);
 
       if (error) throw error;
-      return (data && data[0]) ? (data[0] as SalesStats) : null;
+      return normalizeRpcResult<SalesStats>(data);
     } catch (error) {
       console.error('Error getting sales stats:', error);
       return null;
@@ -95,7 +96,7 @@ export class SellerAnalyticsService {
       } as any);
 
       if (error) throw error;
-      return (data || []) as SalesTrendData[];
+      return normalizeRpcList<SalesTrendData>(data);
     } catch (error) {
       console.error('Error getting sales trend:', error);
       return [];
@@ -123,7 +124,7 @@ export class SellerAnalyticsService {
       } as any);
 
       if (error) throw error;
-      return (data || []) as TopProduct[];
+      return normalizeRpcList<TopProduct>(data);
     } catch (error) {
       console.error('Error getting top products:', error);
       return [];
@@ -149,7 +150,7 @@ export class SellerAnalyticsService {
       } as any);
 
       if (error) throw error;
-      return (data || []) as CategoryStats[];
+      return normalizeRpcList<CategoryStats>(data);
     } catch (error) {
       console.error('Error getting category stats:', error);
       return [];
@@ -175,7 +176,7 @@ export class SellerAnalyticsService {
       } as any);
 
       if (error) throw error;
-      return (data && data[0]) ? (data[0] as ConversionMetrics) : null;
+      return normalizeRpcResult<ConversionMetrics>(data);
     } catch (error) {
       console.error('Error getting conversion metrics:', error);
       return null;

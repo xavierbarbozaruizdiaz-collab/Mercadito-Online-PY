@@ -2,6 +2,7 @@
 // Servicio para features avanzadas del marketplace
 
 import { supabase } from '@/lib/supabaseClient';
+import { normalizeRpcList } from '@/lib/supabase/rpc';
 
 export interface ProductQuestion {
   id: string;
@@ -362,7 +363,7 @@ export class MarketplaceFeaturesService {
       } as any);
 
       if (error) throw error;
-      return (data || []) as PriceHistory[];
+      return normalizeRpcList<PriceHistory>(data);
     } catch (error) {
       console.error('Error getting price history:', error);
       return [];

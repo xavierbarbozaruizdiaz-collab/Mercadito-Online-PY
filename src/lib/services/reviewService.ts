@@ -2,6 +2,7 @@
 // Servicio mejorado para gestión de reviews y ratings
 
 import { supabase } from '@/lib/supabaseClient';
+import { normalizeRpcResult } from '@/lib/supabase/rpc';
 
 export interface Review {
   id: string;
@@ -370,7 +371,7 @@ export class ReviewService {
       } as any);
 
       if (error) throw error;
-      return (data && data[0]) ? (data[0] as ReviewStats) : null;
+      return normalizeRpcResult<ReviewStats>(data);
     } catch (error) {
       console.error('Error getting product rating stats:', error);
       return null;
@@ -389,7 +390,7 @@ export class ReviewService {
       } as any);
 
       if (error) throw error;
-      return (data && data[0]) ? (data[0] as ReviewStats) : null;
+      return normalizeRpcResult<ReviewStats>(data);
     } catch (error) {
       console.error('Error getting store rating stats:', error);
       return null;
