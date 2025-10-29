@@ -125,6 +125,7 @@ export default function ProductsListClient() {
       // Esto ayuda a evitar errores en la primera carga
       await new Promise(resolve => setTimeout(resolve, 50));
 
+      // Query sin joins que pueden fallar - obtendremos seller/store después si es necesario
       let query = supabase
         .from('products')
         .select(`
@@ -138,9 +139,7 @@ export default function ProductsListClient() {
           category_id,
           seller_id,
           store_id,
-          created_at,
-          seller:profiles!products_seller_id_fkey(id, first_name, last_name, username),
-          store:stores!products_store_id_fkey(id, name, slug)
+          created_at
         `)
         .eq('status', 'active'); // Solo productos activos
 
@@ -194,10 +193,61 @@ export default function ProductsListClient() {
           break;
       }
 
-      const { data, error } = await query;
+      const { data: productsData, error: queryError } = await query;
 
-      if (error) throw error;
-      setProducts(data || []);
+      if (queryError) {
+        throw queryError;
+      }
+
+      // Si hay productos, obtener información de sellers y stores por separado
+      if (productsData && productsData.length > 0) {
+        // Obtener sellers únicos
+        const sellerIds = [...new Set(productsData.map((p: any) => p.seller_id).filter(Boolean))] as string[];
+        const storeIds = [...new Set(productsData.map((p: any) => p.store_id).filter(Boolean))] as string[];
+        
+        // Obtener información de profiles (vendedores)
+        let sellersMap: Record<string, any> = {};
+        if (sellerIds.length > 0) {
+          const { data: sellersData } = await supabase
+            .from('profiles')
+            .select('id, first_name, last_name, username')
+            .in('id', sellerIds);
+          
+          if (sellersData) {
+            sellersMap = (sellersData as any[]).reduce((acc: Record<string, any>, seller: any) => {
+              acc[seller.id] = seller;
+              return acc;
+            }, {} as Record<string, any>);
+          }
+        }
+
+        // Obtener información de stores
+        let storesMap: Record<string, any> = {};
+        if (storeIds.length > 0) {
+          const { data: storesData } = await supabase
+            .from('stores')
+            .select('id, name, slug')
+            .in('id', storeIds);
+          
+          if (storesData) {
+            storesMap = (storesData as any[]).reduce((acc: Record<string, any>, store: any) => {
+              acc[store.id] = store;
+              return acc;
+            }, {} as Record<string, any>);
+          }
+        }
+
+        // Enriquecer productos con información de sellers y stores
+        const enrichedProducts = (productsData as any[]).map((product: any) => ({
+          ...product,
+          seller: product.seller_id ? (sellersMap[product.seller_id] || null) : null,
+          store: product.store_id ? (storesMap[product.store_id] || null) : null,
+        }));
+
+        setProducts(enrichedProducts);
+      } else {
+        setProducts([]);
+      }
 
     } catch (err: any) {
       console.error('Error loading products:', err);

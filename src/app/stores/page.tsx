@@ -106,8 +106,8 @@ export default function StoresPage() {
           logo_url,
           cover_image_url,
           is_active,
-          created_at,
-          seller:profiles!stores_seller_id_fkey(id, first_name, last_name)
+          seller_id,
+          created_at
         `)
         .eq('is_active', true);
 
@@ -129,13 +129,40 @@ export default function StoresPage() {
       // TODO: Filtro de categoría (requiere join con productos)
       // Por ahora se omite hasta tener mejor estructura
 
-      const { data, error: queryError } = await query.order('created_at', { ascending: false });
+      const { data: storesData, error: queryError } = await query.order('created_at', { ascending: false });
 
       if (queryError) {
         throw queryError;
       }
 
-      setStores(data || []);
+      // Si hay stores, obtener información de sellers por separado
+      if (storesData && storesData.length > 0) {
+        const sellerIds = [...new Set((storesData as any[]).map((s: any) => s.seller_id).filter(Boolean))] as string[];
+        
+        let sellersMap: Record<string, any> = {};
+        if (sellerIds.length > 0) {
+          const { data: sellersData } = await supabase
+            .from('profiles')
+            .select('id, first_name, last_name')
+            .in('id', sellerIds);
+          
+          if (sellersData) {
+            sellersMap = (sellersData as any[]).reduce((acc: Record<string, any>, seller: any) => {
+              acc[seller.id] = seller;
+              return acc;
+            }, {} as Record<string, any>);
+          }
+        }
+
+        const enrichedStores = (storesData as any[]).map((store: any) => ({
+          ...store,
+          seller: store.seller_id ? (sellersMap[store.seller_id] || null) : null,
+        }));
+
+        setStores(enrichedStores);
+      } else {
+        setStores([]);
+      }
     } catch (err: any) {
       console.error('Error loading stores:', err);
       setError(err.message || 'Error al cargar tiendas');

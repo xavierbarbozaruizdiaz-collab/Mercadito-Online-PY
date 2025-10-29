@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Search, X } from 'lucide-react';
 
@@ -15,7 +15,7 @@ interface SearchBarProps {
   onSearch?: (query: string) => void;
 }
 
-export default function SearchBar({ 
+function SearchBarContent({ 
   className = '',
   placeholder = 'Buscar productos...',
   onSearch
@@ -88,6 +88,23 @@ export default function SearchBar({
         )}
       </div>
     </form>
+  );
+}
+
+export default function SearchBar(props: SearchBarProps) {
+  return (
+    <Suspense fallback={
+      <div className={`relative flex-1 max-w-xl ${props.className || ''}`}>
+        <input
+          type="text"
+          placeholder={props.placeholder || 'Buscar productos...'}
+          disabled
+          className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg text-sm sm:text-base opacity-50"
+        />
+      </div>
+    }>
+      <SearchBarContent {...props} />
+    </Suspense>
   );
 }
 
