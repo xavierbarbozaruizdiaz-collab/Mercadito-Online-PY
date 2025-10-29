@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -22,6 +22,7 @@ import {
   Pagination
 } from '@/components/ui';
 import { useSellerProfile } from '@/lib/hooks/useSellerProfile';
+import { getStoreBySlug } from '@/lib/services/storeService';
 import { 
   Star,
   MapPin,
@@ -61,26 +62,55 @@ export default function StoreProfilePage() {
   const [activeTab, setActiveTab] = useState<'products' | 'reviews' | 'about' | 'policies'>('products');
   const [isFollowing, setIsFollowing] = useState(false);
   const [isFavorited, setIsFavorited] = useState(false);
+  const [sellerId, setSellerId] = useState<string | null>(null);
+  const [storeLoading, setStoreLoading] = useState(true);
+  const [storeError, setStoreError] = useState<string | null>(null);
 
-  // TODO: Obtener el sellerId desde el storeSlug
-  // Por ahora usamos un ID simulado
+  // Obtener el sellerId desde el storeSlug
+  useEffect(() => {
+    async function loadStoreAndGetSellerId() {
+      setStoreLoading(true);
+      setStoreError(null);
+      try {
+        const storeData = await getStoreBySlug(storeSlug);
+        if (storeData && storeData.seller_id) {
+          setSellerId(storeData.seller_id);
+        } else {
+          setStoreError('Tienda no encontrada');
+        }
+      } catch (err) {
+        console.error('Error loading store:', err);
+        setStoreError('No se pudo cargar la información de la tienda.');
+      } finally {
+        setStoreLoading(false);
+      }
+    }
+
+    if (storeSlug) {
+      loadStoreAndGetSellerId();
+    }
+  }, [storeSlug]);
+
   const { 
     profile, 
     products, 
     reviews,
     stats,
-    loading, 
-    error,
+    loading: profileLoading, 
+    error: profileError,
     productsPagination,
     reviewsPagination,
     loadProducts,
     loadReviews,
   } = useSellerProfile({
-    sellerId: 'seller-1', // TODO: Obtener desde el storeSlug
-    autoLoad: true,
+    sellerId: sellerId || undefined,
+    autoLoad: !!sellerId,
   });
 
   const store = profile?.store || null;
+  
+  const loading = storeLoading || profileLoading;
+  const error = storeError || profileError;
 
   // Manejar cambio de página de productos
   const handleProductsPageChange = (page: number) => {
