@@ -324,7 +324,6 @@ export class ReviewService {
         .select(
           `
           *,
-          buyer:profiles!reviews_buyer_id_fkey(id, first_name, last_name, email, avatar_url),
           images:review_images(*),
           response:review_responses(*)
         `,
