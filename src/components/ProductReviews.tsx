@@ -320,7 +320,7 @@ export default function ProductReviews({
                       <span className="text-sm font-medium">
                         {((review.buyer?.first_name || review.buyer?.last_name 
                           ? `${review.buyer.first_name || ''} ${review.buyer.last_name || ''}`.trim()
-                          : review.buyer?.email?.split('@')[0] || 'U').charAt(0).toUpperCase()}
+                          : review.buyer?.email?.split('@')[0] || 'U')).charAt(0).toUpperCase()}
                       </span>
                     )}
                   </div>
