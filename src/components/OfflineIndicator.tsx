@@ -7,18 +7,27 @@ import { useNetworkStatus } from '@/lib/hooks/useNetworkStatus';
 import { WifiOff, Wifi, Gauge } from 'lucide-react';
 
 export default function OfflineIndicator() {
-  const { isOnline, isSlowConnection, effectiveType } = useNetworkStatus();
-  
-  // No mostrar en localhost (desarrollo)
-  const isLocalhost = typeof window !== 'undefined' && 
-    (window.location.hostname === 'localhost' || 
-     window.location.hostname === '127.0.0.1' ||
-     window.location.hostname.startsWith('192.168.') ||
-     window.location.hostname.startsWith('10.') ||
-     window.location.hostname.startsWith('172.'));
+  // Siempre ocultar en desarrollo local
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
+    const isLocalhost = 
+      hostname === 'localhost' || 
+      hostname === '127.0.0.1' ||
+      hostname.startsWith('192.168.') ||
+      hostname.startsWith('10.') ||
+      hostname.startsWith('172.') ||
+      hostname.includes('local');
+    
+    // En desarrollo, nunca mostrar el indicador
+    if (isLocalhost) {
+      return null;
+    }
+  }
 
-  // No mostrar nada si todo está bien o estamos en localhost
-  if ((isOnline && !isSlowConnection) || isLocalhost) {
+  const { isOnline, isSlowConnection, effectiveType } = useNetworkStatus();
+
+  // No mostrar nada si todo está bien
+  if (isOnline && !isSlowConnection) {
     return null;
   }
 

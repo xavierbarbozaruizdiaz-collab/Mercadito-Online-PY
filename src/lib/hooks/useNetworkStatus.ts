@@ -15,14 +15,16 @@ interface UseNetworkStatusReturn {
 }
 
 export function useNetworkStatus(): UseNetworkStatusReturn {
-  // En desarrollo local, asumir que siempre hay conexión
+  // Detectar si estamos en desarrollo local
   const isLocalhost = typeof window !== 'undefined' && 
     (window.location.hostname === 'localhost' || 
      window.location.hostname === '127.0.0.1' ||
      window.location.hostname.startsWith('192.168.') ||
      window.location.hostname.startsWith('10.') ||
-     window.location.hostname.startsWith('172.'));
+     window.location.hostname.startsWith('172.') ||
+     window.location.hostname.includes('local'));
 
+  // En desarrollo local, SIEMPRE retornar online=true sin importar navigator.onLine
   const [status, setStatus] = useState<UseNetworkStatusReturn>({
     isOnline: isLocalhost ? true : (typeof navigator !== 'undefined' ? navigator.onLine : true),
     isSlowConnection: false,
@@ -31,13 +33,13 @@ export function useNetworkStatus(): UseNetworkStatusReturn {
   useEffect(() => {
     if (typeof navigator === 'undefined') return;
 
-    // En localhost, siempre considerar online
+    // En localhost, SIEMPRE considerar online (forzar true)
     if (isLocalhost) {
       setStatus({
         isOnline: true,
         isSlowConnection: false,
       });
-      return;
+      return; // Salir inmediatamente, no escuchar eventos de red en desarrollo
     }
 
     const updateStatus = async () => {
