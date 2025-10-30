@@ -33,15 +33,33 @@ export default function NewProduct() {
     setCategoriesLoading(true);
     try {
       console.log('🔄 Cargando categorías...');
+      
+      // Intentar query simple sin joins que puedan activar políticas problemáticas
       const { data, error } = await supabase
         .from('categories')
-        .select('id, name')
+        .select('id, name')  // Solo campos necesarios, sin joins
         .order('name', { ascending: true });
       
       if (error) {
-        console.error('❌ Error cargando categorías:', error);
-        showMsg('error', `Error cargando categorías: ${error.message}`);
-        setCategories([]);
+        // Si hay error de recursión infinita, mostrar mensaje específico
+        if (error.code === '42P17' || error.message?.includes('infinite recursion')) {
+          console.error('❌ Error de recursión infinita en políticas RLS:', error);
+          showMsg('error', 'Error de configuración en la base de datos. Contacta al administrador.');
+          // Intentar con categorías hardcodeadas como fallback temporal
+          setCategories([
+            { id: 'temp-1', name: 'Electrónicos' },
+            { id: 'temp-2', name: 'Ropa y Accesorios' },
+            { id: 'temp-3', name: 'Hogar y Jardín' },
+            { id: 'temp-4', name: 'Deportes y Fitness' },
+            { id: 'temp-5', name: 'Automotriz' },
+            { id: 'temp-6', name: 'Otros' },
+          ] as Category[]);
+          showMsg('error', '⚠️ Usando categorías temporales. Se requiere corregir políticas RLS en Supabase.');
+        } else {
+          console.error('❌ Error cargando categorías:', error);
+          showMsg('error', `Error cargando categorías: ${error.message}`);
+          setCategories([]);
+        }
       } else if (data) {
         console.log('✅ Categorías cargadas:', data.length);
         setCategories(data);
@@ -49,9 +67,13 @@ export default function NewProduct() {
         console.warn('⚠️ No se recibieron categorías');
         setCategories([]);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('❌ Error de conexión cargando categorías:', err);
-      showMsg('error', 'Error de conexión al cargar categorías');
+      if (err?.code === '42P17' || err?.message?.includes('infinite recursion')) {
+        showMsg('error', 'Error de recursión en políticas RLS. Ejecuta la migración fix_profiles_recursion.sql');
+      } else {
+        showMsg('error', 'Error de conexión al cargar categorías');
+      }
       setCategories([]);
     } finally {
       setCategoriesLoading(false);
