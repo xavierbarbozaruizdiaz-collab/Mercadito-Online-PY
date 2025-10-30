@@ -251,9 +251,40 @@ export class ReviewService {
         .single();
 
       if (error) throw error;
+      if (!data) return null;
+
+      // Obtener información del buyer (profile) por separado
+      let buyer = null;
+      if (data.buyer_id) {
+        try {
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('id, first_name, last_name, email, avatar_url')
+            .eq('id', data.buyer_id)
+            .single();
+          
+          if (profileData) {
+            buyer = profileData;
+          }
+        } catch (err) {
+          console.warn('Error loading buyer profile:', err);
+        }
+      }
+
+      // Combinar datos
+      const reviewWithBuyer = {
+        ...data,
+        buyer: buyer || {
+          id: data.buyer_id,
+          first_name: null,
+          last_name: null,
+          email: null,
+          avatar_url: null,
+        },
+      };
 
       // Verificar si el usuario actual marcó como útil
-      if (currentUserId && data) {
+      if (currentUserId && reviewWithBuyer) {
         const { data: helpful } = await supabase
           .from('review_helpful')
           .select('id')
@@ -261,10 +292,10 @@ export class ReviewService {
           .eq('user_id', currentUserId)
           .single();
 
-        (data as any).is_helpful = !!helpful;
+        reviewWithBuyer.is_helpful = !!helpful;
       }
 
-      return data as Review;
+      return reviewWithBuyer as Review;
     } catch (error) {
       console.error('Error getting review:', error);
       return null;
