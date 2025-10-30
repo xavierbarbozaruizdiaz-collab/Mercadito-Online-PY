@@ -333,22 +333,40 @@ export default function NewProduct() {
         throw new Error(`Error al actualizar portada: ${updateError.message}`);
       }
 
-      // Success
-      showMsg('success', '✅ Producto agregado correctamente');
+      console.log('✅ Producto y imágenes creadas exitosamente');
       
-      // Limpiar form
-      setTitle(''); 
-      setDescription(''); 
-      setPrice(''); 
+      showMsg('success', '✅ Producto creado exitosamente. Redirigiendo...');
+      
+      // Limpiar formulario
+      setTitle('');
+      setDescription('');
+      setPrice('');
+      setSaleType('direct');
+      setCondition('nuevo');
+      setCategoryId(null);
       imagePreviews.forEach(({ preview }) => URL.revokeObjectURL(preview));
       setImagePreviews([]);
-      setSaleType('direct'); 
-      setCondition('nuevo'); 
-      setCategoryId(null);
+      setValidationErrors({});
+
+      // Recargar categorías por si acaso
+      await loadCategories();
+
+      // Redirigir al dashboard después de un breve delay
+      setTimeout(() => {
+        window.location.href = '/dashboard';
+      }, 2000);
+    } catch (err: any) {
+      console.error('❌ Error completo:', err);
+      const errorMessage = err instanceof Error 
+        ? err.message 
+        : (err?.message || 'Error al guardar el producto');
       
-    } catch (err: unknown) {
-      showMsg('error', '❌ ' + (err instanceof Error ? err.message : 'Error al guardar'));
+      showMsg('error', `❌ ${errorMessage}`);
+      
+      // Recargar categorías en caso de error para que sigan disponibles
+      await loadCategories();
     } finally {
+      // Asegurarse de que siempre se libere el loading
       setLoading(false);
     }
   }
