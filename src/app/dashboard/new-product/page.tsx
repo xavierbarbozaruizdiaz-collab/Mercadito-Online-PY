@@ -242,8 +242,27 @@ export default function NewProduct() {
       if (imagePreviews.length === 0) throw new Error('Agrega al menos una imagen');
 
       // Obtener usuario actual
-      const { data: session } = await supabase.auth.getSession();
-      const seller_id = session?.session?.user?.id ?? null;
+      const { data: session, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        throw new Error('Error al obtener la sesión del usuario');
+      }
+      
+      const seller_id = session?.session?.user?.id;
+      
+      if (!seller_id) {
+        throw new Error('No estás autenticado. Por favor, inicia sesión.');
+      }
+
+      console.log('📦 Creando producto con datos:', {
+        title: title.trim(),
+        description: description.trim() || null,
+        price: priceNumber,
+        sale_type: saleType,
+        condition,
+        category_id: categoryId,
+        seller_id,
+      });
 
       // 1. Insertar producto
       const { data: newProduct, error: insertError } = await supabase
@@ -260,7 +279,16 @@ export default function NewProduct() {
         .select('id')
         .single();
 
-      if (insertError || !newProduct) throw insertError;
+      if (insertError) {
+        console.error('❌ Error insertando producto:', insertError);
+        throw new Error(insertError.message || 'Error al crear el producto');
+      }
+      
+      if (!newProduct) {
+        throw new Error('No se pudo crear el producto');
+      }
+      
+      console.log('✅ Producto creado:', newProduct.id);
 
       // 2. Comprimir imágenes
       const compressed = await Promise.all(
@@ -273,21 +301,21 @@ export default function NewProduct() {
       );
 
       // 4. Guardar referencias en product_images
-      const { error: imagesError } = await supabase
+      const { error: imagesError } = await (supabase as any)
         .from('product_images')
         .insert(imageUrls.map((url, idx) => ({
           product_id: newProduct.id,
           image_url: url,
           url: url, // Para compatibilidad
           is_cover: idx === 0, // La primera imagen es la portada
-        })));
+        })) as any);
 
       if (imagesError) throw imagesError;
 
       // 5. Actualizar cover_url
-      const { error: updateError } = await supabase
+      const { error: updateError } = await (supabase as any)
         .from('products')
-        .update({ cover_url: imageUrls[0] })
+        .update({ cover_url: imageUrls[0] } as any)
         .eq('id', newProduct.id);
 
       if (updateError) throw updateError;
