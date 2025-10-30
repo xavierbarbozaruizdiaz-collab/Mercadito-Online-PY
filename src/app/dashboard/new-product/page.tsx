@@ -26,23 +26,35 @@ export default function NewProduct() {
   const [hoveredImage, setHoveredImage] = useState<number | null>(null);
 
   const [categories, setCategories] = useState<Category[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
 
   // Función para cargar categorías
   const loadCategories = async () => {
+    setCategoriesLoading(true);
     try {
+      console.log('🔄 Cargando categorías...');
       const { data, error } = await supabase
         .from('categories')
         .select('id, name')
         .order('name', { ascending: true });
       
       if (error) {
-        console.error('Error cargando categorías:', error);
-        // No mostrar error al usuario aquí, solo loguear
+        console.error('❌ Error cargando categorías:', error);
+        showMsg('error', `Error cargando categorías: ${error.message}`);
+        setCategories([]);
       } else if (data) {
+        console.log('✅ Categorías cargadas:', data.length);
         setCategories(data);
+      } else {
+        console.warn('⚠️ No se recibieron categorías');
+        setCategories([]);
       }
     } catch (err) {
-      console.error('Error de conexión cargando categorías:', err);
+      console.error('❌ Error de conexión cargando categorías:', err);
+      showMsg('error', 'Error de conexión al cargar categorías');
+      setCategories([]);
+    } finally {
+      setCategoriesLoading(false);
     }
   };
 
@@ -501,14 +513,32 @@ export default function NewProduct() {
               validateField('categoryId', e.target.value);
             }}
             required
+            disabled={categoriesLoading}
           >
-            <option value="">— Selecciona una categoría —</option>
+            <option value="">
+              {categoriesLoading ? 'Cargando categorías...' : '— Selecciona una categoría —'}
+            </option>
             {categories.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
               </option>
             ))}
           </select>
+          {categoriesLoading && (
+            <p className="text-sm text-gray-500 mt-1">Cargando categorías...</p>
+          )}
+          {!categoriesLoading && categories.length === 0 && (
+            <p className="text-yellow-600 text-sm mt-1">
+              No hay categorías disponibles. 
+              <button 
+                type="button"
+                onClick={loadCategories}
+                className="ml-1 underline hover:text-yellow-800"
+              >
+                Reintentar
+              </button>
+            </p>
+          )}
           {validationErrors.categoryId && (
             <p className="text-red-500 text-sm mt-1">{validationErrors.categoryId}</p>
           )}
