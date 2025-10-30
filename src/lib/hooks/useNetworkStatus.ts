@@ -15,25 +15,57 @@ interface UseNetworkStatusReturn {
 }
 
 export function useNetworkStatus(): UseNetworkStatusReturn {
+  // En desarrollo local, asumir que siempre hay conexión
+  const isLocalhost = typeof window !== 'undefined' && 
+    (window.location.hostname === 'localhost' || 
+     window.location.hostname === '127.0.0.1' ||
+     window.location.hostname.startsWith('192.168.') ||
+     window.location.hostname.startsWith('10.') ||
+     window.location.hostname.startsWith('172.'));
+
   const [status, setStatus] = useState<UseNetworkStatusReturn>({
-    isOnline: typeof navigator !== 'undefined' ? navigator.onLine : true,
+    isOnline: isLocalhost ? true : (typeof navigator !== 'undefined' ? navigator.onLine : true),
     isSlowConnection: false,
   });
 
   useEffect(() => {
     if (typeof navigator === 'undefined') return;
 
-    const updateStatus = () => {
+    // En localhost, siempre considerar online
+    if (isLocalhost) {
+      setStatus({
+        isOnline: true,
+        isSlowConnection: false,
+      });
+      return;
+    }
+
+    const updateStatus = async () => {
       const connection = (navigator as any).connection ||
         (navigator as any).mozConnection ||
         (navigator as any).webkitConnection;
 
-      // Usar navigator.onLine como indicador primario
-      // Si dice offline pero la conexión existe, confiar en la conexión
+      // Verificar conexión real haciendo un ping ligero
       let isReallyOnline = navigator.onLine;
       
+      // Si navigator dice offline, verificar con un fetch rápido
+      if (!navigator.onLine) {
+        try {
+          // Intentar hacer un fetch a un recurso pequeño para verificar conexión real
+          const response = await fetch('/favicon.ico', { 
+            method: 'HEAD', 
+            cache: 'no-cache',
+            signal: AbortSignal.timeout(2000) // Timeout de 2 segundos
+          });
+          isReallyOnline = response.ok;
+        } catch (err) {
+          // Si falla, está realmente offline
+          isReallyOnline = false;
+        }
+      }
+      
       // Si navigator dice offline pero tenemos información de conexión activa, confiar en eso
-      if (!navigator.onLine && connection && connection.effectiveType) {
+      if (!isReallyOnline && connection && connection.effectiveType) {
         // Si hay información de conexión, probablemente está online pero el navegador lo detectó mal
         isReallyOnline = true;
       }
@@ -80,7 +112,7 @@ export function useNetworkStatus(): UseNetworkStatusReturn {
         (navigator as any).connection.removeEventListener('change', updateStatus);
       }
     };
-  }, []);
+  }, [isLocalhost]);
 
   return status;
 }
