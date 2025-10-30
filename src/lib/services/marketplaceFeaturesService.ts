@@ -124,10 +124,7 @@ export class MarketplaceFeaturesService {
     try {
       let query = supabase
         .from('product_questions')
-        .select(`
-          *,
-          asker:profiles!product_questions_user_id_fkey(id, first_name, last_name, email)
-        `)
+        .select('*')
         .eq('product_id', productId)
         .eq('is_public', true)
         .order('created_at', { ascending: false });
@@ -143,7 +140,40 @@ export class MarketplaceFeaturesService {
       const { data, error } = await query;
 
       if (error) throw error;
-      return (data || []) as ProductQuestion[];
+      
+      // Obtener información de askers (profiles) por separado
+      const userIds = [...new Set((data || []).map((q: any) => q.user_id).filter(Boolean))];
+      let askersMap: Record<string, any> = {};
+      
+      if (userIds.length > 0) {
+        try {
+          const { data: profilesData, error: profilesError } = await supabase
+            .from('profiles')
+            .select('id, first_name, last_name, email')
+            .in('id', userIds);
+          
+          if (!profilesError && profilesData) {
+            profilesData.forEach((profile: any) => {
+              askersMap[profile.id] = profile;
+            });
+          }
+        } catch (err) {
+          console.warn('Error loading asker profiles:', err);
+        }
+      }
+
+      // Combinar datos de questions con asker info
+      const questionsWithAskers = (data || []).map((question: any) => ({
+        ...question,
+        asker: askersMap[question.user_id] || {
+          id: question.user_id,
+          first_name: null,
+          last_name: null,
+          email: null,
+        },
+      }));
+
+      return questionsWithAskers as ProductQuestion[];
     } catch (error) {
       console.error('Error getting questions:', error);
       return [];

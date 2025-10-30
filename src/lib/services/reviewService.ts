@@ -244,7 +244,6 @@ export class ReviewService {
         .from('reviews')
         .select(`
           *,
-          buyer:profiles!reviews_buyer_id_fkey(id, first_name, last_name, email, avatar_url),
           images:review_images(*),
           response:review_responses(*)
         `)
@@ -348,8 +347,41 @@ export class ReviewService {
       const total = count || 0;
       const total_pages = Math.ceil(total / limit);
 
+      // Obtener información de buyers (profiles) por separado
+      const buyerIds = [...new Set((data || []).map((r: any) => r.buyer_id).filter(Boolean))];
+      let buyersMap: Record<string, any> = {};
+      
+      if (buyerIds.length > 0) {
+        try {
+          const { data: profilesData, error: profilesError } = await supabase
+            .from('profiles')
+            .select('id, first_name, last_name, email, avatar_url')
+            .in('id', buyerIds);
+          
+          if (!profilesError && profilesData) {
+            profilesData.forEach((profile: any) => {
+              buyersMap[profile.id] = profile;
+            });
+          }
+        } catch (err) {
+          console.warn('Error loading buyer profiles:', err);
+        }
+      }
+
+      // Combinar datos de reviews con buyer info
+      const reviewsWithBuyers = (data || []).map((review: any) => ({
+        ...review,
+        buyer: buyersMap[review.buyer_id] || {
+          id: review.buyer_id,
+          first_name: null,
+          last_name: null,
+          email: null,
+          avatar_url: null,
+        },
+      }));
+
       return {
-        reviews: (data || []) as Review[],
+        reviews: reviewsWithBuyers as Review[],
         total,
         total_pages,
       };
