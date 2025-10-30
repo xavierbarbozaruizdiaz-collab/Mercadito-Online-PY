@@ -91,10 +91,14 @@ export default function SellerProfilePage() {
 
   // Cargar productos cuando cambian los filtros
   useEffect(() => {
-    if (profile) {
+    console.log('🔄 useEffect triggered - profile:', !!profile, 'sellerId:', sellerId);
+    if (profile && sellerId) {
+      console.log('✅ Calling loadProducts...');
       loadProducts();
+    } else {
+      console.log('⏳ Waiting for profile or sellerId...');
     }
-  }, [sellerId, filters, searchQuery, sortBy]);
+  }, [sellerId, filters, searchQuery, sortBy, profile]);
 
   // Cargar categorías
   useEffect(() => {
@@ -176,15 +180,20 @@ export default function SellerProfilePage() {
   }
 
   async function loadProducts() {
+    if (!sellerId) {
+      console.error('❌ No sellerId provided to loadProducts');
+      setProducts([]);
+      return;
+    }
+    
     try {
       console.log('🛒 Loading products for seller:', sellerId);
       
+      // Primero intentar sin filtro de status para ver todos los productos
       let query = supabase
         .from('products')
-        .select('id, title, description, price, cover_url, condition, sale_type, created_at')
-        .eq('seller_id', sellerId)
-        // No filtrar por status - incluir productos sin status o con status activo
-        .or('status.is.null,status.eq.active');
+        .select('id, title, description, price, cover_url, condition, sale_type, created_at, seller_id, status')
+        .eq('seller_id', sellerId);
       
       console.log('📊 Query configured for seller:', sellerId);
 
