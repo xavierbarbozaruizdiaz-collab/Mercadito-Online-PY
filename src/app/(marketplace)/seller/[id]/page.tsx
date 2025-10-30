@@ -242,12 +242,15 @@ export default function SellerProfilePage() {
         .order(orderColumn, { ascending });
 
       if (productsError) {
+        console.error('❌ Error loading products:', productsError);
         throw productsError;
       }
 
+      console.log('✅ Products loaded:', productsData?.length || 0, 'products');
+      console.log('📦 Products data:', productsData);
       setProducts(productsData || []);
     } catch (err: any) {
-      console.error('Error loading products:', err);
+      console.error('❌ Error loading products:', err);
     }
   }
 
