@@ -27,25 +27,27 @@ export default function NewProduct() {
 
   const [categories, setCategories] = useState<Category[]>([]);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const { data, error } = await supabase
-          .from('categories')
-          .select('id, name')
-          .order('name', { ascending: true });
-        
-        if (error) {
-          showMsg('error', `Error cargando categorías: ${error.message}`);
-        } else if (data) {
-          setCategories(data);
-        } else {
-          showMsg('error', 'No se pudieron cargar las categorías');
-        }
-      } catch {
-        showMsg('error', 'Error de conexión con la base de datos');
+  // Función para cargar categorías
+  const loadCategories = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('categories')
+        .select('id, name')
+        .order('name', { ascending: true });
+      
+      if (error) {
+        console.error('Error cargando categorías:', error);
+        // No mostrar error al usuario aquí, solo loguear
+      } else if (data) {
+        setCategories(data);
       }
-    })();
+    } catch (err) {
+      console.error('Error de conexión cargando categorías:', err);
+    }
+  };
+
+  useEffect(() => {
+    loadCategories();
   }, []);
 
   const priceNumber = useMemo(() => Number(price || 0), [price]);
@@ -289,36 +291,47 @@ export default function NewProduct() {
       }
       
       console.log('✅ Producto creado:', newProduct.id);
+      showMsg('success', '📦 Producto creado. Comprimiendo imágenes...');
 
       // 2. Comprimir imágenes
+      showMsg('success', '🖼️ Comprimiendo imágenes (1/3)...');
       const compressed = await Promise.all(
         imagePreviews.map(({ file }) => compress(file))
       );
 
       // 3. Subir imágenes a Storage
+      showMsg('success', '☁️ Subiendo imágenes (2/3)...');
       const imageUrls = await Promise.all(
         compressed.map((f, idx) => uploadToBucket(f, newProduct.id.toString(), idx))
       );
 
       // 4. Guardar referencias en product_images
-      const { error: imagesError } = await (supabase as any)
+      showMsg('success', '💾 Guardando referencias de imágenes (3/3)...');
+      const { error: imagesError } = await supabase
         .from('product_images')
         .insert(imageUrls.map((url, idx) => ({
           product_id: newProduct.id,
           image_url: url,
           url: url, // Para compatibilidad
           is_cover: idx === 0, // La primera imagen es la portada
-        })) as any);
+        })));
 
-      if (imagesError) throw imagesError;
+      if (imagesError) {
+        console.error('❌ Error guardando imágenes:', imagesError);
+        throw new Error(`Error al guardar imágenes: ${imagesError.message}`);
+      }
 
       // 5. Actualizar cover_url
-      const { error: updateError } = await (supabase as any)
+      showMsg('success', '🔄 Actualizando imagen de portada...');
+      const { error: updateError } = await supabase
         .from('products')
-        .update({ cover_url: imageUrls[0] } as any)
+        .update({ cover_url: imageUrls[0] })
         .eq('id', newProduct.id);
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        console.error('❌ Error actualizando cover_url:', updateError);
+        throw new Error(`Error al actualizar portada: ${updateError.message}`);
+      }
 
       // Success
       showMsg('success', '✅ Producto agregado correctamente');
