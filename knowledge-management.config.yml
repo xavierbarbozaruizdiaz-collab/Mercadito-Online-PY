@@ -1,0 +1,74 @@
+# Knowledge Management Configuration
+# ============================================
+
+# Knowledge Strategy
+KNOWLEDGE_STRATEGY:
+  knowledge_planning: true
+  knowledge_goals: true
+  knowledge_standards: true
+  knowledge_metrics: true
+  knowledge_improvement: true
+
+# Knowledge Management
+KNOWLEDGE_MANAGEMENT:
+  knowledge_creation: true
+  knowledge_capture: true
+  knowledge_storage: true
+  knowledge_sharing: true
+  knowledge_application: true
+
+# Knowledge Systems
+KNOWLEDGE_SYSTEMS:
+  knowledge_base: true
+  document_management: true
+  content_management: true
+  search_systems: true
+  collaboration_platforms: true
+
+# Knowledge Analytics
+KNOWLEDGE_ANALYTICS:
+  knowledge_metrics: true
+  usage_analysis: true
+  trend_analysis: true
+  impact_analysis: true
+  predictive_analytics: true
+
+# Knowledge Technology
+KNOWLEDGE_TECHNOLOGY:
+  knowledge_platforms: true
+  content_management: true
+  search_engines: true
+  analytics_platforms: true
+  automation_tools: true
+
+# Knowledge Culture
+KNOWLEDGE_CULTURE:
+  knowledge_sharing: true
+  learning_culture: true
+  knowledge_innovation: true
+  knowledge_collaboration: true
+  knowledge_leadership: true
+
+# Knowledge Training
+KNOWLEDGE_TRAINING:
+  knowledge_awareness: true
+  knowledge_skills: true
+  knowledge_tools: true
+  knowledge_methods: true
+  knowledge_best_practices: true
+
+# Knowledge Governance
+KNOWLEDGE_GOVERNANCE:
+  knowledge_policies: true
+  knowledge_procedures: true
+  knowledge_standards: true
+  knowledge_compliance: true
+  knowledge_oversight: true
+
+# Knowledge Operations
+KNOWLEDGE_OPERATIONS:
+  knowledge_processes: true
+  knowledge_workflows: true
+  knowledge_governance: true
+  knowledge_support: true
+  knowledge_administration: true

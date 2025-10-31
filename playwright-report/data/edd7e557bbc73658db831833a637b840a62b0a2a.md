@@ -1,0 +1,101 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e1]:
+  - banner [ref=e2]:
+    - link "🛒 Mercadito Online PY" [ref=e3] [cursor=pointer]:
+      - /url: /
+    - generic [ref=e4]:
+      - link "🛒" [ref=e6] [cursor=pointer]:
+        - /url: /cart
+        - generic [ref=e7]: 🛒
+      - link "Entrar" [ref=e8] [cursor=pointer]:
+        - /url: /auth/sign-in
+  - main [ref=e9]:
+    - link "← Volver" [ref=e10] [cursor=pointer]:
+      - /url: /
+    - heading "Acceder" [level=1] [ref=e11]
+    - generic [ref=e12]:
+      - textbox "Email" [ref=e13]
+      - textbox "Contraseña" [ref=e14]
+      - button "Iniciar sesión" [ref=e15]
+    - button "Crear cuenta" [ref=e16]
+  - generic [active]:
+    - generic [ref=e19]:
+      - generic [ref=e20]:
+        - generic [ref=e21]:
+          - navigation [ref=e22]:
+            - button "previous" [disabled] [ref=e23]:
+              - img "previous" [ref=e24]
+            - generic [ref=e26]:
+              - generic [ref=e27]: 1/
+              - text: "1"
+            - button "next" [disabled] [ref=e28]:
+              - img "next" [ref=e29]
+          - img
+        - generic [ref=e31]:
+          - link "Next.js 16.0.0 (stale) Webpack" [ref=e32] [cursor=pointer]:
+            - /url: https://nextjs.org/docs/messages/version-staleness
+            - img [ref=e33]
+            - generic "There is a newer version (16.0.1) available, upgrade recommended!" [ref=e35]: Next.js 16.0.0 (stale)
+            - generic [ref=e36]: Webpack
+          - img
+      - dialog "Build Error" [ref=e38]:
+        - generic [ref=e41]:
+          - generic [ref=e42]:
+            - generic [ref=e43]:
+              - generic [ref=e45]: Build Error
+              - generic [ref=e46]:
+                - button "Copy Error Info" [ref=e47] [cursor=pointer]:
+                  - img [ref=e48]
+                - button "No related documentation found" [disabled] [ref=e50]:
+                  - img [ref=e51]
+                - link "Learn more about enabling Node.js inspector for server code with Chrome DevTools" [ref=e53] [cursor=pointer]:
+                  - /url: https://nextjs.org/docs/app/building-your-application/configuring/debugging#server-side-code
+                  - img [ref=e54]
+            - generic [ref=e63]: x Expected '>', got 'className'
+          - generic [ref=e65]:
+            - generic [ref=e67]:
+              - img [ref=e69]
+              - generic [ref=e73]: ./src/lib/cdn/imageOptimizer.ts
+              - button "Open in editor" [ref=e74] [cursor=pointer]:
+                - img [ref=e76]
+            - generic [ref=e79]:
+              - generic [ref=e80]: "Error:"
+              - text: x
+              - generic [ref=e81]: Expected '>', got 'className' ,-[
+              - text: C:\Users\PCera\mercadito-online-py\src\lib\cdn\imageOptimizer.ts
+              - generic [ref=e82]: :321:1]
+              - text: "318"
+              - generic [ref=e83]: "| if (imageError) {"
+              - text: "319"
+              - generic [ref=e84]: "| return ("
+              - text: "320"
+              - generic [ref=e85]: "| <div"
+              - text: "321"
+              - generic [ref=e86]: "| className={`bg-gray-200 flex items-center justify-center ${className}`} :"
+              - generic [ref=e87]: ^^^^^^^^^
+              - text: "322"
+              - generic [ref=e88]: "| style={{ width, height }}"
+              - text: "323"
+              - generic [ref=e89]: "| >"
+              - text: "323"
+              - generic [ref=e90]: "| <span className=\"text-gray-500 text-sm\">Imagen no disponible</span> `---- Caused by: Syntax Error Import trace for requested module:"
+              - link "./src/lib/cdn/imageOptimizer.ts" [ref=e91] [cursor=pointer]:
+                - text: ./src/lib/cdn/imageOptimizer.ts
+                - img [ref=e92]
+              - link "./src/app/products/[id]/page.tsx" [ref=e96] [cursor=pointer]:
+                - text: ./src/app/products/[id]/page.tsx
+                - img [ref=e97]
+        - generic [ref=e101]: "1"
+        - generic [ref=e102]: "2"
+    - generic [ref=e107] [cursor=pointer]:
+      - button "Open Next.js Dev Tools" [ref=e108]:
+        - img [ref=e109]
+      - button "Open issues overlay" [ref=e113]:
+        - generic [ref=e114]:
+          - generic [ref=e115]: "0"
+          - generic [ref=e116]: "1"
+        - generic [ref=e117]: Issue
+  - alert [ref=e118]
+```

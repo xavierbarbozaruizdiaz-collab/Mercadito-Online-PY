@@ -1,0 +1,74 @@
+# Health and Safety Configuration
+# ============================================
+
+# Health and Safety Strategy
+HEALTH_SAFETY_STRATEGY:
+  hse_planning: true
+  hse_goals: true
+  hse_standards: true
+  hse_metrics: true
+  hse_improvement: true
+
+# Workplace Safety
+WORKPLACE_SAFETY:
+  safety_procedures: true
+  safety_equipment: true
+  safety_training: true
+  safety_monitoring: true
+  safety_reporting: true
+
+# Occupational Health
+OCCUPATIONAL_HEALTH:
+  health_assessments: true
+  health_monitoring: true
+  health_training: true
+  health_programs: true
+  health_records: true
+
+# Environmental Safety
+ENVIRONMENTAL_SAFETY:
+  environmental_monitoring: true
+  environmental_compliance: true
+  environmental_management: true
+  environmental_reporting: true
+  environmental_improvement: true
+
+# Incident Management
+INCIDENT_MANAGEMENT:
+  incident_reporting: true
+  incident_investigation: true
+  incident_response: true
+  incident_analysis: true
+  incident_prevention: true
+
+# Risk Assessment
+HEALTH_SAFETY_RISK_ASSESSMENT:
+  risk_identification: true
+  risk_evaluation: true
+  risk_control: true
+  risk_monitoring: true
+  risk_review: true
+
+# Compliance
+HEALTH_SAFETY_COMPLIANCE:
+  regulatory_compliance: true
+  industry_standards: true
+  safety_policies: true
+  compliance_monitoring: true
+  compliance_reporting: true
+
+# Training
+HEALTH_SAFETY_TRAINING:
+  safety_awareness: true
+  safety_skills: true
+  emergency_response: true
+  safety_tools: true
+  safety_best_practices: true
+
+# Technology
+HEALTH_SAFETY_TECHNOLOGY:
+  safety_systems: true
+  monitoring_tools: true
+  analytics_platforms: true
+  automation_tools: true
+  integration_platforms: true

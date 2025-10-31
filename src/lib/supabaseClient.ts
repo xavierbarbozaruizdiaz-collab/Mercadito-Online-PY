@@ -1,6 +1,7 @@
-import { createClient } from '@supabase/supabase-js';
+// ============================================
+// MERCADITO ONLINE PY - SUPABASE CLIENT (Re-export)
+// Re-exporta el cliente principal para mantener compatibilidad
+// ============================================
 
-export const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+// Re-exportar el cliente único desde supabase/client para evitar múltiples instancias
+export { supabase, supabaseAdmin, getSessionWithTimeout } from './supabase/client';

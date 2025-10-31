@@ -1,0 +1,54 @@
+# CDN Configuration
+# ============================================
+
+# Image Optimization
+IMAGE_OPTIMIZATION:
+  formats: [webp, avif, jpeg, png]
+  quality: 75
+  max_width: 1920
+  max_height: 1080
+  compression_level: 6
+
+# Caching Rules
+CACHING_RULES:
+  static_assets:
+    cache_control: "public, max-age=31536000, immutable"
+    files: ["*.js", "*.css", "*.png", "*.jpg", "*.jpeg", "*.gif", "*.svg", "*.woff", "*.woff2"]
+  
+  api_responses:
+    cache_control: "public, max-age=300, s-maxage=600"
+    files: ["/api/products", "/api/categories", "/api/sellers"]
+  
+  user_content:
+    cache_control: "public, max-age=3600"
+    files: ["/api/user/*"]
+
+# Compression
+COMPRESSION:
+  gzip: true
+  brotli: true
+  minify_html: true
+  minify_css: true
+  minify_js: true
+
+# Security Headers
+SECURITY_HEADERS:
+  content_security_policy: true
+  x_frame_options: "DENY"
+  x_content_type_options: "nosniff"
+  referrer_policy: "strict-origin-when-cross-origin"
+
+# Geographic Distribution
+GEO_DISTRIBUTION:
+  regions: ["us-east-1", "us-west-2", "eu-west-1", "ap-southeast-1"]
+  default_region: "us-east-1"
+
+# Performance Optimizations
+PERFORMANCE:
+  http2: true
+  http3: true
+  tls_1_3: true
+  early_hints: true
+  resource_hints: true
+  critical_css: true
+  lazy_loading: true

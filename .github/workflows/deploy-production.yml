@@ -1,0 +1,171 @@
+name: 🚀 Deploy to Production
+
+on:
+  push:
+    branches: [main, production]
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]  # Solo en PRs hacia main, no desde feat/*
+
+env:
+  NODE_VERSION: '18'
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+jobs:
+  # ============================================
+  # LINTING Y TESTING
+  # ============================================
+  lint-and-test:
+    name: 🔍 Lint & Test
+    runs-on: ubuntu-latest
+    # Solo ejecutar en main/production, no en feat/*
+    if: |
+      github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/production') ||
+      github.event_name == 'pull_request' && github.base_ref == 'main' && github.head_ref && !startsWith(github.head_ref, 'feat/') && !startsWith(github.head_ref, 'feature/') && !startsWith(github.head_ref, 'hotfix/')
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🔍 Run ESLint
+        run: npm run lint
+
+      - name: 🏗️ Build application
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+
+      - name: 🧪 Run E2E tests
+        run: npm run test:e2e
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+
+  # ============================================
+  # SECURITY AUDIT
+  # ============================================
+  security-audit:
+    name: 🔒 Security Audit
+    runs-on: ubuntu-latest
+    # Solo ejecutar en main/production, no en feat/*
+    if: |
+      github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/production') ||
+      github.event_name == 'pull_request' && github.base_ref == 'main' && github.head_ref && !startsWith(github.head_ref, 'feat/') && !startsWith(github.head_ref, 'feature/') && !startsWith(github.head_ref, 'hotfix/')
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🔒 Run Snyk security audit
+        uses: snyk/actions/node@master
+        continue-on-error: true  # No fallar si Snyk no está configurado
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=high
+
+  # ============================================
+  # DEPLOYMENT A VERCEL
+  # ============================================
+  deploy:
+    name: 🚀 Deploy to Vercel
+    runs-on: ubuntu-latest
+    needs: [lint-and-test, security-audit]
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/production'
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: 📦 Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: 🚀 Deploy to Vercel
+        run: vercel --prod --token ${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+  # ============================================
+  # POST-DEPLOYMENT TESTS
+  # ============================================
+  post-deployment-tests:
+    name: 🧪 Post-Deployment Tests
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/production'
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🧪 Run production E2E tests
+        run: npm run test:e2e
+        continue-on-error: true  # No bloquear deployment si tests fallan
+        env:
+          BASE_URL: https://mercadito-online-py.vercel.app
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+
+  # ============================================
+  # NOTIFICATIONS
+  # ============================================
+  notify-success:
+    name: ✅ Notify Success
+    runs-on: ubuntu-latest
+    needs: [deploy, post-deployment-tests]
+    if: success() && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/production')
+    steps:
+      - name: 📢 Notify deployment success
+        uses: 8398a7/action-slack@v3
+        continue-on-error: true  # No fallar si Slack no está configurado
+        with:
+          status: success
+          text: '🚀 Mercadito Online PY deployed successfully to production!'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  notify-failure:
+    name: ❌ Notify Failure
+    runs-on: ubuntu-latest
+    if: failure()
+    steps:
+      - name: 📢 Notify deployment failure
+        uses: 8398a7/action-slack@v3
+        continue-on-error: true  # No fallar si Slack no está configurado
+        with:
+          status: failure
+          text: '❌ Mercadito Online PY deployment failed!'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

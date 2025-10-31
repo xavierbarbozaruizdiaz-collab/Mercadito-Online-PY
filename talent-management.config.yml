@@ -1,0 +1,74 @@
+# Talent Management Configuration
+# ============================================
+
+# Talent Acquisition
+TALENT_ACQUISITION:
+  recruitment: true
+  selection: true
+  onboarding: true
+  employer_branding: true
+  talent_pipeline: true
+
+# Talent Development
+TALENT_DEVELOPMENT:
+  training_programs: true
+  skill_development: true
+  career_development: true
+  mentoring: true
+  coaching: true
+
+# Performance Management
+PERFORMANCE_MANAGEMENT:
+  goal_setting: true
+  performance_reviews: true
+  feedback: true
+  recognition: true
+  improvement_plans: true
+
+# Succession Planning
+SUCCESSION_PLANNING:
+  leadership_pipeline: true
+  key_position_planning: true
+  talent_review: true
+  development_plans: true
+  knowledge_transfer: true
+
+# Retention Strategies
+RETENTION_STRATEGIES:
+  career_opportunities: true
+  competitive_compensation: true
+  work_environment: true
+  recognition_programs: true
+  work_life_balance: true
+
+# Talent Analytics
+TALENT_ANALYTICS:
+  performance_metrics: true
+  engagement_scores: true
+  retention_rates: true
+  skill_gaps: true
+  talent_trends: true
+
+# Learning and Development
+LEARNING_DEVELOPMENT:
+  training_programs: true
+  e_learning: true
+  certifications: true
+  conferences: true
+  continuous_learning: true
+
+# Talent Technology
+TALENT_TECHNOLOGY:
+  hr_systems: true
+  learning_platforms: true
+  performance_tools: true
+  analytics_platforms: true
+  collaboration_tools: true
+
+# Talent Culture
+TALENT_CULTURE:
+  learning_culture: true
+  growth_mindset: true
+  innovation_culture: true
+  collaborative_culture: true
+  inclusive_culture: true

@@ -1,0 +1,127 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e1]:
+  - banner [ref=e2]:
+    - link "🛒 Mercadito Online PY" [ref=e3] [cursor=pointer]:
+      - /url: /
+    - generic [ref=e4]:
+      - link "🛒" [ref=e6] [cursor=pointer]:
+        - /url: /cart
+        - generic [ref=e7]: 🛒
+      - link "Entrar" [ref=e8] [cursor=pointer]:
+        - /url: /auth/sign-in
+  - generic [ref=e9]:
+    - banner [ref=e10]:
+      - generic [ref=e12]:
+        - generic [ref=e13]:
+          - link "📊 Dashboard" [ref=e14] [cursor=pointer]:
+            - /url: /dashboard
+          - navigation [ref=e15]:
+            - link "Resumen" [ref=e16] [cursor=pointer]:
+              - /url: /dashboard
+            - link "Nuevo Producto" [ref=e17] [cursor=pointer]:
+              - /url: /dashboard/new-product
+            - link "Editar Productos" [ref=e18] [cursor=pointer]:
+              - /url: /dashboard/edit-product
+        - link "← Volver al sitio" [ref=e20] [cursor=pointer]:
+          - /url: /
+    - main [ref=e21]:
+      - main [ref=e22]:
+        - generic [ref=e23]:
+          - heading "Panel del vendedor" [level=1] [ref=e24]
+          - generic [ref=e25]:
+            - link "📦 Mis pedidos" [ref=e26] [cursor=pointer]:
+              - /url: /orders
+            - link "+ Nuevo producto" [ref=e27] [cursor=pointer]:
+              - /url: /dashboard/new-product
+        - generic [ref=e28]:
+          - generic [ref=e29]: 📦
+          - heading "No tienes productos aún" [level=2] [ref=e30]
+          - paragraph [ref=e31]: Comienza agregando tu primer producto
+          - link "Crear mi primer producto" [ref=e32] [cursor=pointer]:
+            - /url: /dashboard/new-product
+        - generic [ref=e34]:
+          - heading "Gestión de Rol de Administrador" [level=2] [ref=e35]
+          - generic [ref=e37]:
+            - button "Verificar Estado" [ref=e38]
+            - button "Asignar Rol Admin" [ref=e39]
+  - generic [active]:
+    - generic [ref=e42]:
+      - generic [ref=e43]:
+        - generic [ref=e44]:
+          - navigation [ref=e45]:
+            - button "previous" [disabled] [ref=e46]:
+              - img "previous" [ref=e47]
+            - generic [ref=e49]:
+              - generic [ref=e50]: 1/
+              - text: "1"
+            - button "next" [disabled] [ref=e51]:
+              - img "next" [ref=e52]
+          - img
+        - generic [ref=e54]:
+          - link "Next.js 16.0.0 (stale) Webpack" [ref=e55] [cursor=pointer]:
+            - /url: https://nextjs.org/docs/messages/version-staleness
+            - img [ref=e56]
+            - generic "There is a newer version (16.0.1) available, upgrade recommended!" [ref=e58]: Next.js 16.0.0 (stale)
+            - generic [ref=e59]: Webpack
+          - img
+      - dialog "Build Error" [ref=e61]:
+        - generic [ref=e64]:
+          - generic [ref=e65]:
+            - generic [ref=e66]:
+              - generic [ref=e68]: Build Error
+              - generic [ref=e69]:
+                - button "Copy Error Info" [ref=e70] [cursor=pointer]:
+                  - img [ref=e71]
+                - button "No related documentation found" [disabled] [ref=e73]:
+                  - img [ref=e74]
+                - link "Learn more about enabling Node.js inspector for server code with Chrome DevTools" [ref=e76] [cursor=pointer]:
+                  - /url: https://nextjs.org/docs/app/building-your-application/configuring/debugging#server-side-code
+                  - img [ref=e77]
+            - generic [ref=e86]: x Expected '>', got 'className'
+          - generic [ref=e88]:
+            - generic [ref=e90]:
+              - img [ref=e92]
+              - generic [ref=e96]: ./src/lib/cdn/imageOptimizer.ts
+              - button "Open in editor" [ref=e97] [cursor=pointer]:
+                - img [ref=e99]
+            - generic [ref=e102]:
+              - generic [ref=e103]: "Error:"
+              - text: x
+              - generic [ref=e104]: Expected '>', got 'className' ,-[
+              - text: C:\Users\PCera\mercadito-online-py\src\lib\cdn\imageOptimizer.ts
+              - generic [ref=e105]: :321:1]
+              - text: "318"
+              - generic [ref=e106]: "| if (imageError) {"
+              - text: "319"
+              - generic [ref=e107]: "| return ("
+              - text: "320"
+              - generic [ref=e108]: "| <div"
+              - text: "321"
+              - generic [ref=e109]: "| className={`bg-gray-200 flex items-center justify-center ${className}`} :"
+              - generic [ref=e110]: ^^^^^^^^^
+              - text: "322"
+              - generic [ref=e111]: "| style={{ width, height }}"
+              - text: "323"
+              - generic [ref=e112]: "| >"
+              - text: "323"
+              - generic [ref=e113]: "| <span className=\"text-gray-500 text-sm\">Imagen no disponible</span> `---- Caused by: Syntax Error Import trace for requested module:"
+              - link "./src/lib/cdn/imageOptimizer.ts" [ref=e114] [cursor=pointer]:
+                - text: ./src/lib/cdn/imageOptimizer.ts
+                - img [ref=e115]
+              - link "./src/app/products/[id]/page.tsx" [ref=e119] [cursor=pointer]:
+                - text: ./src/app/products/[id]/page.tsx
+                - img [ref=e120]
+        - generic [ref=e124]: "1"
+        - generic [ref=e125]: "2"
+    - generic [ref=e130] [cursor=pointer]:
+      - button "Open Next.js Dev Tools" [ref=e131]:
+        - img [ref=e132]
+      - button "Open issues overlay" [ref=e136]:
+        - generic [ref=e137]:
+          - generic [ref=e138]: "0"
+          - generic [ref=e139]: "1"
+        - generic [ref=e140]: Issue
+  - alert [ref=e141]
+```

@@ -1,0 +1,74 @@
+# Human Resources Configuration
+# ============================================
+
+# HR Strategy
+HR_STRATEGY:
+  hr_planning: true
+  workforce_planning: true
+  talent_strategy: true
+  hr_goals: true
+  hr_metrics: true
+
+# Recruitment
+RECRUITMENT:
+  job_posting: true
+  candidate_sourcing: true
+  screening: true
+  interviewing: true
+  selection: true
+
+# Onboarding
+ONBOARDING:
+  orientation: true
+  training: true
+  documentation: true
+  integration: true
+  feedback: true
+
+# Performance Management
+PERFORMANCE_MANAGEMENT:
+  goal_setting: true
+  performance_reviews: true
+  feedback: true
+  development_plans: true
+  recognition: true
+
+# Learning and Development
+LEARNING_DEVELOPMENT:
+  training_programs: true
+  skill_development: true
+  career_development: true
+  mentoring: true
+  coaching: true
+
+# Compensation and Benefits
+COMPENSATION_BENEFITS:
+  salary_management: true
+  benefits_administration: true
+  payroll: true
+  compensation_analysis: true
+  benefits_analysis: true
+
+# Employee Relations
+EMPLOYEE_RELATIONS:
+  employee_engagement: true
+  employee_satisfaction: true
+  conflict_resolution: true
+  employee_communication: true
+  employee_feedback: true
+
+# HR Technology
+HR_TECHNOLOGY:
+  hr_systems: true
+  payroll_systems: true
+  learning_platforms: true
+  performance_tools: true
+  analytics_platforms: true
+
+# HR Compliance
+HR_COMPLIANCE:
+  labor_laws: true
+  employment_laws: true
+  workplace_safety: true
+  equal_opportunity: true
+  hr_policies: true
