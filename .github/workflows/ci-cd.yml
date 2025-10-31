@@ -37,7 +37,12 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: |
+          if [[ "${{ github.ref }}" == refs/heads/main || "${{ github.ref }}" == refs/heads/dev ]]; then
+            npm ci
+          else
+            npm install --no-audit --no-fund
+          fi
 
       - name: Run ESLint
         run: npm run lint
@@ -66,12 +71,7 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: |
-          if [[ "${{ github.ref }}" == refs/heads/main || "${{ github.ref }}" == refs/heads/dev ]]; then
-            npm ci
-          else
-            npm install --no-audit --no-fund
-          fi
+        run: npm ci  # Siempre npm ci para builds determinísticos en main/dev
 
       - name: Build application
         run: npm run build
@@ -113,12 +113,7 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: |
-          if [[ "${{ github.ref }}" == refs/heads/main || "${{ github.ref }}" == refs/heads/dev ]]; then
-            npm ci
-          else
-            npm install --no-audit --no-fund
-          fi
+        run: npm ci  # Siempre npm ci para security audit (determinístico)
 
       - name: Run security audit
         run: npm audit --audit-level=moderate
