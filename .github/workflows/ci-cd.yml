@@ -38,7 +38,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          if [[ "${{ github.ref }}" == refs/heads/main || "${{ github.ref }}" == refs/heads/dev ]]; then
+          if [[ "${{ github.ref }}" == refs/heads/main || "${{ github.ref }}" == refs/heads/dev ]] || [[ "${{ github.event_name }}" == pull_request && "${{ github.base_ref }}" == main ]]; then
             npm ci
           else
             npm install --no-audit --no-fund
@@ -172,9 +172,9 @@ jobs:
           BASE_URL: ${{ secrets.PRODUCTION_URL }}
 
       - name: Notify deployment success
+        if: success() && ${{ secrets.SLACK_WEBHOOK_URL != '' }}
         uses: 8398a7/action-slack@v3
         continue-on-error: true  # No fallar si Slack no está configurado
-        if: success()
         with:
           status: success
           text: '🚀 Mercadito Online PY deployed successfully!'
@@ -182,9 +182,9 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
       - name: Notify deployment failure
+        if: failure() && ${{ secrets.SLACK_WEBHOOK_URL != '' }}
         uses: 8398a7/action-slack@v3
         continue-on-error: true  # No fallar si Slack no está configurado
-        if: failure()
         with:
           status: failure
           text: '❌ Mercadito Online PY deployment failed!'
