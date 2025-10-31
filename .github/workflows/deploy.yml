@@ -16,10 +16,10 @@ env:
 jobs:
   test:
     runs-on: ubuntu-latest
-    # No ejecutar si viene de branch feat/* (push o PR)
+    # Solo ejecutar en main, no en feat/*
     if: |
-      (github.event_name == 'push' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/feature/') && !startsWith(github.ref, 'refs/heads/hotfix/')) ||
-      (github.event_name == 'pull_request' && github.head_ref && !startsWith(github.head_ref, 'feat/') && !startsWith(github.head_ref, 'feature/') && !startsWith(github.head_ref, 'hotfix/'))
+      github.event_name == 'push' && github.ref == 'refs/heads/main' ||
+      github.event_name == 'pull_request' && github.base_ref == 'main' && github.head_ref && !startsWith(github.head_ref, 'feat/') && !startsWith(github.head_ref, 'feature/') && !startsWith(github.head_ref, 'hotfix/')
     steps:
       - uses: actions/checkout@v4
       
