@@ -38,7 +38,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          if [[ "${{ github.ref }}" == refs/heads/main || "${{ github.ref }}" == refs/heads/dev ]] || [[ "${{ github.event_name }}" == pull_request && "${{ github.base_ref }}" == main ]]; then
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]] || [[ "${{ github.ref }}" == "refs/heads/dev" ]] || [[ "${{ github.event_name }}" == "pull_request" && "${{ github.base_ref }}" == "main" ]]; then
             npm ci
           else
             npm install --no-audit --no-fund
