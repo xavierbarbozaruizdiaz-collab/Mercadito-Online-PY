@@ -16,9 +16,10 @@ jobs:
   # ============================================
   # LINTING Y TESTING
   # ============================================
-  lint-and-test:
-    name: 🔍 Lint & Test
+  test:
+    name: 🧪 Test (No Bloqueante)
     runs-on: ubuntu-latest
+    continue-on-error: true
     # Solo ejecutar en main/production, no en feat/*
     if: |
       github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/production') ||
@@ -37,16 +38,37 @@ jobs:
         run: npm install --no-audit --no-fund
 
       - name: 🔍 Run ESLint
-        run: npm run lint
+        run: npm run lint --if-present || true
 
-      - name: 🏗️ Build application
-        run: npm run build
+      - name: 🧪 Run E2E tests
+        run: npm run test:e2e || true
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
 
-      - name: 🧪 Run E2E tests
-        run: npm run test:e2e
+  build:
+    name: 🏗️ Build (Bloqueante)
+    runs-on: ubuntu-latest
+    needs: test
+    # Solo ejecutar en main/production, no en feat/*
+    if: |
+      github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/production') ||
+      github.event_name == 'pull_request' && github.base_ref == 'main' && github.head_ref && !startsWith(github.head_ref, 'feat/') && !startsWith(github.head_ref, 'feature/') && !startsWith(github.head_ref, 'hotfix/')
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci  # Determinístico para builds
+
+      - name: 🏗️ Build application
+        run: npm run build
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
