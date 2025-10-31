@@ -21,7 +21,7 @@ jobs:
       github.event_name == 'push' && github.ref == 'refs/heads/main' ||
       github.event_name == 'pull_request' && github.base_ref == 'main' && github.head_ref && !startsWith(github.head_ref, 'feat/') && !startsWith(github.head_ref, 'feature/') && !startsWith(github.head_ref, 'hotfix/')
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -48,7 +48,7 @@ jobs:
     needs: test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -76,7 +76,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       
       - name: Deploy to Vercel
         uses: amondnet/vercel-action@v25
