@@ -2,6 +2,10 @@
   "name": "mercadito-online-py",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": "20.x"
+  },
+  "packageManager": "npm@10",
   "scripts": {
     "dev": "next dev --webpack",
     "build": "next build --webpack",
@@ -15,6 +19,9 @@
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",
     "test:unit": "vitest run"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx}": ["eslint --fix", "prettier --write"]
   },
   "vitest": {
     "environment": "jsdom",
@@ -70,6 +77,7 @@
     "@typescript-eslint/parser": "^8.46.2",
     "eslint": "^9",
     "eslint-config-next": "16.0.0",
+    "eslint-plugin-import": "^2.31.0",
     "husky": "^9.1.7",
     "lint-staged": "^16.2.6",
     "prettier": "^3.6.2",
