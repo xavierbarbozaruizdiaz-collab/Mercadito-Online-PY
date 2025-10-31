@@ -12,7 +12,8 @@ import { formatCurrency } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import Badge from '@/components/ui/Badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { ArrowLeft, Gavel, User, MapPin, Calendar, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Button } from '@/components/ui';
+import { ArrowLeft, Gavel, User, MapPin, Calendar, Clock, ChevronLeft, ChevronRight, Share2, Flag, TrendingUp } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import ProductImageGallery from '@/components/ProductImageGallery';
 
@@ -33,6 +34,10 @@ export default function AuctionDetailPage() {
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
   const [maxVersion, setMaxVersion] = useState<number>(0); // Para descartar mensajes viejos
   const [isConnected, setIsConnected] = useState<boolean>(true); // Estado de conexión WebSocket
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [myBidPosition, setMyBidPosition] = useState<number | null>(null); // Posición del usuario (1ro, 2do, etc.)
+  const [winnerInfo, setWinnerInfo] = useState<any>(null);
+  const [recentEvents, setRecentEvents] = useState<Array<{type: string; message: string; time: string}>>([]);
   
   // Función para reproducir sonido (mover fuera de useEffect)
   const playBidSound = useCallback(() => {
@@ -238,6 +243,17 @@ export default function AuctionDetailPage() {
     try {
       setError(null);
       
+      // Obtener usuario actual
+      try {
+        const { getSessionWithTimeout } = await import('@/lib/supabase/client');
+        const { data: session } = await getSessionWithTimeout();
+        if (session?.session?.user?.id) {
+          setCurrentUserId(session.session.user.id);
+        }
+      } catch (err) {
+        console.warn('Error obteniendo usuario:', err);
+      }
+      
       // Obtener tiempo del servidor para sincronización
       try {
         const { getServerTime } = await import('@/lib/utils/timeSync');
@@ -310,6 +326,113 @@ export default function AuctionDetailPage() {
       // Inicializar versión máxima cuando se carga la subasta
       if ((auctionData as any).auction_version !== undefined) {
         setMaxVersion((auctionData as any).auction_version);
+      }
+      
+      // Calcular posición del usuario actual si está pujando
+      if (currentUserId && auctionData) {
+        try {
+          const { data: myBids } = await supabase
+            .from('auction_bids')
+            .select('amount, bid_time')
+            .eq('product_id', productId)
+            .eq('bidder_id', currentUserId)
+            .eq('is_retracted', false)
+            .order('amount', { ascending: false })
+            .order('bid_time', { ascending: false })
+            .limit(1);
+          
+          if (myBids && myBids.length > 0) {
+            const myHighestBid = myBids[0].amount;
+            
+            // Obtener todas las pujas ordenadas para encontrar posición
+            const { data: allBids } = await supabase
+              .from('auction_bids')
+              .select('bidder_id, amount')
+              .eq('product_id', productId)
+              .eq('is_retracted', false)
+              .order('amount', { ascending: false });
+            
+            if (allBids) {
+              const uniqueBidders = new Map<string, number>();
+              allBids.forEach(bid => {
+                if (!uniqueBidders.has(bid.bidder_id) || uniqueBidders.get(bid.bidder_id)! < bid.amount) {
+                  uniqueBidders.set(bid.bidder_id, bid.amount);
+                }
+              });
+              
+              const sortedUnique = Array.from(uniqueBidders.entries())
+                .sort((a, b) => b[1] - a[1]);
+              
+              const myPosition = sortedUnique.findIndex(([bidderId]) => bidderId === currentUserId);
+              if (myPosition !== -1) {
+                setMyBidPosition(myPosition + 1); // 1-indexed
+              }
+            }
+          }
+        } catch (err) {
+          console.warn('Error calculando posición:', err);
+        }
+      }
+      
+      // Cargar información del ganador si la subasta terminó
+      if (auctionData.auction_status === 'ended' && auctionData.winner_id) {
+        try {
+          const { data: winner } = await supabase
+            .from('profiles')
+            .select('id, first_name, last_name, email')
+            .eq('id', auctionData.winner_id)
+            .single();
+          
+          if (winner) {
+            setWinnerInfo(winner);
+          }
+        } catch (err) {
+          console.warn('Error cargando información del ganador:', err);
+        }
+      }
+      
+      // Cargar eventos recientes de auditoría
+      try {
+        const { data: events } = await supabase
+          .from('auction_events')
+          .select('event_type, event_data, server_timestamp')
+          .eq('product_id', productId)
+          .order('server_timestamp', { ascending: false })
+          .limit(10);
+        
+        if (events) {
+          const formattedEvents = events.map(event => {
+            let message = '';
+            const data = event.event_data || {};
+            
+            switch (event.event_type) {
+              case 'BID_PLACED':
+                message = `Nueva puja: ${formatCurrency(data.amount || 0)}`;
+                break;
+              case 'BID_REJECTED':
+                message = `Puja rechazada: ${data.reason || 'Motivo desconocido'}`;
+                break;
+              case 'TIMER_EXTENDED':
+                message = `⏱️ Tiempo extendido ${data.extension_seconds || 0}s`;
+                break;
+              case 'LOT_CLOSED':
+                message = `🏁 Subasta finalizada. Ganador: ${formatCurrency(data.winning_bid || 0)}`;
+                break;
+              default:
+                message = event.event_type;
+            }
+            
+            return {
+              type: event.event_type,
+              message,
+              time: event.server_timestamp,
+            };
+          });
+          
+          setRecentEvents(formattedEvents);
+        }
+      } catch (err) {
+        console.warn('Error cargando eventos:', err);
       }
       
       // Cargar todas las imágenes del producto
@@ -701,17 +824,63 @@ export default function AuctionDetailPage() {
               </Card>
             )}
 
-            {/* Estado finalizado */}
+            {/* Estado finalizado - MEJORADO con información del ganador */}
             {isEnded && (
-              <Card className="border-2 border-gray-300">
-                <CardContent className="p-6 text-center bg-gray-50">
-                  <Badge variant="secondary" size="lg" className="mb-4">
-                    Subasta Finalizada
+              <Card className="border-2 border-emerald-500 shadow-2xl relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-emerald-400 via-green-400 to-teal-500 opacity-10"></div>
+                <CardContent className="p-6 text-center bg-gradient-to-br from-emerald-50 to-green-50 relative">
+                  <Badge variant="success" size="lg" className="mb-4 animate-bounce-in">
+                    🏆 SUBASTA FINALIZADA
                   </Badge>
-                  {auction.winner_id && (
-                    <p className="text-sm text-gray-600">
-                      Ganador asignado
-                    </p>
+                  
+                  {currentUserId === auction.winner_id && (
+                    <div className="mt-4 p-4 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-xl text-white shadow-lg animate-pulse-glow">
+                      <div className="flex items-center justify-center gap-2 mb-2">
+                        <Gavel className="h-6 w-6" />
+                        <h3 className="text-xl font-bold">¡GANASTE ESTA SUBASTA!</h3>
+                        <Gavel className="h-6 w-6" />
+                      </div>
+                      <p className="text-sm opacity-90">
+                        Precio final: {formatCurrency(auction.current_bid || auction.price)}
+                      </p>
+                      <div className="mt-4 flex gap-2 justify-center">
+                        <Button
+                          onClick={() => window.location.href = `/checkout?auction=${productId}`}
+                          className="bg-white text-emerald-600 hover:bg-emerald-50 font-bold"
+                        >
+                          💳 Pagar Ahora
+                        </Button>
+                        <Button
+                          onClick={() => window.location.href = `/messages?user=${auction.seller_id}`}
+                          variant="outline"
+                          className="border-white text-white hover:bg-white hover:text-emerald-600"
+                        >
+                          💬 Contactar Vendedor
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {auction.winner_id && winnerInfo && currentUserId !== auction.winner_id && (
+                    <div className="mt-4 p-4 bg-white rounded-lg border-2 border-emerald-200">
+                      <p className="text-sm text-gray-600 mb-2">Ganador:</p>
+                      <p className="font-bold text-lg text-gray-900">
+                        {winnerInfo.first_name || winnerInfo.last_name
+                          ? `${winnerInfo.first_name || ''} ${winnerInfo.last_name || ''}`.trim()
+                          : winnerInfo.email?.split('@')[0] || 'Usuario'}
+                      </p>
+                      <p className="text-sm text-gray-500 mt-1">
+                        Precio ganador: {formatCurrency(auction.current_bid || auction.price)}
+                      </p>
+                    </div>
+                  )}
+                  
+                  {!auction.winner_id && (
+                    <div className="mt-4 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                      <p className="text-sm text-yellow-800">
+                        ⚠️ Esta subasta finalizó sin ganador (sin pujas)
+                      </p>
+                    </div>
                   )}
                 </CardContent>
               </Card>
@@ -730,7 +899,7 @@ export default function AuctionDetailPage() {
                       <div 
                         className={`w-32 h-32 rounded-full bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center shadow-xl border-4 border-white transition-all duration-300 ${
                           newBidNotification ? 'animate-pulse scale-110' : ''
-                        }`}
+                        } ${myBidPosition === 1 ? 'ring-4 ring-emerald-400 ring-offset-2' : ''}`}
                       >
                         <div className="text-center text-white">
                           <p className="text-xs font-medium opacity-90 mb-1">PUJA ACTUAL</p>
@@ -745,8 +914,30 @@ export default function AuctionDetailPage() {
                           {auction.total_bids}
                         </div>
                       )}
+                      {/* Indicador de posición si el usuario está pujando */}
+                      {myBidPosition !== null && myBidPosition > 0 && (
+                        <div className={`absolute -bottom-2 left-1/2 transform -translate-x-1/2 px-3 py-1 rounded-full text-xs font-bold shadow-lg ${
+                          myBidPosition === 1 
+                            ? 'bg-emerald-500 text-white animate-pulse' 
+                            : myBidPosition === 2
+                            ? 'bg-amber-500 text-white'
+                            : 'bg-gray-500 text-white'
+                        }`}>
+                          {myBidPosition === 1 ? '👑 Eres el máximo postor' : `Posición #${myBidPosition}`}
+                        </div>
+                      )}
                     </div>
                   </div>
+                  
+                  {/* Indicador si fuiste superado */}
+                  {myBidPosition !== null && myBidPosition > 1 && (
+                    <Alert variant="warning" className="mb-4">
+                      <AlertDescription className="flex items-center gap-2">
+                        <Clock className="h-4 w-4" />
+                        Fuiste superado. Tu posición actual: #{myBidPosition}. ¡Puja más para recuperar el primer lugar!
+                      </AlertDescription>
+                    </Alert>
+                  )}
                   
                   {/* Incremento mínimo visible */}
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
