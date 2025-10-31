@@ -124,8 +124,6 @@ jobs:
         continue-on-error: true  # No fallar si Snyk no está configurado
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
           args: --severity-threshold=high
 
