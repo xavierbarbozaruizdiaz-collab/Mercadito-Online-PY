@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -13,6 +13,16 @@ export default function SignInPage() {
   const [isSignUp, setIsSignUp] = useState(false);
   const router = useRouter();
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Limpiar timeout al desmontar el componente o cambiar entre sign-in/sign-up
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    };
+  }, [isSignUp]); // También limpiar cuando cambie el modo
 
   async function signIn(e: React.FormEvent) {
     e.preventDefault();
@@ -43,22 +53,32 @@ export default function SignInPage() {
       } else {
         // Actualizar login_count y last_login_at
         if (authData?.user) {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('login_count')
-            .eq('id', authData.user.id)
-            .single();
+          // Usar UPSERT en lugar de UPDATE para manejar usuarios sin perfil
+          try {
+            const { data: existingProfile } = await supabase
+              .from('profiles')
+              .select('login_count')
+              .eq('id', authData.user.id)
+              .single();
 
-          const currentCount = (profile as any)?.login_count || 0;
-          
-          await supabase
-            .from('profiles')
-            .update({
-              login_count: currentCount + 1,
-              last_login_at: new Date().toISOString(),
-              last_seen: new Date().toISOString(),
-            })
-            .eq('id', authData.user.id);
+            const currentCount = (existingProfile as any)?.login_count || 0;
+            const now = new Date().toISOString();
+
+            // UPSERT: insertar si no existe, actualizar si existe
+            await supabase
+              .from('profiles')
+              .upsert({
+                id: authData.user.id,
+                login_count: currentCount + 1,
+                last_login_at: now,
+                last_seen: now,
+              }, {
+                onConflict: 'id'
+              });
+          } catch (profileError) {
+            // Silenciosamente manejar errores de perfil (no crítico para el login)
+            console.warn('Error actualizando perfil:', profileError);
+          }
         }
 
         if (timeoutRef.current) {
@@ -307,10 +327,16 @@ export default function SignInPage() {
             <button
               type="button"
               onClick={() => {
+                // Limpiar timeout antes de cambiar modo
+                if (timeoutRef.current) {
+                  clearTimeout(timeoutRef.current);
+                  timeoutRef.current = null;
+                }
                 setIsSignUp(!isSignUp);
                 setMsg(null);
                 setEmail('');
                 setPassword('');
+                setLoading(false);
               }}
               disabled={loading}
               className="text-sm text-gray-600 hover:text-blue-600 transition-colors disabled:opacity-50"
