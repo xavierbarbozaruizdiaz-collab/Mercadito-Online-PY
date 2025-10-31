@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { getUserBids } from '@/lib/services/auctionService';
 import { formatCurrency } from '@/lib/utils';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
 import Link from 'next/link';
 import Image from 'next/image';

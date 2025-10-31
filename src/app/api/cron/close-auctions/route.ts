@@ -5,13 +5,7 @@ import { createClient } from '@supabase/supabase-js';
  * API Route para cerrar subastas expiradas automáticamente
  * 
  * Se ejecuta cada 5-10 segundos mediante Vercel Cron Jobs
- * Configurar en vercel.json con:
- * {
- *   "crons": [{
- *     "path": "/api/cron/close-auctions",
- *     "schedule": "*/10 * * * * *"
- *   }]
- * }
+ * Configurar en vercel.json
  */
 
 export const runtime = 'edge';

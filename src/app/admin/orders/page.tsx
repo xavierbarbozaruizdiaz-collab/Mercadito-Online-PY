@@ -121,7 +121,7 @@ export default function AdminOrdersPage() {
               .eq('id', id)
               .single();
 
-            return data ? { id: data.id, email: data.email } : null;
+            return data ? { id: (data as { id: string; email: string }).id, email: (data as { id: string; email: string }).email } : null;
           })
         );
 

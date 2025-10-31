@@ -127,8 +127,10 @@ export default function AdminReportsPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('No autenticado');
 
+      // @ts-ignore - Supabase types for reports table are incomplete
       const { error } = await supabase
         .from('reports')
+        // @ts-ignore
         .update({
           status: resolution,
           resolved_by: user.id,

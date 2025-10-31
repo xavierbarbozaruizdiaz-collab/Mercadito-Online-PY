@@ -9,7 +9,7 @@ import AuctionTimer from '@/components/auction/AuctionTimer';
 import BidForm from '@/components/auction/BidForm';
 import BidHistory from '@/components/auction/BidHistory';
 import { formatCurrency } from '@/lib/utils';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui';
