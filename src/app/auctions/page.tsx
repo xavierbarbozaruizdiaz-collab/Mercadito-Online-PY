@@ -58,7 +58,11 @@ export default function AuctionsPage() {
       switch (sortBy) {
         case 'all':
           // Para "TODAS", mostrar por fecha de creación (más recientes primero)
-          sorted.sort((a, b) => new Date(b.created_at || b.id).getTime() - new Date(a.created_at || a.id).getTime());
+          sorted.sort((a, b) => {
+            const aDate = a.created_at ? new Date(a.created_at).getTime() : 0;
+            const bDate = b.created_at ? new Date(b.created_at).getTime() : 0;
+            return bDate - aDate; // Más recientes primero
+          });
           break;
         case 'ending_soon':
           sorted.sort((a, b) => {
@@ -74,7 +78,11 @@ export default function AuctionsPage() {
           sorted.sort((a, b) => (b.current_bid || b.price) - (a.current_bid || a.price));
           break;
         case 'recent':
-          sorted.sort((a, b) => new Date(b.created_at || b.id).getTime() - new Date(a.created_at || a.id).getTime());
+          sorted.sort((a, b) => {
+            const aDate = a.created_at ? new Date(a.created_at).getTime() : 0;
+            const bDate = b.created_at ? new Date(b.created_at).getTime() : 0;
+            return bDate - aDate; // Más recientes primero
+          });
           break;
       }
       
