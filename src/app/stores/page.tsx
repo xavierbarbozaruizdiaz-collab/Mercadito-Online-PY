@@ -96,6 +96,20 @@ export default function StoresPage() {
     setError(null);
 
     try {
+      // Primero verificar si hay tiendas sin filtro para debugging
+      const { count: totalCount } = await supabase
+        .from('stores')
+        .select('*', { count: 'exact', head: true });
+      
+      console.log('🔍 Total de tiendas en BD:', totalCount);
+
+      const { count: activeCount } = await supabase
+        .from('stores')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_active', true);
+      
+      console.log('✅ Tiendas activas:', activeCount);
+
       let query = supabase
         .from('stores')
         .select(`
@@ -117,24 +131,29 @@ export default function StoresPage() {
         query = query.or(`name.ilike.%${filters.search}%,description.ilike.%${filters.search}%`);
       }
 
-      // Filtro de departamento
+      // Filtro de departamento (usar el nuevo campo structured)
       if (filters.department) {
-        query = query.ilike('location', `%${filters.department}%`);
+        query = query.ilike('department', `%${filters.department}%`);
       }
 
-      // Filtro de ubicación (texto libre)
+      // Filtro de ubicación (texto libre - buscar en location antigua o city)
       if (filters.location.trim()) {
-        query = query.ilike('location', `%${filters.location}%`);
+        query = query.or(`location.ilike.%${filters.location}%,city.ilike.%${filters.location}%,neighborhood.ilike.%${filters.location}%`);
       }
 
-      // TODO: Filtro de categoría (requiere join con productos)
-      // Por ahora se omite hasta tener mejor estructura
+      // Filtro de categoría (por category_ids de la tienda)
+      if (filters.category) {
+        query = query.contains('category_ids', [filters.category]);
+      }
 
       const { data: storesData, error: queryError } = await query.order('created_at', { ascending: false });
 
       if (queryError) {
+        console.error('❌ Error en consulta de tiendas:', queryError);
         throw queryError;
       }
+
+      console.log('📦 Tiendas encontradas:', storesData?.length || 0);
 
       // Si hay stores, obtener información de sellers por separado
       if (storesData && storesData.length > 0) {
@@ -314,11 +333,16 @@ export default function StoresPage() {
             <h2 className="text-xl font-medium text-gray-600 mb-2">
               No se encontraron tiendas
             </h2>
-            <p className="text-gray-500">
+            <p className="text-gray-500 mb-4">
               {hasActiveFilters
                 ? 'Intenta ajustar los filtros de búsqueda'
                 : 'No hay tiendas disponibles en este momento'}
             </p>
+            {!hasActiveFilters && (
+              <p className="text-sm text-gray-400">
+                Las tiendas deben ser aprobadas por un administrador para aparecer aquí.
+              </p>
+            )}
           </div>
         ) : (
           <>

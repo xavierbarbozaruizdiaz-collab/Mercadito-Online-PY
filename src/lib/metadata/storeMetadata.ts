@@ -8,7 +8,7 @@ import { supabase } from '@/lib/supabaseClient';
 
 export async function generateStoreMetadata(slug: string): Promise<Metadata> {
   try {
-    const { data: store } = await supabase
+    const { data: store } = await (supabase as any)
       .from('stores')
       .select(`
         name,

@@ -17,6 +17,8 @@ export default function Dashboard() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [role, setRole] = useState<'buyer' | 'seller' | 'admin' | null>(null);
+  const [storeStatus, setStoreStatus] = useState<'none' | 'pending' | 'active'>('none');
 
   useEffect(() => {
     (async () => {
@@ -25,6 +27,28 @@ export default function Dashboard() {
         if (!session?.session?.user?.id) {
           setLoading(false);
           return;
+        }
+
+        // Cargar rol del perfil y estado de tienda
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', session.session.user.id)
+          .single();
+        setRole((profile as any)?.role || 'buyer');
+
+        if ((profile as any)?.role === 'seller') {
+          const { data: s } = await supabase
+            .from('stores')
+            .select('is_active, settings')
+            .eq('seller_id', session.session.user.id)
+            .maybeSingle();
+          if (s) {
+            const pending = (s as any).settings?.verification_status === 'pending' || (s as any).is_active === false;
+            setStoreStatus(pending ? 'pending' : 'active');
+          } else {
+            setStoreStatus('none');
+          }
         }
 
         const { data, error } = await supabase
@@ -112,6 +136,55 @@ export default function Dashboard() {
             + Nuevo producto
           </Link>
         </div>
+      </div>
+
+      {/* Enlaces de configuración */}
+      <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Link
+          href="/dashboard/profile"
+          className="bg-white rounded-lg border p-4 hover:shadow-md transition-shadow"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center text-2xl">
+              👤
+            </div>
+            <div>
+              <h3 className="font-semibold text-gray-900">Mi Perfil {storeStatus === 'active' ? '& Tienda' : ''}</h3>
+              <p className="text-sm text-gray-600">Foto de perfil, portada, información personal{storeStatus === 'active' ? ' y datos de tienda' : ''}</p>
+            </div>
+          </div>
+        </Link>
+        {role !== 'seller' ? (
+          <Link href="/dashboard/become-seller" className="bg-white rounded-lg border p-4 hover:shadow-md transition-shadow">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-2xl">🏪</div>
+              <div>
+                <h3 className="font-semibold text-gray-900">Convertirme en Tienda</h3>
+                <p className="text-sm text-gray-600">Suscripción y solicitud de verificación del local</p>
+              </div>
+            </div>
+          </Link>
+        ) : storeStatus === 'pending' ? (
+          <Link href="/dashboard/profile" className="bg-white rounded-lg border p-4 hover:shadow-md transition-shadow">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-full bg-yellow-100 flex items-center justify-center text-2xl">⏳</div>
+              <div>
+                <h3 className="font-semibold text-gray-900">Verificación en proceso</h3>
+                <p className="text-sm text-gray-600">Configura tu tienda mientras validamos el lugar</p>
+              </div>
+            </div>
+          </Link>
+        ) : (
+          <Link href="/dashboard/profile" className="bg-white rounded-lg border p-4 hover:shadow-md transition-shadow">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-2xl">🏪</div>
+              <div>
+                <h3 className="font-semibold text-gray-900">Información de Tienda</h3>
+                <p className="text-sm text-gray-600">Logo, portada, contacto, ubicación, rubros</p>
+              </div>
+            </div>
+          </Link>
+        )}
       </div>
 
       {loading ? (

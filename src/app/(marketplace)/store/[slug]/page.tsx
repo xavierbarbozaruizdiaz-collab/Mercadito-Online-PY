@@ -23,6 +23,7 @@ import {
 } from '@/components/ui';
 import { useSellerProfile } from '@/lib/hooks/useSellerProfile';
 import { getStoreBySlug, getStoreProducts } from '@/lib/services/storeService';
+import { useSearchParams } from 'next/navigation';
 import { 
   Star,
   MapPin,
@@ -57,7 +58,9 @@ import {
 export default function StoreProfilePage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const storeSlug = params.slug as string;
+  const isAdminView = searchParams.get('admin') === 'true';
   
   const [activeTab, setActiveTab] = useState<'products' | 'reviews' | 'about' | 'policies'>('products');
   const [isFollowing, setIsFollowing] = useState(false);
@@ -117,7 +120,7 @@ export default function StoreProfilePage() {
       setStoreLoading(true);
       setStoreError(null);
       try {
-        const storeData = await getStoreBySlug(storeSlug);
+        const storeData = await getStoreBySlug(storeSlug, isAdminView);
         console.log('🏪 Store data loaded:', storeData);
         if (storeData) {
           setStore(storeData);
@@ -160,7 +163,7 @@ export default function StoreProfilePage() {
     if (storeSlug) {
       loadStoreAndGetIds();
     }
-  }, [storeSlug]);
+  }, [storeSlug, isAdminView]);
 
   const { 
     profile, 
@@ -247,22 +250,65 @@ export default function StoreProfilePage() {
 
   if (error || !store) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <EmptyState
-          title="Tienda no encontrada"
-          description="La tienda que buscas no existe o ha sido eliminada."
-          action={{
-            label: 'Volver al inicio',
-            onClick: () => router.push('/'),
-          }}
-          icon={<Store className="w-16 h-16" />}
-        />
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="text-center max-w-md">
+          <EmptyState
+            icon={Store}
+            title="Tienda no encontrada"
+            description={error || "Esta tienda no existe o no está disponible."}
+          />
+          <Link href="/" className="mt-4 inline-block text-blue-600 hover:underline">
+            ← Volver al inicio
+          </Link>
+        </div>
       </div>
     );
   }
 
+  // Verificar si la tienda está pendiente o incompleta
+  const isPending = !store.is_active || (store.settings as any)?.verification_status === 'pending';
+  const isRejected = (store.settings as any)?.verification_status === 'rejected';
+  const isIncomplete = !store.description || !store.contact_phone;
+
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Banner de estado para admin o tiendas pendientes */}
+      {(isAdminView || isPending || isRejected || isIncomplete) && (
+        <div className="bg-yellow-50 border-b border-yellow-200 px-4 sm:px-6 lg:px-8 py-3">
+          <div className="max-w-7xl mx-auto">
+            {isPending && (
+              <div className="flex items-center gap-2 text-yellow-800">
+                <span className="text-lg">⏳</span>
+                <p className="text-sm">
+                  <strong>Tienda pendiente de verificación.</strong> El vendedor aún no ha completado toda la información.
+                </p>
+              </div>
+            )}
+            {isRejected && (
+              <div className="flex items-center gap-2 text-red-800">
+                <span className="text-lg">❌</span>
+                <p className="text-sm">
+                  <strong>Verificación rechazada.</strong> Esta tienda necesita corregir su información antes de ser aprobada.
+                </p>
+              </div>
+            )}
+            {isIncomplete && !isPending && !isRejected && (
+              <div className="flex items-center gap-2 text-blue-800">
+                <span className="text-lg">ℹ️</span>
+                <p className="text-sm">
+                  <strong>Información incompleta.</strong> Esta tienda no tiene todos los datos requeridos.
+                </p>
+              </div>
+            )}
+            {isAdminView && (
+              <div className="mt-2 text-xs text-gray-600">
+                Vista de administrador - Puedes ver tiendas incluso si están inactivas o incompletas.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Header del perfil */}
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -275,7 +321,7 @@ export default function StoreProfilePage() {
                 size="xl"
                 className="border-4 border-white shadow-lg"
               />
-              {store.is_verified && (
+              {((store as any).is_verified) && (
                 <div className="absolute -bottom-2 -right-2 bg-blue-600 text-white rounded-full p-1">
                   <CheckCircle className="w-5 h-5" />
                 </div>
@@ -288,7 +334,7 @@ export default function StoreProfilePage() {
                 <div>
                   <h1 className="text-3xl font-bold text-gray-900 flex items-center">
                     {store.name}
-                    {store.is_verified && (
+                    {((store as any).is_verified) && (
                       <Badge variant="success" size="sm" className="ml-2">
                         <Award className="w-3 h-3 mr-1" />
                         Verificada
@@ -297,11 +343,13 @@ export default function StoreProfilePage() {
                   </h1>
                   
                   <div className="flex items-center space-x-4 mt-2 text-gray-600">
-                    <div className="flex items-center">
-                      <Star className="w-4 h-4 text-yellow-500 mr-1" />
-                      <span className="font-medium">{store.rating.toFixed(1)}</span>
-                      <span className="text-sm ml-1">({store.total_reviews} reseñas)</span>
-                    </div>
+                    {((store as any).rating !== undefined) && (
+                      <div className="flex items-center">
+                        <Star className="w-4 h-4 text-yellow-500 mr-1" />
+                        <span className="font-medium">{((store as any).rating || 0).toFixed(1)}</span>
+                        <span className="text-sm ml-1">({((store as any).total_reviews || 0)} reseñas)</span>
+                      </div>
+                    )}
                     
                     <div className="flex items-center">
                       <Calendar className="w-4 h-4 mr-1" />
@@ -607,9 +655,13 @@ export default function StoreProfilePage() {
                             <div className="flex items-start space-x-3">
                               <Avatar
                                 src={review.buyer.avatar_url}
-                                fallback={((review.buyer.first_name || review.buyer.last_name 
-                                  ? `${review.buyer.first_name || ''} ${review.buyer.last_name || ''}`.trim()
-                                  : review.buyer.email?.split('@')[0] || 'U').charAt(0).toUpperCase()}
+                                fallback={
+                                  (
+                                    (review.buyer.first_name || review.buyer.last_name)
+                                      ? `${review.buyer.first_name || ''} ${review.buyer.last_name || ''}`.trim()
+                                      : (review.buyer.email?.split('@')[0] || 'U')
+                                  ).charAt(0).toUpperCase()
+                                }
                                 size="md"
                               />
                               <div className="flex-1">

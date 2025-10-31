@@ -33,7 +33,7 @@ export class ReferralService {
     userId: string
   ): Promise<string | null> {
     try {
-      const { data, error } = await supabase.rpc('get_or_create_referral_code', {
+      const { data, error } = await (supabase as any).rpc('get_or_create_referral_code', {
         user_id_param: userId,
       });
 
@@ -54,7 +54,7 @@ export class ReferralService {
     referredUserId: string
   ): Promise<Referral | null> {
     try {
-      const { data, error } = await supabase.rpc('process_referral', {
+      const { data, error } = await (supabase as any).rpc('process_referral', {
         referral_code_param: referralCode,
         referred_user_id: referredUserId,
       });

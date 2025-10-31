@@ -63,7 +63,7 @@ export class ShippingService {
     trackingNumber?: string
   ): Promise<Shipment | null> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('shipments')
         .insert({
           order_id: orderId,
@@ -91,7 +91,7 @@ export class ShippingService {
     shipmentId: string
   ): Promise<ShipmentEvent[]> {
     try {
-      const { data, error } = await supabase.rpc(
+      const { data, error } = await (supabase as any).rpc(
         'get_shipment_tracking',
         { shipment_id_param: shipmentId }
       );
@@ -163,7 +163,7 @@ export class ShippingService {
         updates.actual_delivery_date = new Date().toISOString();
       }
 
-      const { error: updateError } = await supabase
+      const { error: updateError } = await (supabase as any)
         .from('shipments')
         .update(updates)
         .eq('id', shipmentId);
@@ -172,7 +172,7 @@ export class ShippingService {
 
       // Agregar evento de tracking
       if (location || description) {
-        const { error: eventError } = await supabase
+        const { error: eventError } = await (supabase as any)
           .from('shipment_events')
           .insert({
             shipment_id: shipmentId,
@@ -203,7 +203,7 @@ export class ShippingService {
     carrier: Carrier = 'correo_paraguayo'
   ): Promise<number> {
     try {
-      const { data, error } = await supabase.rpc('calculate_shipping_cost', {
+      const { data, error } = await (supabase as any).rpc('calculate_shipping_cost', {
         origin_city: originCity,
         destination_city: destinationCity,
         weight_kg: weightKg,

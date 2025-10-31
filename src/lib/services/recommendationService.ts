@@ -35,7 +35,7 @@ export class RecommendationService {
       const { data: similarProducts, error } = await supabase
         .from('products')
         .select('*')
-        .eq('category_id', currentProduct.category_id)
+        .eq('category_id', (currentProduct as any).category_id)
         .eq('status', 'active')
         .neq('id', productId)
         .limit(limit);
@@ -46,10 +46,10 @@ export class RecommendationService {
       }
 
       // Ordenar por relevancia (mismo precio, tags similares)
-      const sortedProducts = (similarProducts || []).sort((a, b) => {
+      const sortedProducts = (similarProducts || []).sort((a: any, b: any) => {
         // Priorizar productos con precio similar
-        const priceDiffA = Math.abs(a.price - currentProduct.price);
-        const priceDiffB = Math.abs(b.price - currentProduct.price);
+        const priceDiffA = Math.abs((a as any).price - (currentProduct as any).price);
+        const priceDiffB = Math.abs((b as any).price - (currentProduct as any).price);
         return priceDiffA - priceDiffB;
       });
 
@@ -162,7 +162,7 @@ export class RecommendationService {
       }
 
       // Buscar productos basados en esos términos
-      const searchTerms = searchHistory.map((item) => item.query).join(' ');
+      const searchTerms = (searchHistory as any[]).map((item: any) => item.query).join(' ');
 
       const { data: products, error } = await supabase
         .from('products')

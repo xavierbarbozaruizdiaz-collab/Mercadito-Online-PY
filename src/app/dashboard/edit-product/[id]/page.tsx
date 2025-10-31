@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import imageCompression from 'browser-image-compression';
-import { supabase } from '@/lib/supabaseClient';
+import { supabase, getSessionWithTimeout } from '@/lib/supabaseClient';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 
@@ -58,19 +58,22 @@ export default function EditProduct() {
         if (productError) throw productError;
         if (!productData) throw new Error('Producto no encontrado');
 
-        // Verificar permisos (solo el creador puede editar)
+        // Cast para evitar errores de tipo de TypeScript
+        const product = productData as any;
+
+        // Verificar permisos (solo el vendedor puede editar)
         const { data: session } = await supabase.auth.getSession();
-        if (productData.created_by !== session?.session?.user?.id) {
+        if (product.seller_id !== session?.session?.user?.id) {
           throw new Error('No tienes permisos para editar este producto');
         }
 
         // Cargar datos del producto
-        setTitle(productData.title || '');
-        setDescription(productData.description || '');
-        setPrice(productData.price?.toString() || '');
-        setSaleType(productData.sale_type || 'direct');
-        setCondition(productData.condition || 'nuevo');
-        setCategoryId(productData.category_id);
+        setTitle(product.title || '');
+        setDescription(product.description || '');
+        setPrice(product.price?.toString() || '');
+        setSaleType(product.sale_type || 'direct');
+        setCondition(product.condition || 'nuevo');
+        setCategoryId(product.category_id);
 
         // Cargar imágenes existentes
         const { data: imagesData, error: imagesError } = await supabase
@@ -282,10 +285,11 @@ export default function EditProduct() {
       if (!title.trim()) throw new Error('Título requerido');
       if (!priceNumber || priceNumber <= 0) throw new Error('Precio inválido');
       if (!categoryId) throw new Error('Selecciona una categoría');
+
       if (totalImagesCount === 0) throw new Error('Agrega al menos una imagen');
 
       // 1. Actualizar producto
-      const { error: updateError } = await supabase
+      const { error: updateError } = await (supabase as any)
         .from('products')
         .update({
           title: title.trim(),
@@ -312,13 +316,13 @@ export default function EditProduct() {
         );
 
         // Guardar referencias en product_images
-        const { error: imagesError } = await supabase
+        const { error: imagesError } = await (supabase as any)
           .from('product_images')
           .insert(imageUrls.map((url, idx) => ({
             product_id: productId,
             url,
             idx: existingImages.length + idx,
-          })));
+          })) as any);
 
         if (imagesError) throw imagesError;
       }
@@ -333,9 +337,9 @@ export default function EditProduct() {
       if (allImages.length > 0) {
         const firstImageUrl = existingImages.length > 0 ? existingImages[0].url : '';
         if (firstImageUrl) {
-          const { error: coverError } = await supabase
+          const { error: coverError } = await (supabase as any)
             .from('products')
-            .update({ cover_url: firstImageUrl })
+            .update({ cover_url: firstImageUrl } as any)
             .eq('id', productId);
 
           if (coverError) throw coverError;

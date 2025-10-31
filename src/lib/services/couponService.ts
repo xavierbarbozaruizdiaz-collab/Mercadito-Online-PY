@@ -87,7 +87,7 @@ export class CouponService {
     orderAmount: number
   ): Promise<CouponValidationResult> {
     try {
-      const { data, error } = await supabase.rpc('validate_coupon', {
+      const { data, error } = await (supabase as any).rpc('validate_coupon', {
         coupon_code: couponCode.toUpperCase().trim(),
         user_id_param: userId,
         order_amount: orderAmount,
@@ -95,7 +95,7 @@ export class CouponService {
 
       if (error) throw error;
 
-      const result = normalizeRpcResult(data);
+      const result = normalizeRpcResult<any>(data as any) as any;
       if (!result) {
         return {
           valid: false,
@@ -194,7 +194,7 @@ export class CouponService {
     userId: string
   ): Promise<CouponValidationResult> {
     try {
-      const { data, error } = await supabase.rpc('apply_coupon_to_order', {
+      const { data, error } = await (supabase as any).rpc('apply_coupon_to_order', {
         coupon_code_param: couponCode.toUpperCase().trim(),
         order_id_param: orderId,
         user_id_param: userId,
@@ -202,7 +202,7 @@ export class CouponService {
 
       if (error) throw error;
 
-      const result = normalizeRpcResult(data);
+      const result = normalizeRpcResult<any>(data as any) as any;
       if (!result) {
         return {
           valid: false,

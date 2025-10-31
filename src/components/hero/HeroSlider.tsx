@@ -25,22 +25,24 @@ export type HeroSlide = {
 };
 
 export default function HeroSlider({ slides }: { slides: HeroSlide[] }) {
-  const autoplayPlugin = useMemo(() => 
-    Autoplay({ 
-      delay: 5000, 
+  // Crear el plugin de autoplay solo si hay múltiples slides
+  const autoplayPlugin = useMemo(() => {
+    if (slides.length <= 1) return undefined;
+    return Autoplay({ 
+      delay: 3000,
       stopOnMouseEnter: true,
-      stopOnInteraction: false 
-    }), 
-    []
-  );
+      stopOnInteraction: false,
+    });
+  }, [slides.length]);
 
   const [emblaRef, emblaApi] = useEmblaCarousel(
     { 
       loop: slides.length > 1,
       align: 'start',
-      duration: 25,
+      duration: 20,
+      skipSnaps: false,
     },
-    [autoplayPlugin]
+    autoplayPlugin ? [autoplayPlugin] : undefined
   );
   
   const [index, setIndex] = useState(0);
@@ -53,16 +55,14 @@ export default function HeroSlider({ slides }: { slides: HeroSlide[] }) {
   useEffect(() => {
     if (!emblaApi) return;
     
-    // Reinicializar cuando cambian los slides
-    emblaApi.reInit();
-    
+    // Configurar listeners
     emblaApi.on('select', onSelect);
     onSelect();
     
     return () => {
       emblaApi.off('select', onSelect);
     };
-  }, [emblaApi, onSelect, slides.length]);
+  }, [emblaApi, onSelect]);
 
   const scrollTo = (i: number) => emblaApi?.scrollTo(i);
   const prev = () => emblaApi?.scrollPrev();

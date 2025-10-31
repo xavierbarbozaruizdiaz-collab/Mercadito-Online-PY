@@ -14,7 +14,7 @@ export default function ProfileEnsurer() {
 
   const ensureProfile = async () => {
     try {
-      const { data, error } = await supabase.rpc('ensure_user_profile');
+      const { data, error } = await (supabase as any).rpc('ensure_user_profile');
       
       if (error) {
         setMessage('Error creando perfil: ' + error.message);
@@ -22,7 +22,7 @@ export default function ProfileEnsurer() {
         return;
       }
       
-      if (data && data.startsWith('SUCCESS')) {
+      if (typeof data === 'string' && data.startsWith('SUCCESS')) {
         setMessage(data);
         setProfileExists(true);
         

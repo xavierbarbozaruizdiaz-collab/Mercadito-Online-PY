@@ -24,42 +24,7 @@ export default function OfflineIndicator() {
     }
   }
 
-  const { isOnline, isSlowConnection, effectiveType } = useNetworkStatus();
-
-  // No mostrar nada si todo está bien
-  if (isOnline && !isSlowConnection) {
-    return null;
-  }
-
-  return (
-    <div
-      className={`fixed bottom-4 right-4 z-50 p-3 rounded-lg shadow-lg flex items-center gap-2 ${
-        !isOnline
-          ? 'bg-red-500 text-white'
-          : isSlowConnection
-          ? 'bg-yellow-500 text-white'
-          : 'bg-blue-500 text-white'
-      }`}
-    >
-      {!isOnline ? (
-        <>
-          <WifiOff className="w-4 h-4" />
-          <span className="text-sm font-medium">Sin conexión</span>
-        </>
-      ) : isSlowConnection ? (
-        <>
-          <Gauge className="w-4 h-4" />
-          <span className="text-sm font-medium">
-            Conexión lenta ({effectiveType || '2g'})
-          </span>
-        </>
-      ) : (
-        <>
-          <Wifi className="w-4 h-4" />
-          <span className="text-sm font-medium">Conectado</span>
-        </>
-      )}
-    </div>
-  );
+  // OCULTAR COMPLETAMENTE - Es demasiado molesto y no es necesario
+  return null;
 }
 

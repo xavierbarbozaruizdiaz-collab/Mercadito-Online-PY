@@ -92,7 +92,7 @@ export class MarketplaceFeaturesService {
     answerText: string
   ): Promise<ProductQuestion | null> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('product_questions')
         .update({
           answer_text: answerText,
@@ -198,7 +198,7 @@ export class MarketplaceFeaturesService {
           .single();
 
         if (question) {
-          await supabase
+          await (supabase as any)
             .from('product_questions')
             .update({ upvotes: (question as any).upvotes + 1 } as any)
             .eq('id', questionId);
@@ -246,7 +246,7 @@ export class MarketplaceFeaturesService {
       if (error) {
         // Si ya existe, actualizar
         if (error.code === '23505') {
-          const { data: updated } = await supabase
+          const { data: updated } = await (supabase as any)
             .from('price_alerts')
             .update({
               target_price: targetPrice,

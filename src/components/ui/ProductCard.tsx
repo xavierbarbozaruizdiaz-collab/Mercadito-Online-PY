@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { 
@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { useWishlist } from '@/lib/hooks/useWishlist';
+import { supabase } from '@/lib/supabaseClient';
 
 // ============================================
 // TIPOS
@@ -44,6 +45,7 @@ interface Product {
   sale_type: string;
   cover_url?: string;
   created_at: string;
+  seller_id?: string; // ID del vendedor
   store: {
     name: string;
     slug: string;
@@ -79,7 +81,40 @@ export default function ProductCard({
 }: ProductCardProps) {
   const { isInWishlist, toggleWishlist } = useWishlist();
   const [isAddingToCart, setIsAddingToCart] = useState(false);
+  const [isOwnProduct, setIsOwnProduct] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const isLiked = isInWishlist(product.id);
+
+  // Verificar si el producto pertenece al usuario actual
+  useEffect(() => {
+    const checkOwnership = async () => {
+      try {
+        const { data: session } = await supabase.auth.getSession();
+        const userId = session?.session?.user?.id || null;
+        setCurrentUserId(userId);
+        
+        // Si el producto tiene seller_id, compararlo con el usuario actual
+        if (product.seller_id && userId) {
+          setIsOwnProduct(product.seller_id === userId);
+        } else if (!product.seller_id && userId) {
+          // Si no tiene seller_id en el objeto, obtenerlo del producto
+          const { data: productData } = await (supabase as any)
+            .from('products')
+            .select('seller_id')
+            .eq('id', product.id)
+            .single();
+          
+          if (productData?.seller_id === userId) {
+            setIsOwnProduct(true);
+          }
+        }
+      } catch (err) {
+        console.error('Error checking product ownership:', err);
+      }
+    };
+    
+    checkOwnership();
+  }, [product.id, product.seller_id]);
 
   // Manejar clic en la tarjeta
   const handleCardClick = () => {
@@ -101,10 +136,61 @@ export default function ProductCard({
 
   // Manejar agregar al carrito
   const handleAddToCart = async () => {
+    // Validar que no sea su propio producto
+    if (isOwnProduct) {
+      alert('No puedes agregar tus propios productos al carrito');
+      return;
+    }
+
     setIsAddingToCart(true);
     try {
-      // Aquí iría la lógica para agregar al carrito
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simular API call
+      const { data: session } = await supabase.auth.getSession();
+      if (!session?.session?.user?.id) {
+        alert('Debes iniciar sesión para agregar productos al carrito');
+        return;
+      }
+
+      // Verificar nuevamente que no sea su producto (doble validación)
+      const sellerId = product.seller_id;
+      if (sellerId && sellerId === session.session.user.id) {
+        alert('No puedes agregar tus propios productos al carrito');
+        return;
+      }
+
+      // Agregar al carrito usando el servicio
+      const { error } = await (supabase as any)
+        .from('cart_items')
+        .insert({
+          user_id: session.session.user.id,
+          product_id: product.id,
+          quantity: 1
+        });
+
+      if (error) {
+        // Si ya existe, actualizar cantidad
+        if (error.code === '23505') {
+          const { data: existing } = await (supabase as any)
+            .from('cart_items')
+            .select('id, quantity')
+            .eq('user_id', session.session.user.id)
+            .eq('product_id', product.id)
+            .single();
+
+          if (existing) {
+            await (supabase as any)
+              .from('cart_items')
+              .update({ quantity: existing.quantity + 1 })
+              .eq('id', existing.id);
+          }
+        } else {
+          throw error;
+        }
+      }
+
+      alert('Producto agregado al carrito');
+    } catch (err: any) {
+      console.error('Error adding to cart:', err);
+      alert(err.message || 'Error al agregar al carrito');
     } finally {
       setIsAddingToCart(false);
     }
@@ -252,10 +338,11 @@ export default function ProductCard({
                         variant="outline"
                         size="sm"
                         onClick={(e) => handleActionClick(e, handleAddToCart)}
-                        disabled={isAddingToCart}
+                        disabled={isAddingToCart || isOwnProduct}
+                        title={isOwnProduct ? 'No puedes agregar tus propios productos al carrito' : ''}
                       >
                         <ShoppingCart className="w-4 h-4 mr-1" />
-                        {isAddingToCart ? 'Agregando...' : 'Agregar'}
+                        {isAddingToCart ? 'Agregando...' : isOwnProduct ? 'Tu producto' : 'Agregar'}
                       </Button>
                     </div>
                   )}
@@ -375,11 +462,12 @@ export default function ProductCard({
               variant="outline"
               size="sm"
               onClick={(e) => handleActionClick(e, handleAddToCart)}
-              disabled={isAddingToCart}
+              disabled={isAddingToCart || isOwnProduct}
               className="flex-1"
+              title={isOwnProduct ? 'No puedes agregar tus propios productos al carrito' : ''}
             >
               <ShoppingCart className="w-4 h-4 mr-1" />
-              {isAddingToCart ? 'Agregando...' : 'Agregar'}
+              {isAddingToCart ? 'Agregando...' : isOwnProduct ? 'Tu producto' : 'Agregar'}
             </Button>
             <Button
               variant="ghost"

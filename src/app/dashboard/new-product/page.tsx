@@ -2,13 +2,28 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import imageCompression from 'browser-image-compression';
-import { supabase } from '@/lib/supabaseClient';
+import { supabase, getSessionWithTimeout } from '@/lib/supabaseClient';
 import Link from 'next/link';
 
 const MAX_IMAGES = 5; // Reducido de 10 a 5 para ser más razonable
 
 type Category = { id: string; name: string };
 type ImagePreview = { file: File; preview: string };
+
+// Definición de campos por categoría
+type CategoryFields = {
+  vehiculos: {
+    kilometraje?: string;
+    año?: string;
+    color?: string;
+    documentacion?: string;
+    marca?: string;
+    modelo?: string;
+  };
+  // Puedes agregar más categorías aquí
+};
+
+type AllCategoryFields = CategoryFields[keyof CategoryFields];
 
 export default function NewProduct() {
   const [title, setTitle] = useState('');
@@ -17,6 +32,15 @@ export default function NewProduct() {
   const [saleType, setSaleType] = useState<'direct' | 'auction'>('direct');
   const [condition, setCondition] = useState<'nuevo' | 'usado' | 'usado_como_nuevo'>('nuevo');
   const [categoryId, setCategoryId] = useState<string | null>(null);
+  const [storeId, setStoreId] = useState<string | null>(null);
+  
+  // Campos específicos para subastas
+  const [auctionStartingPrice, setAuctionStartingPrice] = useState<string>('');
+  const [auctionBuyNowPrice, setAuctionBuyNowPrice] = useState<string>('');
+  const [auctionStartDate, setAuctionStartDate] = useState<string>('');
+  
+  // Campos específicos por categoría
+  const [categoryFields, setCategoryFields] = useState<AllCategoryFields>({});
 
   const [imagePreviews, setImagePreviews] = useState<ImagePreview[]>([]);
   const [loading, setLoading] = useState(false);
@@ -27,6 +51,18 @@ export default function NewProduct() {
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
+  
+  // Función para obtener el nombre de la categoría seleccionada
+  const selectedCategoryName = useMemo(() => {
+    if (!categoryId) return null;
+    const cat = categories.find(c => c.id === categoryId);
+    return cat?.name?.toLowerCase() || null;
+  }, [categoryId, categories]);
+
+  // Tiendas del vendedor
+  type Store = { id: string; name: string; location?: string | null };
+  const [stores, setStores] = useState<Store[]>([]);
+  const [storesLoading, setStoresLoading] = useState<boolean>(true);
 
   // Función para cargar categorías
   const loadCategories = async () => {
@@ -84,6 +120,39 @@ export default function NewProduct() {
     loadCategories();
   }, []);
 
+  // Cargar tiendas del vendedor
+  useEffect(() => {
+    const loadStores = async () => {
+      setStoresLoading(true);
+      try {
+        const { data: session, error } = await supabase.auth.getSession();
+        if (error) throw error;
+        const sellerId = session?.session?.user?.id;
+        if (!sellerId) {
+          setStores([]);
+          return;
+        }
+        const { data, error: storesError } = await supabase
+          .from('stores')
+          .select('id, name, location')
+          .eq('seller_id', sellerId)
+          .order('created_at', { ascending: false });
+        if (storesError) throw storesError;
+        setStores(data || []);
+        // Si solo hay una tienda, preseleccionarla
+        if ((data || []).length === 1) {
+          setStoreId((data as any)[0].id);
+        }
+      } catch (e) {
+        console.error('Error cargando tiendas:', e);
+        setStores([]);
+      } finally {
+        setStoresLoading(false);
+      }
+    };
+    loadStores();
+  }, []);
+
   const priceNumber = useMemo(() => Number(price || 0), [price]);
   const imagesCount = imagePreviews.length;
 
@@ -95,10 +164,20 @@ export default function NewProduct() {
       case 'title':
         if (!String(value)?.trim()) {
           errors.title = 'El título es requerido';
-        } else if (String(value).trim().length < 3) {
-          errors.title = 'El título debe tener al menos 3 caracteres';
         } else {
-          delete errors.title;
+          const normalized = String(value).trim().toLowerCase();
+          if (normalized.length < 3) {
+            errors.title = 'El título debe tener al menos 3 caracteres';
+          } else {
+            delete errors.title;
+          }
+        }
+        break;
+      case 'storeId':
+        if ((stores?.length || 0) > 0 && !value) {
+          errors.storeId = 'Selecciona una tienda';
+        } else {
+          delete errors.storeId;
         }
         break;
       case 'price':
@@ -134,9 +213,11 @@ export default function NewProduct() {
       priceNumber > 0 &&
       categoryId &&
       imagePreviews.length > 0 &&
+      // Si el usuario tiene tiendas, debe elegir una
+      ((stores?.length || 0) === 0 || !!storeId) &&
       Object.keys(validationErrors).length === 0
     );
-  }, [title, priceNumber, categoryId, imagePreviews.length, validationErrors]);
+  }, [title, priceNumber, categoryId, imagePreviews.length, validationErrors, stores?.length, storeId]);
 
   // Procesar archivos (común para input y drag&drop)
   function processFiles(files: FileList | File[]) {
@@ -273,12 +354,36 @@ export default function NewProduct() {
     try {
       // Validar
       if (!title.trim()) throw new Error('Título requerido');
-      if (!priceNumber || priceNumber <= 0) throw new Error('Precio inválido');
+      
+      // Validación de precio: para subastas, validar precio base; para venta directa, validar precio
+      let finalPrice = priceNumber;
+      if (saleType === 'auction') {
+        if (!auctionStartingPrice || Number(auctionStartingPrice) <= 0) {
+          throw new Error('El precio base es requerido para subastas');
+        }
+        if (!auctionStartDate) {
+          throw new Error('La fecha de inicio de subasta es requerida');
+        }
+        const startDate = new Date(auctionStartDate);
+        if (startDate < new Date()) {
+          throw new Error('La fecha de inicio debe ser en el futuro');
+        }
+        if (auctionBuyNowPrice && Number(auctionBuyNowPrice) <= Number(auctionStartingPrice)) {
+          throw new Error('El precio de compra ahora debe ser mayor que el precio base');
+        }
+        // Para subastas, el precio principal será el precio base
+        finalPrice = Number(auctionStartingPrice);
+      } else {
+        if (!priceNumber || priceNumber <= 0) throw new Error('Precio inválido');
+        finalPrice = priceNumber;
+      }
+      
       if (!categoryId) throw new Error('Selecciona una categoría');
       if (imagePreviews.length === 0) throw new Error('Agrega al menos una imagen');
+      if (stores.length > 0 && !storeId) throw new Error('Selecciona desde qué tienda publicar');
 
-      // Obtener usuario actual
-      const { data: session, error: sessionError } = await supabase.auth.getSession();
+      // Obtener usuario actual (con timeout/retry para evitar cuelgues)
+      const { data: session, error: sessionError } = await getSessionWithTimeout();
       
       if (sessionError) {
         throw new Error('Error al obtener la sesión del usuario');
@@ -290,27 +395,57 @@ export default function NewProduct() {
         throw new Error('No estás autenticado. Por favor, inicia sesión.');
       }
 
+      // Preparar atributos de categoría (limpiar valores vacíos)
+      const cleanAttributes: Record<string, any> = {};
+      if (selectedCategoryName === 'vehiculos') {
+        const vehFields = categoryFields as CategoryFields['vehiculos'];
+        if (vehFields.marca?.trim()) cleanAttributes.marca = vehFields.marca.trim();
+        if (vehFields.modelo?.trim()) cleanAttributes.modelo = vehFields.modelo.trim();
+        if (vehFields.año?.trim()) cleanAttributes.año = vehFields.año.trim();
+        if (vehFields.kilometraje?.trim()) cleanAttributes.kilometraje = vehFields.kilometraje.trim();
+        if (vehFields.color?.trim()) cleanAttributes.color = vehFields.color.trim();
+        if (vehFields.documentacion?.trim()) cleanAttributes.documentacion = vehFields.documentacion.trim();
+      }
+      
+      // Agregar información de subasta si es tipo subasta
+      if (saleType === 'auction') {
+        const startDate = new Date(auctionStartDate);
+        cleanAttributes.auction = {
+          starting_price: Number(auctionStartingPrice),
+          buy_now_price: auctionBuyNowPrice && Number(auctionBuyNowPrice) > 0 
+            ? Number(auctionBuyNowPrice) 
+            : null,
+          start_date: startDate.toISOString(),
+        };
+      }
+
       console.log('📦 Creando producto con datos:', {
         title: title.trim(),
         description: description.trim() || null,
-        price: priceNumber,
+        price: finalPrice,
         sale_type: saleType,
         condition,
         category_id: categoryId,
         seller_id,
+        store_id: storeId,
+        auction: saleType === 'auction' ? cleanAttributes.auction : null,
       });
 
       // 1. Insertar producto
-      const { data: newProduct, error: insertError } = await supabase
+      const { data: newProduct, error: insertError } = await (supabase as any)
         .from('products')
         .insert({
           title: title.trim(),
           description: description.trim() || null,
-          price: priceNumber,
+          price: finalPrice,
           sale_type: saleType,
           condition,
           category_id: categoryId,
           seller_id,
+          // Guardar tienda si fue seleccionada
+          store_id: storeId || null,
+          // Guardar atributos específicos de la categoría y subasta
+          attributes: Object.keys(cleanAttributes).length > 0 ? cleanAttributes : null,
         })
         .select('id')
         .single();
@@ -341,7 +476,7 @@ export default function NewProduct() {
 
       // 4. Guardar referencias en product_images
       showMsg('success', '💾 Guardando referencias de imágenes (3/3)...');
-      const { error: imagesError } = await supabase
+      const { error: imagesError } = await (supabase as any)
         .from('product_images')
         .insert(imageUrls.map((url, idx) => ({
           product_id: newProduct.id,
@@ -357,7 +492,7 @@ export default function NewProduct() {
 
       // 5. Actualizar cover_url
       showMsg('success', '🔄 Actualizando imagen de portada...');
-      const { error: updateError } = await supabase
+      const { error: updateError } = await (supabase as any)
         .from('products')
         .update({ cover_url: imageUrls[0] })
         .eq('id', newProduct.id);
@@ -378,6 +513,11 @@ export default function NewProduct() {
       setSaleType('direct');
       setCondition('nuevo');
       setCategoryId(null);
+      setAuctionStartingPrice('');
+      setAuctionBuyNowPrice('');
+      setAuctionStartDate('');
+      setStoreId(stores.length === 1 ? stores[0].id : null);
+      setCategoryFields({});
       imagePreviews.forEach(({ preview }) => URL.revokeObjectURL(preview));
       setImagePreviews([]);
       setValidationErrors({});
@@ -488,24 +628,80 @@ export default function NewProduct() {
             <div className="flex gap-2">
               <button
                 type="button"
-                className={`px-4 py-2 border rounded ${
-                  saleType === 'direct' ? 'bg-black text-white' : ''
+                className={`px-4 py-2 border-2 rounded transition-colors ${
+                  saleType === 'direct' 
+                    ? 'bg-black text-white border-black' 
+                    : 'bg-white text-black border-gray-300 hover:border-gray-400'
                 }`}
-                onClick={() => setSaleType('direct')}
+                onClick={() => {
+                  setSaleType('direct');
+                  console.log('Tipo de venta cambiado a: direct');
+                }}
               >
                 Directa
               </button>
               <button
                 type="button"
-                className={`px-4 py-2 border rounded ${
-                  saleType === 'auction' ? 'bg-black text-white' : ''
+                className={`px-4 py-2 border-2 rounded transition-colors ${
+                  saleType === 'auction' 
+                    ? 'bg-black text-white border-black' 
+                    : 'bg-white text-black border-gray-300 hover:border-gray-400'
                 }`}
-                onClick={() => setSaleType('auction')}
+                onClick={() => {
+                  setSaleType('auction');
+                  console.log('Tipo de venta cambiado a: auction');
+                }}
               >
                 Subasta
               </button>
             </div>
           </div>
+
+          {/* Campos específicos de subasta */}
+          {saleType === 'auction' && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 space-y-4">
+              <h3 className="font-semibold text-yellow-900 mb-3">🔨 Información de la Subasta</h3>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Precio base (Gs.) *</label>
+                  <input
+                    type="number"
+                    placeholder="Ej: 100000"
+                    min="0"
+                    value={auctionStartingPrice}
+                    onChange={(e) => setAuctionStartingPrice(e.target.value)}
+                    className="border p-2 w-full rounded"
+                    required={saleType === 'auction'}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Precio mínimo de la subasta</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Compra ahora (Gs.)</label>
+                  <input
+                    type="number"
+                    placeholder="Ej: 200000 (opcional)"
+                    min="0"
+                    value={auctionBuyNowPrice}
+                    onChange={(e) => setAuctionBuyNowPrice(e.target.value)}
+                    className="border p-2 w-full rounded"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Precio para compra inmediata (opcional)</p>
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium mb-1">Fecha de inicio de subasta *</label>
+                  <input
+                    type="datetime-local"
+                    value={auctionStartDate}
+                    onChange={(e) => setAuctionStartDate(e.target.value)}
+                    className="border p-2 w-full rounded"
+                    required={saleType === 'auction'}
+                    min={new Date().toISOString().slice(0, 16)}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Cuándo comenzará la subasta</p>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium mb-1">Condición</label>
@@ -522,6 +718,41 @@ export default function NewProduct() {
           </div>
         </div>
 
+        {/* Tienda / Publicar desde */}
+        <div>
+          <label className="block text-sm font-medium mb-1">Publicar desde</label>
+          {storesLoading ? (
+            <p className="text-sm text-gray-500">Cargando tus tiendas…</p>
+          ) : stores.length === 0 ? (
+            <p className="text-sm text-gray-600">
+              No tienes tiendas creadas aún. Puedes crear una tienda desde tu perfil para mostrar ubicación.
+            </p>
+          ) : (
+            <select
+              className={`border p-2 w-full rounded ${
+                validationErrors.storeId ? 'border-red-500' : storeId ? 'border-green-500' : ''
+              }`}
+              value={storeId ?? ''}
+              onChange={(e) => {
+                setStoreId(e.target.value || null);
+                validateField('storeId', e.target.value);
+              }}
+              required={stores.length > 0}
+              disabled={storesLoading}
+            >
+              <option value="">— Selecciona una tienda —</option>
+              {stores.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}{s.location ? ` — ${s.location}` : ''}
+                </option>
+              ))}
+            </select>
+          )}
+          {validationErrors.storeId && (
+            <p className="text-red-500 text-sm mt-1">{validationErrors.storeId}</p>
+          )}
+        </div>
+
         {/* Categoría */}
         <div>
           <label className="block text-sm font-medium mb-1">Categoría *</label>
@@ -533,6 +764,8 @@ export default function NewProduct() {
             onChange={(e) => {
               setCategoryId(e.target.value || null);
               validateField('categoryId', e.target.value);
+              // Limpiar campos de categoría al cambiar
+              setCategoryFields({});
             }}
             required
             disabled={categoriesLoading}
@@ -540,7 +773,7 @@ export default function NewProduct() {
             <option value="">
               {categoriesLoading ? 'Cargando categorías...' : '— Selecciona una categoría —'}
             </option>
-            {categories.map((c) => (
+            {!categoriesLoading && categories.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
               </option>
@@ -565,6 +798,101 @@ export default function NewProduct() {
             <p className="text-red-500 text-sm mt-1">{validationErrors.categoryId}</p>
           )}
         </div>
+
+        {/* Campos específicos por categoría */}
+        {selectedCategoryName === 'vehiculos' && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-4">
+            <h3 className="font-semibold text-blue-900 mb-3">🚗 Información del Vehículo</h3>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Marca</label>
+                <input
+                  type="text"
+                  placeholder="Ej: Ford, Toyota, Chevrolet..."
+                  value={(categoryFields as CategoryFields['vehiculos'])?.marca || ''}
+                  onChange={(e) => setCategoryFields(prev => ({
+                    ...prev,
+                    marca: e.target.value
+                  } as CategoryFields['vehiculos']))}
+                  className="border p-2 w-full rounded"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Modelo</label>
+                <input
+                  type="text"
+                  placeholder="Ej: Fiesta, Corolla, Cruze..."
+                  value={(categoryFields as CategoryFields['vehiculos'])?.modelo || ''}
+                  onChange={(e) => setCategoryFields(prev => ({
+                    ...prev,
+                    modelo: e.target.value
+                  } as CategoryFields['vehiculos']))}
+                  className="border p-2 w-full rounded"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Año</label>
+                <input
+                  type="number"
+                  placeholder="Ej: 2020"
+                  min="1900"
+                  max={new Date().getFullYear() + 1}
+                  value={(categoryFields as CategoryFields['vehiculos'])?.año || ''}
+                  onChange={(e) => setCategoryFields(prev => ({
+                    ...prev,
+                    año: e.target.value
+                  } as CategoryFields['vehiculos']))}
+                  className="border p-2 w-full rounded"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Kilometraje</label>
+                <input
+                  type="number"
+                  placeholder="Ej: 50000"
+                  min="0"
+                  value={(categoryFields as CategoryFields['vehiculos'])?.kilometraje || ''}
+                  onChange={(e) => setCategoryFields(prev => ({
+                    ...prev,
+                    kilometraje: e.target.value
+                  } as CategoryFields['vehiculos']))}
+                  className="border p-2 w-full rounded"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Color</label>
+                <input
+                  type="text"
+                  placeholder="Ej: Blanco, Negro, Rojo..."
+                  value={(categoryFields as CategoryFields['vehiculos'])?.color || ''}
+                  onChange={(e) => setCategoryFields(prev => ({
+                    ...prev,
+                    color: e.target.value
+                  } as CategoryFields['vehiculos']))}
+                  className="border p-2 w-full rounded"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Documentación</label>
+                <select
+                  value={(categoryFields as CategoryFields['vehiculos'])?.documentacion || ''}
+                  onChange={(e) => setCategoryFields(prev => ({
+                    ...prev,
+                    documentacion: e.target.value
+                  } as CategoryFields['vehiculos']))}
+                  className="border p-2 w-full rounded"
+                >
+                  <option value="">— Selecciona —</option>
+                  <option value="al_dia">Al día</option>
+                  <option value="solo_titulo">Solo título</option>
+                  <option value="solo_cedula_verde">Solo cédula verde</option>
+                  <option value="titulo_y_cedula_verde">Título y cédula verde</option>
+                  <option value="ninguna">Ninguna de las anteriores</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Imágenes */}
         <div>

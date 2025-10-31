@@ -99,16 +99,24 @@ export default function SellerDashboard() {
         setError(null);
 
         // Cargar estadísticas
-        const [productsResult, ordersResult] = await Promise.all([
-          supabase
+        // Intentar primero con stock_quantity, si falla intentar sin él
+        let productsResult = await supabase
+          .from('products')
+          .select('id, status, stock_quantity, price, created_at')
+          .eq('store_id', store.id);
+
+        if (productsResult.error && productsResult.error.message?.includes('stock_quantity')) {
+          // Si stock_quantity no existe, intentar sin él
+          productsResult = await supabase
             .from('products')
-            .select('id, status, stock_quantity, price, created_at')
-            .eq('store_id', store.id),
-          supabase
-            .from('orders')
-            .select('id, status, total_amount, created_at')
-            .eq('seller_id', user.id)
-        ]);
+            .select('id, status, price, created_at')
+            .eq('store_id', store.id);
+        }
+
+        const ordersResult = await supabase
+          .from('orders')
+          .select('id, status, total_amount, created_at')
+          .eq('seller_id', user.id);
 
         if (productsResult.error) throw productsResult.error;
         if (ordersResult.error) throw ordersResult.error;
@@ -146,13 +154,23 @@ export default function SellerDashboard() {
           conversion_rate: conversionRate,
         });
 
-        // Cargar productos recientes
-        const recentProductsResult = await supabase
+        // Cargar productos recientes - Intentar con stock_quantity primero
+        let recentProductsResult = await supabase
           .from('products')
           .select('id, title, price, status, stock_quantity, created_at, cover_url')
           .eq('store_id', store.id)
           .order('created_at', { ascending: false })
           .limit(5);
+
+        if (recentProductsResult.error && recentProductsResult.error.message?.includes('stock_quantity')) {
+          // Si stock_quantity no existe, intentar sin él
+          recentProductsResult = await supabase
+            .from('products')
+            .select('id, title, price, status, created_at, cover_url')
+            .eq('store_id', store.id)
+            .order('created_at', { ascending: false })
+            .limit(5);
+        }
 
         if (recentProductsResult.data) {
           setRecentProducts(recentProductsResult.data);

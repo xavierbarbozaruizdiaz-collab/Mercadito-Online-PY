@@ -44,7 +44,7 @@ export class WishlistService {
     productId: string
   ): Promise<boolean> {
     try {
-      const { error } = await supabase.from('wishlists').insert({
+      const { error } = await (supabase as any).from('wishlists').insert({
         user_id: userId,
         product_id: productId,
       });
@@ -72,7 +72,7 @@ export class WishlistService {
     productId: string
   ): Promise<boolean> {
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('wishlists')
         .delete()
         .eq('user_id', userId)

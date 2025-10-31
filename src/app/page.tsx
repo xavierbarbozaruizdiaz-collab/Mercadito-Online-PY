@@ -1,9 +1,7 @@
 import ProductsListClient from '@/components/ProductsListClient';
 import { Suspense } from 'react';
-import dynamic from 'next/dynamic';
 import HeroSlider from '@/components/hero/HeroSlider';
-import { supabase } from '@/lib/supabaseClient';
-import { heroPublicUrlFromPath } from '@/lib/storage/hero';
+import { supabase } from '@/lib/supabase/client';
 
 const FEATURE_HERO = process.env.NEXT_PUBLIC_FEATURE_HERO === 'true';
 
@@ -24,45 +22,66 @@ type HeroSlide = {
   position: number;
 };
 
-type Stats = { products: number; stores: number; auctions: number };
-
 export default async function Home() {
   let slides: HeroSlide[] = [];
 
   if (FEATURE_HERO) {
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('hero_slides')
         .select(
           'id, title, subtitle, cta_primary_label, cta_primary_href, cta_secondary_label, cta_secondary_href, bg_type, bg_gradient_from, bg_gradient_to, storage_path, position, banner_position'
         )
         .eq('is_active', true)
-        .or('banner_position.eq.hero,banner_position.is.null')
         .order('position', { ascending: true });
-      const base = (data as unknown as Partial<HeroSlide>[]) ?? [];
-      slides = base.map((s) => ({
-        id: s.id as string,
-        title: (s.title ?? null) as string | null,
-        subtitle: (s.subtitle ?? null) as string | null,
-        cta_primary_label: (s.cta_primary_label ?? null) as string | null,
-        cta_primary_href: (s.cta_primary_href ?? null) as string | null,
-        cta_secondary_label: (s.cta_secondary_label ?? null) as string | null,
-        cta_secondary_href: (s.cta_secondary_href ?? null) as string | null,
-        bg_type: (s.bg_type as any) || 'gradient',
-        bg_gradient_from: (s.bg_gradient_from ?? null) as string | null,
-        bg_gradient_to: (s.bg_gradient_to ?? null) as string | null,
-        bg_image_url: (s.bg_image_url ?? null) as string | null,
-        storage_path: (s.storage_path ?? null) as string | null,
-        public_url: heroPublicUrlFromPath(s.storage_path as any),
-        position: (s.position as number) ?? 0,
-      }));
-    } catch {}
+      
+      if (error) {
+        console.error('Error loading hero slides:', error);
+      } else if (data) {
+        // Filtrar SOLO slides con banner_position = 'hero' o null (excluir 'footer', 'sidebar', 'top')
+        const filteredBase = data.filter((s: any) => {
+          const position = s.banner_position;
+          return position === 'hero' || position === null || position === undefined || position === '';
+        });
+        
+        const getPublicUrl = (path: string | null | undefined): string | null => {
+          if (!path) return null;
+          try {
+            const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://hqdatzhliaordlsqtjea.supabase.co';
+            const bucketName = 'hero-banners';
+            return `${supabaseUrl}/storage/v1/object/public/${bucketName}/${path}`;
+          } catch {
+            return null;
+          }
+        };
+        
+        slides = filteredBase.map((s: any) => ({
+          id: s.id as string,
+          title: (s.title ?? null) as string | null,
+          subtitle: (s.subtitle ?? null) as string | null,
+          cta_primary_label: (s.cta_primary_label ?? null) as string | null,
+          cta_primary_href: (s.cta_primary_href ?? null) as string | null,
+          cta_secondary_label: (s.cta_secondary_label ?? null) as string | null,
+          cta_secondary_href: (s.cta_secondary_href ?? null) as string | null,
+          bg_type: (s.bg_type as any) || 'gradient',
+          bg_gradient_from: (s.bg_gradient_from ?? null) as string | null,
+          bg_gradient_to: (s.bg_gradient_to ?? null) as string | null,
+          bg_image_url: (s.bg_image_url ?? null) as string | null,
+          storage_path: (s.storage_path ?? null) as string | null,
+          public_url: getPublicUrl(s.storage_path),
+          position: (s.position as number) ?? 0,
+        }));
+      }
+    } catch (err: any) {
+      console.error('Error in Home component:', err?.message || err);
+      slides = [];
+    }
   }
 
   return (
     <main className="min-h-screen bg-gray-50">
       {/* Hero Section */}
-      {FEATURE_HERO ? (
+      {FEATURE_HERO && slides.length > 0 ? (
         <HeroSlider slides={slides} />
       ) : (
         <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-12 sm:py-16">

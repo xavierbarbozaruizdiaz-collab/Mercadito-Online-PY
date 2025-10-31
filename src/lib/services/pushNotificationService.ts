@@ -50,7 +50,7 @@ export class PushNotificationService {
     subscription: PushSubscription
   ): Promise<boolean> {
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('push_subscriptions')
         .insert({
           user_id: userId,
@@ -63,7 +63,7 @@ export class PushNotificationService {
       if (error) {
         // Si ya existe, actualizar en lugar de insertar
         if (error.code === '23505') {
-          const { error: updateError } = await supabase
+          const { error: updateError } = await (supabase as any)
             .from('push_subscriptions')
             .update({
               p256dh: subscription.p256dh,
@@ -92,7 +92,7 @@ export class PushNotificationService {
    */
   static async unsubscribe(userId: string, endpoint: string): Promise<boolean> {
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('push_subscriptions')
         .delete()
         .eq('user_id', userId)
@@ -130,8 +130,15 @@ export class PushNotificationService {
 
   /**
    * Crea un service worker registration para push
+   * NOTA: Service Worker deshabilitado temporalmente para evitar problemas de página en blanco
+   * TODO: Reactivar cuando se implemente correctamente el SW con mejor manejo de errores
    */
   static async registerServiceWorker(): Promise<ServiceWorkerRegistration | null> {
+    // Deshabilitado temporalmente - el SW está causando problemas de carga
+    console.warn('[PushNotifications] Service Worker registration deshabilitado temporalmente');
+    return null;
+    
+    /* Código original comentado:
     if (!('serviceWorker' in navigator)) {
       console.warn('Este navegador no soporta service workers');
       return null;
@@ -144,6 +151,7 @@ export class PushNotificationService {
       console.error('Error registering service worker:', error);
       return null;
     }
+    */
   }
 
   /**

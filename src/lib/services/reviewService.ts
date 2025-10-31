@@ -183,7 +183,7 @@ export class ReviewService {
       if (input.title !== undefined) updateData.title = input.title;
       if (input.comment !== undefined) updateData.comment = input.comment;
 
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('reviews')
         .update(updateData)
         .eq('id', reviewId)
@@ -196,7 +196,7 @@ export class ReviewService {
       // Actualizar imágenes si se proporcionan
       if (input.images !== undefined && data) {
         // Eliminar imágenes existentes
-        await supabase.from('review_images').delete().eq('review_id', reviewId);
+        await (supabase as any).from('review_images').delete().eq('review_id', reviewId);
         // Agregar nuevas
         if (input.images.length > 0) {
           await this.addReviewImages(reviewId, input.images);
@@ -224,7 +224,7 @@ export class ReviewService {
         order_index: index,
       }));
 
-      const { error } = await supabase.from('review_images').insert(images as any);
+      const { error } = await (supabase as any).from('review_images').insert(images as any);
       if (error) throw error;
     } catch (error) {
       console.error('Error adding review images:', error);
@@ -255,12 +255,12 @@ export class ReviewService {
 
       // Obtener información del buyer (profile) por separado
       let buyer = null;
-      if (data.buyer_id) {
+      if ((data as any).buyer_id) {
         try {
           const { data: profileData } = await supabase
             .from('profiles')
             .select('id, first_name, last_name, email, avatar_url')
-            .eq('id', data.buyer_id)
+            .eq('id', (data as any).buyer_id)
             .single();
           
           if (profileData) {
@@ -273,9 +273,9 @@ export class ReviewService {
 
       // Combinar datos
       const reviewWithBuyer = {
-        ...data,
+        ...(data as any),
         buyer: buyer || {
-          id: data.buyer_id,
+          id: (data as any).buyer_id,
           first_name: null,
           last_name: null,
           email: null,
@@ -532,7 +532,7 @@ export class ReviewService {
       if (error) {
         // Si ya existe, actualizar
         if (error.code === '23505') {
-          const { data: updated } = await supabase
+          const { data: updated } = await (supabase as any)
             .from('review_responses')
             .update({ response_text: responseText } as any)
             .eq('review_id', reviewId)

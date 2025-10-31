@@ -79,26 +79,37 @@ export async function createConversation(params: CreateConversationParams): Prom
  */
 export async function getConversationById(conversationId: string): Promise<Conversation | null> {
   try {
-    const { data, error } = await supabase
+    // Primero obtener la conversación básica
+    const { data: conversation, error: convError } = await supabase
       .from('conversations')
-      .select(`
-        *,
-        buyer:profiles!conversations_buyer_id_fkey(*),
-        seller:profiles!conversations_seller_id_fkey(*),
-        product:products(*),
-        store:stores(*),
-        participants:conversation_participants(*),
-        messages:messages(*)
-      `)
+      .select('*')
       .eq('id', conversationId)
       .single();
 
-    if (error) {
-      console.error('Error fetching conversation:', error);
+    if (convError || !conversation) {
+      console.error('Error fetching conversation:', convError);
       return null;
     }
 
-    return data as Conversation;
+    const conv: any = conversation;
+    // Obtener perfiles del buyer y seller en paralelo
+    const [buyerResult, sellerResult, productResult, storeResult] = await Promise.allSettled([
+      conv.buyer_id ? supabase.from('profiles').select('*').eq('id', conv.buyer_id).single() : Promise.resolve({ data: null, error: null }),
+      conv.seller_id ? supabase.from('profiles').select('*').eq('id', conv.seller_id).single() : Promise.resolve({ data: null, error: null }),
+      conv.product_id ? supabase.from('products').select('*').eq('id', conv.product_id).single() : Promise.resolve({ data: null, error: null }),
+      conv.store_id ? supabase.from('stores').select('*').eq('id', conv.store_id).single() : Promise.resolve({ data: null, error: null }),
+    ]);
+
+    // Construir el objeto de conversación con relaciones
+    const enrichedConversation: Conversation = {
+      ...(conv as any),
+      buyer: buyerResult.status === 'fulfilled' && !buyerResult.value.error ? buyerResult.value.data : undefined,
+      seller: sellerResult.status === 'fulfilled' && !sellerResult.value.error ? sellerResult.value.data : undefined,
+      product: productResult.status === 'fulfilled' && !productResult.value.error ? productResult.value.data : undefined,
+      store: storeResult.status === 'fulfilled' && !storeResult.value.error ? storeResult.value.data : undefined,
+    };
+
+    return enrichedConversation;
   } catch (error) {
     console.error('Error in getConversationById:', error);
     return null;
@@ -113,16 +124,10 @@ export async function getUserConversations(
   filters: ChatFilters = {}
 ): Promise<Conversation[]> {
   try {
+    // Obtener conversaciones básicas sin JOINs complejos
     let query = supabase
       .from('conversations')
-      .select(`
-        *,
-        buyer:profiles!conversations_buyer_id_fkey(*),
-        seller:profiles!conversations_seller_id_fkey(*),
-        product:products(*),
-        store:stores(*),
-        participants:conversation_participants(*)
-      `)
+      .select('*')
       .or(`buyer_id.eq.${userId},seller_id.eq.${userId}`)
       .order('last_message_at', { ascending: false });
 
@@ -137,18 +142,62 @@ export async function getUserConversations(
       query = query.eq('store_id', filters.store_id);
     }
 
-    const { data, error } = await query;
+    const { data: conversations, error } = await query;
 
-    if (error) {
+    if (error || !conversations) {
       console.error('Error fetching conversations:', error);
       return [];
     }
 
+    // Obtener IDs únicos para las queries en paralelo
+    const buyerIds = [...new Set((conversations as any[]).map((c: any) => c.buyer_id).filter(Boolean))];
+    const sellerIds = [...new Set((conversations as any[]).map((c: any) => c.seller_id).filter(Boolean))];
+    const productIds = [...new Set((conversations as any[]).map((c: any) => c.product_id).filter(Boolean))];
+    const storeIds = [...new Set((conversations as any[]).map((c: any) => c.store_id).filter(Boolean))];
+
+    // Cargar relaciones en paralelo
+    const [buyersResult, sellersResult, productsResult, storesResult] = await Promise.allSettled([
+      buyerIds.length > 0 ? supabase.from('profiles').select('*').in('id', buyerIds) : Promise.resolve({ data: [], error: null }),
+      sellerIds.length > 0 ? supabase.from('profiles').select('*').in('id', sellerIds) : Promise.resolve({ data: [], error: null }),
+      productIds.length > 0 ? supabase.from('products').select('*').in('id', productIds) : Promise.resolve({ data: [], error: null }),
+      storeIds.length > 0 ? supabase.from('stores').select('*').in('id', storeIds) : Promise.resolve({ data: [], error: null }),
+    ]);
+
+    // Crear maps para búsqueda rápida
+    const buyersMap = new Map();
+    if (buyersResult.status === 'fulfilled' && !buyersResult.value.error && buyersResult.value.data) {
+      (buyersResult.value.data as any[]).forEach((profile: any) => buyersMap.set(profile.id, profile));
+    }
+
+    const sellersMap = new Map();
+    if (sellersResult.status === 'fulfilled' && !sellersResult.value.error && sellersResult.value.data) {
+      (sellersResult.value.data as any[]).forEach((profile: any) => sellersMap.set(profile.id, profile));
+    }
+
+    const productsMap = new Map();
+    if (productsResult.status === 'fulfilled' && !productsResult.value.error && productsResult.value.data) {
+      (productsResult.value.data as any[]).forEach((product: any) => productsMap.set(product.id, product));
+    }
+
+    const storesMap = new Map();
+    if (storesResult.status === 'fulfilled' && !storesResult.value.error && storesResult.value.data) {
+      (storesResult.value.data as any[]).forEach((store: any) => storesMap.set(store.id, store));
+    }
+
+    // Enriquecer conversaciones con relaciones
+    const enrichedConversations = (conversations as any[]).map((conv: any) => ({
+      ...(conv as any),
+      buyer: buyersMap.get(conv.buyer_id),
+      seller: sellersMap.get(conv.seller_id),
+      product: conv.product_id ? productsMap.get(conv.product_id) : undefined,
+      store: conv.store_id ? storesMap.get(conv.store_id) : undefined,
+    }));
+
     // Calcular conteo de mensajes no leídos para cada conversación
     const conversationsWithUnread = await Promise.all(
-      (data || []).map(async (conversation) => {
-        const unreadCount = await getUnreadMessageCount((conversation as any).id, userId);
-        return { ...(conversation as any), unread_count: unreadCount };
+      enrichedConversations.map(async (conversation) => {
+        const unreadCount = await getUnreadMessageCount(conversation.id, userId);
+        return { ...conversation, unread_count: unreadCount };
       })
     );
 

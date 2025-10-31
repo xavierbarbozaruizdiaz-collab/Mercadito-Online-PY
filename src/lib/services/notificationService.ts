@@ -149,7 +149,7 @@ export class NotificationService {
    */
   static async markAsRead(notificationId: string): Promise<boolean> {
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('notifications')
         .update({ is_read: true } as any)
         .eq('id', notificationId);
@@ -167,7 +167,7 @@ export class NotificationService {
    */
   static async markAllAsRead(userId: string): Promise<boolean> {
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('notifications')
         .update({ is_read: true } as any)
         .eq('user_id', userId)
@@ -248,7 +248,7 @@ export class NotificationService {
       // Asegurar que existan las preferencias
       await this.getNotificationPreferences(userId);
 
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('notification_preferences')
         .update(preferences as any)
         .eq('user_id', userId)

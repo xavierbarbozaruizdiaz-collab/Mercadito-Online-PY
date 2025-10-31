@@ -55,10 +55,10 @@ export default function DashboardLayout({
                   Nuevo Producto
                 </Link>
                 <Link 
-                  href="/dashboard/edit-product" 
+                  href="/dashboard" 
                   className="text-gray-500 hover:text-gray-900 transition-colors"
                 >
-                  Editar Productos
+                  Mis Productos
                 </Link>
               </nav>
             </div>

@@ -7,10 +7,20 @@
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint:hero": "eslint src/app/page.tsx src/components/hero src/app/api/hero-slides src/app/api/site-stats",
+    "typecheck:hero": "tsc --noEmit src/app/page.tsx src/components/hero/HeroCarousel.tsx src/app/api/hero-slides/route.ts src/app/api/site-stats/route.ts",
     "db:push": "npx supabase db push",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:e2e:headed": "playwright test --headed"
+    "test:e2e:headed": "playwright test --headed",
+    "test:unit": "vitest run"
+  },
+  "vitest": {
+    "environment": "jsdom",
+    "setupFiles": [
+      "./tests/setup.ts"
+    ]
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -18,6 +28,7 @@
     "@radix-ui/react-dropdown-menu": "^2.1.16",
     "@radix-ui/react-slot": "^1.2.3",
     "@radix-ui/react-toast": "^1.2.15",
+    "@react-email/render": "^1.4.0",
     "@sentry/nextjs": "^10.22.0",
     "@supabase/auth-helpers-nextjs": "^0.10.0",
     "@supabase/supabase-js": "^2.76.1",
@@ -27,6 +38,8 @@
     "critters": "^0.0.23",
     "csv-parser": "^3.2.0",
     "date-fns": "^4.1.0",
+    "embla-carousel-autoplay": "^8.6.0",
+    "embla-carousel-react": "^8.6.0",
     "framer-motion": "^12.23.24",
     "json2csv": "^6.0.0-alpha.2",
     "lucide-react": "^0.548.0",

@@ -57,27 +57,39 @@ export default function CheckoutPage() {
         return;
       }
 
-      const { data, error } = await supabase
+      // Primero obtener cart items básicos
+      const { data: cartData, error } = await (supabase as any)
         .from('cart_items')
-        .select(`
-          id,
-          product_id,
-          quantity,
-          product:products!inner(
-            id,
-            title,
-            price,
-            cover_url
-          )
-        `)
+        .select('id, product_id, quantity')
         .eq('user_id', session.session.user.id);
 
       if (error) throw error;
-      setCartItems((data as unknown as CartItem[]) || []);
-
-      if (data?.length === 0) {
+      if (!cartData || cartData.length === 0) {
         router.push('/cart');
+        return;
       }
+
+      // Obtener productos en paralelo
+      const productIds = (cartData as Array<{ product_id: string | null | undefined }>)
+        .map((item) => item.product_id)
+        .filter(Boolean) as string[];
+      const { data: productsData } = await (supabase as any)
+        .from('products')
+        .select('id, title, price, cover_url')
+        .in('id', productIds);
+
+      // Combinar cart items con productos
+      const productsMap = new Map();
+      if (productsData) {
+        (productsData as Array<any>).forEach((product: any) => productsMap.set(product.id, product));
+      }
+
+      const enrichedCartItems = (cartData as any[]).map((item: any) => ({
+        ...item,
+        product: productsMap.get(item.product_id) || { id: item.product_id, title: 'Producto no encontrado', price: 0, cover_url: null },
+      }));
+
+      setCartItems(enrichedCartItems as CartItem[]);
     } catch (err) {
       console.error('Error loading cart:', err);
     } finally {

@@ -6,9 +6,9 @@ import ProductReviews from '@/components/ProductReviews';
 import ProductQandA from '@/components/ProductQandA';
 import PriceAlertButton from '@/components/PriceAlertButton';
 import PriceHistoryChart from '@/components/PriceHistoryChart';
+import ProductImageGallery from '@/components/ProductImageGallery';
 import { Metadata } from 'next';
 import { generateProductStructuredData, generateBreadcrumbStructuredData } from '@/lib/structuredData';
-import { OptimizedImage } from '@/components/OptimizedImage';
 
 type Product = {
   id: string;
@@ -59,35 +59,36 @@ export async function generateMetadata(
       };
     }
 
-    const category = product.categories?.[0]?.name || 'General';
-    const price = Number(product.price).toLocaleString('es-PY');
+    const productData = product as any; // Cast para evitar errores de tipo
+    const category = productData.categories?.[0]?.name || 'General';
+    const price = Number(productData.price).toLocaleString('es-PY');
     
     return {
-      title: `${product.title} | Mercadito Online PY`,
-      description: product.description || `Compra ${product.title} por ${price} Gs. ${category} - Mercadito Online PY`,
+      title: `${productData.title} | Mercadito Online PY`,
+      description: productData.description || `Compra ${productData.title} por ${price} Gs. ${category} - Mercadito Online PY`,
       keywords: [
-        product.title,
+        productData.title,
         category,
         'comprar',
         'venta',
         'Paraguay',
         'Mercadito Online PY',
-        product.condition,
-        product.sale_type === 'auction' ? 'subasta' : 'venta directa'
+        productData.condition,
+        productData.sale_type === 'auction' ? 'subasta' : 'venta directa'
       ],
       openGraph: {
-        title: product.title,
-        description: product.description || `Compra ${product.title} por ${price} Gs.`,
-        images: product.cover_url ? [product.cover_url] : [],
+        title: productData.title,
+        description: productData.description || `Compra ${productData.title} por ${price} Gs.`,
+        images: productData.cover_url ? [productData.cover_url] : [],
         type: 'website',
         locale: 'es_PY',
         siteName: 'Mercadito Online PY',
       },
       twitter: {
         card: 'summary_large_image',
-        title: product.title,
-        description: product.description || `Compra ${product.title} por ${price} Gs.`,
-        images: product.cover_url ? [product.cover_url] : [],
+        title: productData.title,
+        description: productData.description || `Compra ${productData.title} por ${price} Gs.`,
+        images: productData.cover_url ? [productData.cover_url] : [],
       },
       alternates: {
         canonical: `https://mercadito-online-py.vercel.app/products/${id}`,
@@ -128,6 +129,13 @@ export default async function ProductPage(
     .eq('id', id)
     .single();
 
+  // Cargar todas las imágenes del producto
+  const { data: productImages } = await supabase
+    .from('product_images')
+    .select('id, url, idx')
+    .eq('product_id', id)
+    .order('idx', { ascending: true });
+
   if (error || !data) {
     return (
       <main className="min-h-screen bg-gray-50 p-8">
@@ -146,6 +154,20 @@ export default async function ProductPage(
   // Obtener la primera categoría (debería ser solo una)
   const category = p.categories && p.categories.length > 0 ? p.categories[0] : null;
 
+  // Preparar array de imágenes: si hay imágenes en product_images, usarlas; si no, usar cover_url
+  const images = (productImages && productImages.length > 0) 
+    ? productImages.map((img: any) => img.url).sort((a: string, b: string) => {
+        // Ordenar por idx si está disponible
+        const imgA = productImages.find((img: any) => img.url === a);
+        const imgB = productImages.find((img: any) => img.url === b);
+        return (imgA?.idx || 0) - (imgB?.idx || 0);
+      })
+    : (p.cover_url ? [p.cover_url] : []);
+  
+  // Si no hay imágenes, usar placeholder
+  const displayImages = images.length > 0 ? images : ['https://placehold.co/800x600?text=Producto'];
+  const mainImage = displayImages[0];
+
   // Generar structured data
   const productStructuredData = generateProductStructuredData({
     id: p.id,
@@ -153,7 +175,7 @@ export default async function ProductPage(
     description: p.description || '',
     price: Number(p.price),
     currency: 'PYG',
-    image: p.cover_url || '',
+    image: mainImage || '',
     condition: p.condition,
     availability: 'InStock',
     seller: {
@@ -190,15 +212,11 @@ export default async function ProductPage(
 
       <div className="bg-white rounded-lg sm:rounded-2xl shadow p-4 sm:p-6 mt-3">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
-          {/* Imagen del producto */}
-          <div className="space-y-4">
-            <OptimizedImage
-              src={p.cover_url ?? 'https://placehold.co/800x600?text=Producto'}
-              alt={p.title}
-              width={800}
-              height={600}
-              className="w-full rounded-lg sm:rounded-xl object-cover"
-              priority={true}
+          {/* Galería de imágenes del producto */}
+          <div>
+            <ProductImageGallery 
+              images={displayImages} 
+              title={p.title}
             />
             
             {/* Información adicional */}

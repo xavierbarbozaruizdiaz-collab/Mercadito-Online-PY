@@ -4,4 +4,4 @@
 // ============================================
 
 // Re-exportar el cliente único desde supabase/client para evitar múltiples instancias
-export { supabase, supabaseAdmin } from './supabase/client';
+export { supabase, supabaseAdmin, getSessionWithTimeout } from './supabase/client';

@@ -50,13 +50,13 @@ export class PaymentService {
       };
 
       // Guardar en base de datos
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('payment_intents')
         .insert({
           id: paymentIntent.id,
           order_id: request.order_id,
           amount: request.amount,
-          currency: request.currency,
+          currency: paymentIntent.currency,
           status: paymentIntent.status,
           payment_method: request.payment_method,
           metadata: request.metadata || {},
@@ -121,7 +121,7 @@ export class PaymentService {
     paymentIntentId: string
   ): Promise<boolean> {
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('payment_intents')
         .update({ status: 'succeeded' })
         .eq('id', paymentIntentId);
@@ -165,7 +165,7 @@ export class PaymentService {
   ): Promise<boolean> {
     try {
       // Para pagos contra entrega, simplemente marcamos como pendiente
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('payment_intents')
         .insert({
           order_id: orderId,

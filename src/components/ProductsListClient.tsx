@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabaseClient';
+import SearchBar from '@/components/SearchBar';
 
 type Product = { 
   id: string; 
@@ -62,10 +63,11 @@ export default function ProductsListClient() {
   // Actualizar búsqueda cuando cambia la URL
   useEffect(() => {
     const urlQuery = searchParams?.get('q') || '';
-    if (urlQuery !== filters.search) {
+    // Solo actualizar si realmente cambió para evitar loops
+    if (urlQuery !== filters.search && urlQuery !== undefined) {
       setFilters(prev => ({ ...prev, search: urlQuery }));
     }
-  }, [searchParams, filters.search]);
+  }, [searchParams]); // Remover filters.search de dependencias para evitar loops
 
   // Cargar categorías con manejo de errores mejorado
   useEffect(() => {
@@ -114,12 +116,28 @@ export default function ProductsListClient() {
 
   // Cargar productos con filtros
   useEffect(() => {
-    loadProducts();
+    let mounted = true;
+    const timeoutId = setTimeout(() => {
+      if (mounted) {
+        loadProducts();
+      }
+    }, 100); // Pequeño delay para evitar múltiples llamadas
+    
+    return () => {
+      mounted = false;
+      clearTimeout(timeoutId);
+    };
   }, [filters]);
 
   async function loadProducts() {
     setLoading(true);
     setError(null);
+
+    // Timeout de seguridad: si después de 30 segundos no hay respuesta, mostrar error
+    const timeoutId = setTimeout(() => {
+      setError('⏱️ Tiempo de espera agotado. Por favor recarga la página.');
+      setLoading(false);
+    }, 30000);
 
     try {
       // Esperar un poco para asegurar que la sesión de Supabase está lista
@@ -201,67 +219,87 @@ export default function ProductsListClient() {
         throw queryError;
       }
 
-      // Si hay productos, obtener información de sellers y stores
+      // Si hay productos, obtener información de sellers y stores (optimizado con límites)
       if (productsData && productsData.length > 0) {
-        const sellerIds = [...new Set(productsData.map((p: any) => p.seller_id).filter(Boolean))] as string[];
-        const storeIds = [...new Set(productsData.map((p: any) => p.store_id).filter(Boolean))] as string[];
+        // Limitar productos a enriquecer para mejor rendimiento
+        const maxProductsToEnrich = 50;
+        const productsToEnrich = productsData.slice(0, maxProductsToEnrich);
         
-        // Obtener información de sellers (profiles) - campos existentes únicamente
-        let sellersMap: Record<string, any> = {};
-        if (sellerIds.length > 0) {
+        const sellerIds = [...new Set(productsToEnrich.map((p: any) => p.seller_id).filter(Boolean))].slice(0, 100) as string[];
+        const storeIds = [...new Set(productsToEnrich.map((p: any) => p.store_id).filter(Boolean))].slice(0, 100) as string[];
+        
+        // Función helper para crear query con timeout
+        const createQueryWithTimeout = async (queryBuilder: any, timeoutMs: number = 10000) => {
           try {
-            // NO usar full_name - no existe como columna, solo first_name, last_name, email
-            const { data: profilesData, error: profilesError } = await supabase
-              .from('profiles')
-              .select('id, first_name, last_name, email')
-              .in('id', sellerIds);
-            
-            if (!profilesError && profilesData) {
-              profilesData.forEach((profile: any) => {
-                sellersMap[profile.id] = {
-                  ...profile,
-                  display_name: profile.full_name || 
-                    (profile.first_name || profile.last_name 
-                      ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim()
-                      : profile.email?.split('@')[0] || 'Vendedor')
-                };
-              });
-            }
+            return await Promise.race([
+              queryBuilder,
+              new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Query timeout')), timeoutMs)
+              )
+            ]);
           } catch (err) {
-            console.warn('Error loading sellers:', err);
+            console.warn('Query timeout or error:', err);
+            return { data: [], error: err };
           }
+        };
+        
+        // Cargar sellers y stores en paralelo con timeouts individuales
+        const [profilesResult, storesResult] = await Promise.allSettled([
+          // Obtener información de sellers (profiles)
+          sellerIds.length > 0 
+            ? createQueryWithTimeout(
+                supabase
+                  .from('profiles')
+                  .select('id, first_name, last_name, email')
+                  .in('id', sellerIds),
+                15000
+              )
+            : Promise.resolve({ data: [], error: null }),
           
-          // Placeholders para sellers no encontrados
-          sellerIds.forEach((id) => {
-            if (!sellersMap[id]) {
-              sellersMap[id] = {
-                id,
-                display_name: `Vendedor ${id.slice(0, 6)}`
-              };
-            }
+          // Obtener información de stores
+          storeIds.length > 0
+            ? createQueryWithTimeout(
+                supabase
+                  .from('stores')
+                  .select('id, name, slug')
+                  .in('id', storeIds),
+                15000
+              )
+            : Promise.resolve({ data: [], error: null }),
+        ]);
+
+        // Procesar resultados de profiles
+        let sellersMap: Record<string, any> = {};
+        if (profilesResult.status === 'fulfilled' && !profilesResult.value.error && profilesResult.value.data) {
+          profilesResult.value.data.forEach((profile: any) => {
+            sellersMap[profile.id] = {
+              ...profile,
+              display_name: profile.first_name || profile.last_name 
+                ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim()
+                : profile.email?.split('@')[0] || 'Vendedor'
+            };
+          });
+        }
+        
+        // Placeholders para sellers no encontrados
+        sellerIds.forEach((id) => {
+          if (!sellersMap[id]) {
+            sellersMap[id] = {
+              id,
+              display_name: `Vendedor ${id.slice(0, 6)}`
+            };
+          }
+        });
+
+        // Procesar resultados de stores
+        let storesMap: Record<string, any> = {};
+        if (storesResult.status === 'fulfilled' && !storesResult.value.error && storesResult.value.data) {
+          storesResult.value.data.forEach((store: any) => {
+            storesMap[store.id] = store;
           });
         }
 
-        // Obtener información de stores
-        let storesMap: Record<string, any> = {};
-        if (storeIds.length > 0) {
-          try {
-            const { data: storesData } = await supabase
-              .from('stores')
-              .select('id, name, slug')
-              .in('id', storeIds);
-            
-            if (storesData) {
-              storesData.forEach((store: any) => {
-                storesMap[store.id] = store;
-              });
-            }
-          } catch (err) {
-            console.warn('Error loading stores:', err);
-          }
-        }
-
-        // Enriquecer productos
+        // Enriquecer productos (todos, no solo los primeros 50)
         const enrichedProducts = (productsData as any[]).map((product: any) => ({
           ...product,
           seller: sellersMap[product.seller_id] || null,
@@ -278,13 +316,10 @@ export default function ProductsListClient() {
       // Mensaje de error más amigable
       const errorMessage = err?.message || 'Error al cargar productos. Por favor, inténtalo de nuevo.';
       setError(errorMessage);
-      // Intentar nuevamente después de 3 segundos si es un error de red
-      if (errorMessage.includes('network') || errorMessage.includes('fetch')) {
-        setTimeout(() => {
-          loadProducts();
-        }, 3000);
-      }
+      // NO reintentar automáticamente para evitar loops infinitos
+      // El usuario puede recargar la página manualmente si lo necesita
     } finally {
+      clearTimeout(timeoutId);
       setLoading(false);
     }
   }
@@ -338,31 +373,43 @@ export default function ProductsListClient() {
           </div>
         </div>
 
-        {/* Filtros avanzados - Acordeón */}
+        {/* Búsqueda y Filtros */}
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
-          <div className="flex items-center justify-between p-3">
-            <button
-              onClick={() => setFiltersOpen(!filtersOpen)}
-              className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 transition-colors font-medium"
-            >
-              <svg className={`w-4 h-4 transition-transform ${filtersOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-              <span>Filtros</span>
-              {hasActiveFilters && (
-                <span className="ml-1 px-1.5 py-0.5 text-xs bg-blue-100 text-blue-700 rounded-full">
-                  {Object.values(filters).filter(v => v !== '' && v !== 'date_desc').length}
-                </span>
-              )}
-            </button>
-            {hasActiveFilters && (
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-stretch sm:items-center p-3">
+            {/* Buscador - al lado de Filtros */}
+            <div className="flex-1 min-w-0">
+              <SearchBar
+                placeholder="Buscar productos..."
+                onSearch={(query) => updateFilter('search', query)}
+                className="w-full"
+              />
+            </div>
+            
+            {/* Botón Filtros */}
+            <div className="flex items-center justify-between gap-2 sm:flex-shrink-0">
               <button
-                onClick={clearFilters}
-                className="text-xs text-blue-600 hover:text-blue-800 hover:underline"
+                onClick={() => setFiltersOpen(!filtersOpen)}
+                className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 transition-colors font-medium whitespace-nowrap"
               >
-                Limpiar
+                <svg className={`w-4 h-4 transition-transform ${filtersOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+                <span>Filtros</span>
+                {hasActiveFilters && (
+                  <span className="ml-1 px-1.5 py-0.5 text-xs bg-blue-100 text-blue-700 rounded-full">
+                    {Object.values(filters).filter(v => v !== '' && v !== 'date_desc').length}
+                  </span>
+                )}
               </button>
-            )}
+              {hasActiveFilters && (
+                <button
+                  onClick={clearFilters}
+                  className="text-xs text-blue-600 hover:text-blue-800 hover:underline whitespace-nowrap"
+                >
+                  Limpiar
+                </button>
+              )}
+            </div>
           </div>
 
           <div className={`px-3 pb-3 transition-all duration-300 overflow-hidden border-t border-gray-100 ${
@@ -531,16 +578,16 @@ export default function ProductsListClient() {
                         </Link>
                       ) : product.seller ? (
                         <Link
-                          href={product.store?.slug ? `/store/${product.store.slug}` : `/seller/${product.seller.id}`}
+                          href={(product.store as any)?.slug ? `/store/${(product.store as any).slug}` : `/seller/${product.seller?.id}`}
                           onClick={(e) => e.stopPropagation()}
                           className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-600 hover:text-blue-800 hover:underline transition-colors cursor-pointer"
                         >
                           <span>👤</span>
                           <span>
-                            {product.seller?.display_name || 
-                             (product.seller?.first_name || product.seller?.last_name 
-                              ? `${product.seller.first_name || ''} ${product.seller.last_name || ''}`.trim()
-                              : product.seller?.full_name || product.seller?.email?.split('@')[0] || `Vendedor ${product.seller_id?.slice(0, 6) || ''}`)}
+                            {(product.seller as any)?.display_name || 
+                             ((product.seller as any)?.first_name || (product.seller as any)?.last_name 
+                              ? `${(product.seller as any)?.first_name || ''} ${(product.seller as any)?.last_name || ''}`.trim()
+                              : (product.seller as any)?.full_name || (product.seller as any)?.email?.split('@')[0] || `Vendedor ${product.seller_id?.slice(0, 6) || ''}`)}
                           </span>
                         </Link>
                       ) : product.seller_id ? (

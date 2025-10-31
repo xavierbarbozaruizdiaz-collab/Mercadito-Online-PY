@@ -58,6 +58,47 @@ export const supabaseAdmin = getSupabaseAdminClient();
 // FUNCIONES DE AUTENTICACIÓN
 // ============================================
 
+// Obtiene la sesión con timeout y reintento rápido para evitar cuelgues en UI
+export async function getSessionWithTimeout(options?: { timeoutMs?: number; retryDelayMs?: number }) {
+  const timeoutMs = options?.timeoutMs ?? 10000; // 10s por defecto, menos errores falsos
+  const retryDelayMs = options?.retryDelayMs ?? 200; // breve espera antes del reintento
+
+  function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const t = setTimeout(() => reject(new Error('Tiempo de espera agotado al obtener la sesión')), ms);
+      promise
+        .then((v) => {
+          clearTimeout(t);
+          resolve(v);
+        })
+        .catch((e) => {
+          clearTimeout(t);
+          reject(e);
+        });
+    });
+  }
+
+  try {
+    const first = await withTimeout(supabase.auth.getSession(), timeoutMs);
+    if (first?.data?.session) {
+      return first;
+    }
+    // Reintento rápido si vino vacío
+    await new Promise((r) => setTimeout(r, retryDelayMs));
+    return await withTimeout(supabase.auth.getSession(), timeoutMs);
+  } catch (err) {
+    // Fallback: intentar getUser para al menos obtener el id
+    try {
+      const userRes = await supabase.auth.getUser();
+      const user = userRes.data?.user ?? null;
+      return { data: { session: user ? { user } as any : null }, error: null } as any;
+    } catch {
+      // No lanzar error para no romper UI; devolver estructura vacía
+      return { data: { session: null }, error: err as any } as any;
+    }
+  }
+}
+
 export interface AuthUser {
   id: string;
   email: string;

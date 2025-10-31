@@ -33,7 +33,7 @@ export class EmailService {
         subject: options.subject,
         html: options.html,
         bcc: options.bcc ? (Array.isArray(options.bcc) ? options.bcc : [options.bcc]) : undefined,
-        reply_to: options.replyTo,
+        replyTo: options.replyTo,
       });
 
       if (error) {
@@ -296,6 +296,160 @@ export class EmailService {
     });
 
     return result !== null;
+  }
+
+  /**
+   * Envía notificación masiva por email
+   */
+  static async sendBulkNotificationEmail(
+    recipients: Array<{ email: string; name?: string }>,
+    notification: {
+      title: string;
+      message: string;
+      type: 'promotion' | 'system' | 'announcement' | 'urgent';
+      action_url?: string;
+    }
+  ): Promise<{ sent: number; failed: number }> {
+    if (!process.env.RESEND_API_KEY) {
+      console.warn('RESEND_API_KEY no configurada. Emails no enviados.');
+      return { sent: 0, failed: recipients.length };
+    }
+
+    const typeColors = {
+      promotion: '#10b981',
+      system: '#3b82f6',
+      announcement: '#8b5cf6',
+      urgent: '#dc2626',
+    };
+
+    const typeIcons = {
+      promotion: '🎉',
+      system: '⚙️',
+      announcement: '📢',
+      urgent: '🚨',
+    };
+
+    let sent = 0;
+    let failed = 0;
+
+    // Enviar en lotes de 50 (límite de Resend)
+    const batchSize = 50;
+    for (let i = 0; i < recipients.length; i += batchSize) {
+      const batch = recipients.slice(i, i + batchSize);
+
+      const emails = batch.map((recipient) => ({
+        to: recipient.email,
+        subject: notification.title,
+        html: this.getNotificationEmailTemplate(recipient.name || 'Usuario', notification),
+      }));
+
+      try {
+        // Resend permite enviar múltiples emails en una sola llamada
+        const promises = emails.map((email) =>
+          resend.emails.send({
+            from: this.defaultFrom,
+            to: email.to,
+            subject: email.subject,
+            html: email.html,
+          })
+        );
+
+        const results = await Promise.allSettled(promises);
+
+        results.forEach((result) => {
+          if (result.status === 'fulfilled' && result.value.data) {
+            sent++;
+          } else {
+            failed++;
+            console.error('Error sending email:', result.status === 'rejected' ? result.reason : result.value.error);
+          }
+        });
+      } catch (error) {
+        console.error('Error en batch de emails:', error);
+        failed += batch.length;
+      }
+    }
+
+    return { sent, failed };
+  }
+
+  /**
+   * Genera el template HTML para notificaciones masivas
+   */
+  private static getNotificationEmailTemplate(
+    userName: string,
+    notification: {
+      title: string;
+      message: string;
+      type: 'promotion' | 'system' | 'announcement' | 'urgent';
+      action_url?: string;
+    }
+  ): string {
+    const typeColors = {
+      promotion: '#10b981',
+      system: '#3b82f6',
+      announcement: '#8b5cf6',
+      urgent: '#dc2626',
+    };
+
+    const typeIcons = {
+      promotion: '🎉',
+      system: '⚙️',
+      announcement: '📢',
+      urgent: '🚨',
+    };
+
+    const color = typeColors[notification.type];
+    const icon = typeIcons[notification.type];
+
+    return `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background: ${color}; color: white; padding: 30px 20px; text-align: center; border-radius: 8px 8px 0 0; }
+            .header h1 { margin: 0; font-size: 24px; }
+            .content { background: #f9fafb; padding: 30px 20px; border: 1px solid #e5e7eb; }
+            .message-box { background: white; padding: 20px; border-left: 4px solid ${color}; margin: 20px 0; border-radius: 4px; }
+            .button { display: inline-block; padding: 12px 24px; background: ${color}; color: white; text-decoration: none; border-radius: 6px; margin: 20px 0; font-weight: bold; }
+            .button:hover { opacity: 0.9; }
+            .footer { text-align: center; padding: 20px; color: #6b7280; font-size: 12px; border-top: 1px solid #e5e7eb; }
+            .unsubscribe { text-align: center; margin-top: 20px; font-size: 11px; color: #9ca3af; }
+            .unsubscribe a { color: #9ca3af; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>${icon} ${notification.title}</h1>
+            </div>
+            <div class="content">
+              <p>Hola ${userName},</p>
+              <div class="message-box">
+                ${notification.message.split('\n').map((line) => `<p>${line}</p>`).join('')}
+              </div>
+              ${notification.action_url ? `
+                <div style="text-align: center;">
+                  <a href="${notification.action_url}" class="button">Ver más información</a>
+                </div>
+              ` : ''}
+              <p>Gracias por ser parte de Mercadito Online PY.</p>
+            </div>
+            <div class="footer">
+              <p><strong>Mercadito Online PY</strong></p>
+              <p>El mejor marketplace de Paraguay</p>
+              <div class="unsubscribe">
+                <p>Puedes desactivar estas notificaciones en tu <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/settings/notifications">configuración de cuenta</a></p>
+              </div>
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
   }
 }
 

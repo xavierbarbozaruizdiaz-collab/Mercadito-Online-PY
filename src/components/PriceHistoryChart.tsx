@@ -68,11 +68,34 @@ export default function PriceHistoryChart({
   const maxPrice = Math.max(...allPrices);
   const priceRange = maxPrice - minPrice;
 
-  const getPriceChange = (index: number) => {
-    if (index === 0) return null;
-    const current = index === 0 ? currentPrice : history[index - 1].price;
-    const previous = index === 0 ? history[0].price : history[index].price;
-    return current - previous;
+  // Calcular cambios de precio de forma segura
+  const getPriceChange = (displayIndex: number, displayedHistory: PriceHistory[]) => {
+    // Validar que displayedHistory esté definido
+    if (!displayedHistory || !Array.isArray(displayedHistory)) {
+      return null;
+    }
+    
+    // displayIndex 0 es el precio actual
+    if (displayIndex === 0) {
+      if (displayedHistory.length === 0) return null;
+      // El primer elemento del historial mostrado es el más reciente
+      const mostRecent = displayedHistory[0];
+      if (!mostRecent) return null;
+      return currentPrice - mostRecent.price;
+    }
+    
+    // Para entradas del historial mostrado, comparar con la anterior en el mismo array
+    // displayIndex > 0 corresponde a una entrada del historial mostrado
+    // displayedHistory ya está ordenado del más reciente al más antiguo (por el reverse)
+    if (displayIndex > displayedHistory.length) return null;
+    if (displayIndex === 0) return null; // Ya manejado arriba
+    
+    const current = displayedHistory[displayIndex - 1]; // -1 porque displayIndex 1 = primer elemento (índice 0)
+    const previous = displayedHistory[displayIndex - 2]; // El anterior
+    
+    if (!current || !previous) return null;
+    
+    return current.price - previous.price;
   };
 
   return (
@@ -90,27 +113,37 @@ export default function PriceHistoryChart({
                 {formatCurrency(currentPrice)}
               </div>
             </div>
-            {history.length > 0 && (
-              <div className="text-right">
-                {getPriceChange(0) !== null && getPriceChange(0)! < 0 ? (
-                  <TrendingDown className="w-6 h-6 text-green-600" />
-                ) : getPriceChange(0)! > 0 ? (
-                  <TrendingUp className="w-6 h-6 text-red-600" />
-                ) : (
-                  <Minus className="w-6 h-6 text-gray-400" />
-                )}
-              </div>
-            )}
+            {history.length > 0 && (() => {
+              const displayedHistory = history.length > 0 ? history.slice(-14).reverse() : [];
+              const priceChange = getPriceChange(0, displayedHistory);
+              return priceChange !== null && (
+                <div className="text-right">
+                  {priceChange < 0 ? (
+                    <TrendingDown className="w-6 h-6 text-green-600" />
+                  ) : priceChange > 0 ? (
+                    <TrendingUp className="w-6 h-6 text-red-600" />
+                  ) : (
+                    <Minus className="w-6 h-6 text-gray-400" />
+                  )}
+                </div>
+              );
+            })()}
           </div>
 
           {/* Gráfico simple */}
           <div className="space-y-2">
-            {history.slice(-14).reverse().map((entry, index) => {
-              const height = priceRange > 0 ? ((entry.price - minPrice) / priceRange) * 100 : 50;
-              const change = getPriceChange(history.length - index);
+            {(() => {
+              const displayedHistory = history.length > 0 ? history.slice(-14).reverse() : [];
+              if (displayedHistory.length === 0) return null;
+              
+              return displayedHistory.map((entry, displayIndex) => {
+                const height = priceRange > 0 ? ((entry.price - minPrice) / priceRange) * 100 : 50;
+                // displayIndex empieza en 0 para el primer elemento mostrado
+                // Necesitamos +1 porque el índice 0 se reserva para el precio actual
+                const change = getPriceChange(displayIndex + 1, displayedHistory);
 
               return (
-                <div key={index} className="flex items-center gap-3">
+                <div key={displayIndex} className="flex items-center gap-3">
                   <div className="w-20 text-xs text-gray-600">
                     {entry.days_ago === 0 ? 'Hoy' : `Hace ${entry.days_ago}d`}
                   </div>
@@ -134,7 +167,8 @@ export default function PriceHistoryChart({
                   </div>
                 </div>
               );
-            })}
+            });
+            })()}
           </div>
         </div>
       </CardContent>

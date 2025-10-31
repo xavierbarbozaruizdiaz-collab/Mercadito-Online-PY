@@ -1,26 +1,9 @@
 
-import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import type { Metadata } from "next";
 import "./globals.css";
-import UserMenu from "@/components/UserMenu";
-import CartButton from "@/components/CartButton";
-import NotificationsPanel from "@/components/NotificationsPanel";
-import AnalyticsProvider from "@/components/AnalyticsProvider";
-import OfflineIndicator from "@/components/OfflineIndicator";
-import SearchBar from "@/components/SearchBar";
 import Link from "next/link";
-
-// Sentry se carga automáticamente via instrumentation.ts
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+import CartButton from "@/components/CartButton";
+import UserMenu from "@/components/UserMenu";
 
 export const metadata: Metadata = {
   title: {
@@ -100,14 +83,6 @@ export const metadata: Metadata = {
   },
 };
 
-export const viewport: Viewport = {
-  width: 'device-width',
-  initialScale: 1,
-  maximumScale: 5,
-  userScalable: true,
-  themeColor: '#3b82f6',
-};
-
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -115,78 +90,77 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es">
-      <head>
-        {/* PWA Meta Tags */}
-        <meta name="application-name" content="Mercadito Online PY" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="apple-mobile-web-app-title" content="Mercadito PY" />
-        <meta name="format-detection" content="telephone=no" />
-        <meta name="mobile-web-app-capable" content="yes" />
-        <meta name="msapplication-config" content="/icons/browserconfig.xml" />
-        <meta name="msapplication-TileColor" content="#3b82f6" />
-        <meta name="msapplication-tap-highlight" content="no" />
-        <meta name="theme-color" content="#3b82f6" />
-        
-        {/* Apple Touch Icons */}
-        <link rel="apple-touch-icon" href="/icons/icon-152x152.png" />
-        <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152x152.png" />
-        <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180x180.png" />
-        <link rel="apple-touch-icon" sizes="167x167" href="/icons/icon-167x167.png" />
-        
-        {/* Favicons */}
-        <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png" />
-        <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16x16.png" />
-        <link rel="shortcut icon" href="/favicon.ico" />
-        
-        {/* Splash Screens */}
-        <link rel="apple-touch-startup-image" href="/icons/apple-splash-2048-2732.jpg" media="(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" />
-        <link rel="apple-touch-startup-image" href="/icons/apple-splash-1668-2388.jpg" media="(device-width: 834px) and (device-height: 1194px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" />
-        <link rel="apple-touch-startup-image" href="/icons/apple-splash-1536-2048.jpg" media="(device-width: 768px) and (device-height: 1024px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" />
-        <link rel="apple-touch-startup-image" href="/icons/apple-splash-1125-2436.jpg" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
-        <link rel="apple-touch-startup-image" href="/icons/apple-splash-1242-2688.jpg" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
-        <link rel="apple-touch-startup-image" href="/icons/apple-splash-750-1334.jpg" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" />
-        <link rel="apple-touch-startup-image" href="/icons/apple-splash-828-1792.jpg" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" />
-      </head>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <AnalyticsProvider>
-          {/* Header global */}
-          <header className="flex items-center justify-between px-4 py-3 border-b bg-white sticky top-0 z-50 gap-4">
-            <Link href="/" className="text-lg sm:text-xl font-bold truncate hover:text-blue-600 transition-colors whitespace-nowrap">
-              🛒 Mercadito Online PY
-            </Link>
-            <div className="flex items-center gap-2 sm:gap-4 flex-1 max-w-2xl mx-4">
-              <SearchBar />
+      <body className="antialiased">
+        <header className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center justify-between h-16 gap-4">
+              {/* Logo */}
+              <Link href="/" className="flex items-center gap-2 flex-shrink-0">
+                <span className="text-2xl font-bold text-blue-600 hover:text-blue-700 transition-colors">
+                  🛒 Mercadito Online PY
+                </span>
+              </Link>
+              
+              {/* Espacio central - Opciones disponibles */}
+              <div className="hidden md:flex flex-1 justify-center items-center gap-4">
+                {/* TODO: Agregar componente aquí - ver opciones más abajo */}
+              </div>
+              
+              {/* Acciones derecha */}
+              <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+                <CartButton />
+                <UserMenu />
+              </div>
             </div>
-            <div className="flex items-center gap-2 sm:gap-4">
-              <NotificationsPanel />
-              <CartButton />
-              <UserMenu />
-            </div>
-          </header>
-
-          {/* Contenido de cada página */}
-          {children}
-        </AnalyticsProvider>
-        
-        {/* Indicador de estado offline */}
-        <OfflineIndicator />
-        
-        {/* Service Worker Registration */}
+          </div>
+        </header>
+        {children}
+        {/* Service Worker deshabilitado y desregistrado agresivamente */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
-              if ('serviceWorker' in navigator) {
-                window.addEventListener('load', function() {
-                  navigator.serviceWorker.register('/sw.js')
-                    .then(function(registration) {
-                      console.log('SW registered: ', registration);
-                    })
-                    .catch(function(registrationError) {
-                      console.log('SW registration failed: ', registrationError);
+              // Ejecutar inmediatamente para desregistrar SW antes de cualquier otro código
+              (function() {
+                if ('serviceWorker' in navigator) {
+                  // Desregistrar todos los Service Workers
+                  navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                    console.log('[SW Cleanup] Desregistrando', registrations.length, 'Service Workers...');
+                    for(let registration of registrations) {
+                      registration.unregister().then(function(success) {
+                        if (success) {
+                          console.log('[SW Cleanup] Service Worker desregistrado correctamente');
+                        }
+                      });
+                    }
+                  }).catch(function(err) {
+                    console.warn('[SW Cleanup] Error al obtener registraciones:', err);
+                  });
+                  
+                  // Limpiar todos los cachés
+                  if ('caches' in window) {
+                    caches.keys().then(function(cacheNames) {
+                      console.log('[SW Cleanup] Eliminando', cacheNames.length, 'cachés...');
+                      return Promise.allSettled(
+                        cacheNames.map(function(cacheName) {
+                          return caches.delete(cacheName);
+                        })
+                      );
+                    }).then(function(results) {
+                      const deleted = results.filter(r => r.status === 'fulfilled').length;
+                      console.log('[SW Cleanup]', deleted, 'cachés eliminados');
+                    }).catch(function(err) {
+                      console.warn('[SW Cleanup] Error al limpiar cachés:', err);
                     });
-                });
-              }
+                  }
+                  
+                  // Prevenir nuevos registros del SW
+                  const originalRegister = navigator.serviceWorker.register;
+                  navigator.serviceWorker.register = function() {
+                    console.warn('[SW Cleanup] Intento de registro de SW bloqueado');
+                    return Promise.reject(new Error('Service Worker está deshabilitado temporalmente'));
+                  };
+                }
+              })();
             `,
           }}
         />

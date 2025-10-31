@@ -32,7 +32,7 @@ export class ProductComparisonService {
     {
       name: 'category',
       label: 'Categoría',
-      getValue: (product) => product.category?.name || '',
+      getValue: (product) => (product as any).category?.name || '',
       type: 'text',
     },
     {
