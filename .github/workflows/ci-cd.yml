@@ -18,8 +18,7 @@ jobs:
   # ============================================
   lint-and-typecheck:
     runs-on: ubuntu-latest
-    # No ejecutar en branches feat/* (incluso en PRs)
-    if: github.event_name == 'push' || (github.event_name == 'pull_request' && !startsWith(github.head_ref, 'feat/') && !startsWith(github.head_ref, 'feature/') && !startsWith(github.head_ref, 'hotfix/'))
+    if: github.ref != 'refs/heads/feat/core-ecommerce' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/feature/') && !startsWith(github.ref, 'refs/heads/hotfix/')
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -85,8 +84,7 @@ jobs:
   # ============================================
   security-audit:
     runs-on: ubuntu-latest
-    # No ejecutar en branches feat/* (incluso en PRs)
-    if: github.event_name == 'push' || (github.event_name == 'pull_request' && !startsWith(github.head_ref, 'feat/') && !startsWith(github.head_ref, 'feature/') && !startsWith(github.head_ref, 'hotfix/'))
+    if: github.ref != 'refs/heads/feat/core-ecommerce' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/feature/') && !startsWith(github.ref, 'refs/heads/hotfix/')
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -106,7 +104,6 @@ jobs:
       - name: Run Snyk security scan
         uses: snyk/actions/node@master
         continue-on-error: true  # No fallar si Snyk no está configurado
-        if: ${{ secrets.SNYK_TOKEN != '' }}  # Solo ejecutar si el token está configurado
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
@@ -159,7 +156,7 @@ jobs:
       - name: Notify deployment success
         uses: 8398a7/action-slack@v3
         continue-on-error: true  # No fallar si Slack no está configurado
-        if: success() && ${{ secrets.SLACK_WEBHOOK_URL != '' }}  # Solo ejecutar si el webhook está configurado
+        if: success()
         with:
           status: success
           text: '🚀 Mercadito Online PY deployed successfully!'
@@ -169,7 +166,7 @@ jobs:
       - name: Notify deployment failure
         uses: 8398a7/action-slack@v3
         continue-on-error: true  # No fallar si Slack no está configurado
-        if: failure() && ${{ secrets.SLACK_WEBHOOK_URL != '' }}  # Solo ejecutar si el webhook está configurado
+        if: failure()
         with:
           status: failure
           text: '❌ Mercadito Online PY deployment failed!'
