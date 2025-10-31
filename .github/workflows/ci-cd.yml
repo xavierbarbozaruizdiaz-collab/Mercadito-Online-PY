@@ -8,7 +8,6 @@ name: CI/CD Pipeline
 on:
   push:
     branches: [ main, dev ]
-    branches-ignore: ['feat/*', 'feature/*', 'hotfix/*']  # Ignorar branches de desarrollo
   pull_request:
     branches: [ main ]
     types: [opened, synchronize, reopened]  # Solo en PRs hacia main

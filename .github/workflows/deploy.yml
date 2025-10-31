@@ -4,7 +4,6 @@ name: Production Deployment
 on:
   push:
     branches: [main]
-    branches-ignore: ['feat/*', 'feature/*', 'hotfix/*']  # Ignorar branches de desarrollo
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened]

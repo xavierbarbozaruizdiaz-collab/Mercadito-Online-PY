@@ -3,7 +3,6 @@ name: 🚀 Deploy to Production
 on:
   push:
     branches: [main, production]
-    branches-ignore: ['feat/*', 'feature/*', 'hotfix/*']  # Ignorar branches de desarrollo
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened]  # Solo en PRs hacia main, no desde feat/*
