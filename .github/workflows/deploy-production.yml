@@ -19,8 +19,7 @@ jobs:
   lint-and-test:
     name: 🔍 Lint & Test
     runs-on: ubuntu-latest
-    # No ejecutar en branches feat/* (incluso en PRs)
-    if: github.event_name == 'push' || (github.event_name == 'pull_request' && !startsWith(github.head_ref, 'feat/') && !startsWith(github.head_ref, 'feature/') && !startsWith(github.head_ref, 'hotfix/'))
+    if: github.ref != 'refs/heads/feat/core-ecommerce' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/feature/') && !startsWith(github.ref, 'refs/heads/hotfix/')
     steps:
       - name: 📥 Checkout code
         uses: actions/checkout@v4
@@ -55,8 +54,7 @@ jobs:
   security-audit:
     name: 🔒 Security Audit
     runs-on: ubuntu-latest
-    # No ejecutar en branches feat/* (incluso en PRs)
-    if: github.event_name == 'push' || (github.event_name == 'pull_request' && !startsWith(github.head_ref, 'feat/') && !startsWith(github.head_ref, 'feature/') && !startsWith(github.head_ref, 'hotfix/'))
+    if: github.ref != 'refs/heads/feat/core-ecommerce' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/feature/') && !startsWith(github.ref, 'refs/heads/hotfix/')
     steps:
       - name: 📥 Checkout code
         uses: actions/checkout@v4
