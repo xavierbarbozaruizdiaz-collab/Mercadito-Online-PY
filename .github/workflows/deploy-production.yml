@@ -75,6 +75,7 @@ jobs:
         run: npm ci
 
       - name: 🔒 Run Snyk security audit
+        if: ${{ secrets.SNYK_TOKEN != '' }}
         uses: snyk/actions/node@master
         continue-on-error: true  # No fallar si Snyk no está configurado
         env:

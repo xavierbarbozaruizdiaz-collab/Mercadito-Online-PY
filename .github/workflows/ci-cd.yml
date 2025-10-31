@@ -66,7 +66,12 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: |
+          if [[ "${{ github.ref }}" == refs/heads/main || "${{ github.ref }}" == refs/heads/dev ]]; then
+            npm ci
+          else
+            npm install --no-audit --no-fund
+          fi
 
       - name: Build application
         run: npm run build
@@ -108,12 +113,18 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: |
+          if [[ "${{ github.ref }}" == refs/heads/main || "${{ github.ref }}" == refs/heads/dev ]]; then
+            npm ci
+          else
+            npm install --no-audit --no-fund
+          fi
 
       - name: Run security audit
         run: npm audit --audit-level=moderate
 
       - name: Run Snyk security scan
+        if: ${{ secrets.SNYK_TOKEN != '' }}
         uses: snyk/actions/node@master
         continue-on-error: true  # No fallar si Snyk no está configurado
         env:
