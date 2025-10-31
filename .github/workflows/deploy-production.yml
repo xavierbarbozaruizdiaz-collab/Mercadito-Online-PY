@@ -75,7 +75,7 @@ jobs:
         run: npm ci
 
       - name: 🔒 Run Snyk security audit
-        if: ${{ secrets.SNYK_TOKEN != '' }}
+        if: env.SNYK_TOKEN != ''
         uses: snyk/actions/node@master
         continue-on-error: true  # No fallar si Snyk no está configurado
         env:
@@ -149,7 +149,6 @@ jobs:
     if: success() && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/production')
     steps:
       - name: 📢 Notify deployment success
-        if: ${{ secrets.SLACK_WEBHOOK_URL != '' }}
         uses: 8398a7/action-slack@v3
         continue-on-error: true  # No fallar si Slack no está configurado
         with:
@@ -164,7 +163,6 @@ jobs:
     if: failure()
     steps:
       - name: 📢 Notify deployment failure
-        if: ${{ secrets.SLACK_WEBHOOK_URL != '' }}
         uses: 8398a7/action-slack@v3
         continue-on-error: true  # No fallar si Slack no está configurado
         with:
