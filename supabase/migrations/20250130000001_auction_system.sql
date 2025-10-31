@@ -212,7 +212,7 @@ BEGIN
   
   -- Crear notificaciones
   -- Notificar al vendedor
-  INSERT INTO public.notifications (user_id, type, title, content, data)
+  INSERT INTO public.notifications (user_id, type, title, message, data)
   VALUES (
     v_product.seller_id,
     'order',
@@ -227,7 +227,7 @@ BEGIN
   
   -- Notificar al postor anterior si fue superado
   IF v_previous_bidder_id IS NOT NULL AND v_previous_bidder_id != p_bidder_id THEN
-    INSERT INTO public.notifications (user_id, type, title, content, data)
+    INSERT INTO public.notifications (user_id, type, title, message, data)
     VALUES (
       v_previous_bidder_id,
       'order',
@@ -311,7 +311,7 @@ BEGIN
   
   -- Notificar a todos los postores
   IF v_all_bidders IS NOT NULL THEN
-    INSERT INTO public.notifications (user_id, type, title, content, data)
+    INSERT INTO public.notifications (user_id, type, title, message, data)
     SELECT 
       bidder_id,
       'order',
@@ -326,7 +326,7 @@ BEGIN
   END IF;
   
   -- Notificar al vendedor
-  INSERT INTO public.notifications (user_id, type, title, content, data)
+  INSERT INTO public.notifications (user_id, type, title, message, data)
   VALUES (
     v_product.seller_id,
     'order',
@@ -390,7 +390,7 @@ BEGIN
       -- Verificar precio de reserva
       IF v_auction.reserve_price IS NULL OR v_auction.current_bid >= v_auction.reserve_price THEN
         -- Notificar al ganador
-        INSERT INTO public.notifications (user_id, type, title, content, data)
+        INSERT INTO public.notifications (user_id, type, title, message, data)
         VALUES (
           v_auction.winner_id,
           'order',
@@ -403,7 +403,7 @@ BEGIN
         );
         
         -- Notificar al vendedor
-        INSERT INTO public.notifications (user_id, type, title, content, data)
+        INSERT INTO public.notifications (user_id, type, title, message, data)
         VALUES (
           v_auction.seller_id,
           'order',
@@ -417,7 +417,7 @@ BEGIN
         );
         
         -- Notificar a otros postores que perdieron
-        INSERT INTO public.notifications (user_id, type, title, content, data)
+        INSERT INTO public.notifications (user_id, type, title, message, data)
         SELECT 
           bidder_id,
           'order',
@@ -433,7 +433,7 @@ BEGIN
           AND is_retracted = false;
       ELSE
         -- Precio de reserva no alcanzado - notificar al vendedor
-        INSERT INTO public.notifications (user_id, type, title, content, data)
+        INSERT INTO public.notifications (user_id, type, title, message, data)
         VALUES (
           v_auction.seller_id,
           'order',
@@ -448,7 +448,7 @@ BEGIN
       END IF;
     ELSE
       -- No hay ganador (sin pujas)
-      INSERT INTO public.notifications (user_id, type, title, content, data)
+      INSERT INTO public.notifications (user_id, type, title, message, data)
       VALUES (
         v_auction.seller_id,
         'order',

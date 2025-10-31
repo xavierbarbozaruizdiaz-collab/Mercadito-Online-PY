@@ -33,34 +33,101 @@ export default function UserOrdersPage() {
   async function loadOrders() {
     try {
       const { data: session } = await supabase.auth.getSession();
-      if (!session?.session?.user?.id) return;
+      if (!session?.session?.user?.id) {
+        console.warn('⚠️ No hay sesión de usuario');
+        setLoading(false);
+        return;
+      }
 
-      const { data, error } = await supabase
+      const userId = session.session.user.id;
+      console.log('🔍 Cargando pedidos para usuario:', userId);
+
+      // Primero verificar si hay pedidos sin joins para diagnosticar
+      const { data: simpleData, error: simpleError } = await supabase
         .from('orders')
-        .select(`
-          id,
-          status,
-          total_amount,
-          created_at,
-          order_items (
-            id,
-            quantity,
-            unit_price,
-            total_price,
-            product:products (
-              id,
-              title,
-              cover_url
-            )
-          )
-        `)
-        .eq('buyer_id', session.session.user.id)
+        .select('id, status, total_amount, created_at, buyer_id')
+        .eq('buyer_id', userId)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setOrders((data as unknown as Order[]) || []);
+      console.log('📦 Pedidos encontrados (simple):', {
+        count: simpleData?.length || 0,
+        orders: simpleData,
+        error: simpleError,
+        errorDetails: simpleError ? {
+          code: simpleError.code,
+          message: simpleError.message,
+          details: simpleError.details,
+          hint: simpleError.hint
+        } : null
+      });
+
+      // Verificación adicional: consultar todos los pedidos (sin filtro) para debugging
+      if (simpleData?.length === 0) {
+        console.log('⚠️ No se encontraron pedidos para este usuario. Verificando...');
+        
+        // Llamar a API de debug
+        try {
+          const debugResponse = await fetch(`/api/debug/check-orders?userId=${userId}`);
+          const debugData = await debugResponse.json();
+          console.log('🔍 Debug info:', debugData);
+          
+          if (debugData.diagnostics?.hasAnyOrders) {
+            console.warn('⚠️ Hay pedidos en la BD, pero no para este usuario. Posible problema con buyer_id.');
+          } else {
+            console.warn('⚠️ No hay pedidos en la BD. Verifica que los pedidos se estén creando correctamente en checkout.');
+          }
+        } catch (debugErr) {
+          console.warn('No se pudo obtener información de debug:', debugErr);
+        }
+      }
+
+      if (simpleError) {
+        console.error('❌ Error en query simple:', simpleError);
+        throw simpleError;
+      }
+
+      // Si hay pedidos, obtener con los detalles
+      if (simpleData && simpleData.length > 0) {
+        const { data, error } = await supabase
+          .from('orders')
+          .select(`
+            id,
+            status,
+            total_amount,
+            created_at,
+            order_items (
+              id,
+              quantity,
+              unit_price,
+              total_price,
+              product:products (
+                id,
+                title,
+                cover_url
+              )
+            )
+          `)
+          .eq('buyer_id', userId)
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('❌ Error en query completa:', error);
+          throw error;
+        }
+        
+        console.log('✅ Pedidos cargados con detalles:', {
+          count: data?.length || 0,
+          orders: data
+        });
+        
+        setOrders((data as unknown as Order[]) || []);
+      } else {
+        console.log('ℹ️ No se encontraron pedidos para este usuario');
+        setOrders([]);
+      }
     } catch (err) {
-      console.error('Error loading orders:', err);
+      console.error('❌ Error loading orders:', err);
+      setOrders([]);
     } finally {
       setLoading(false);
     }

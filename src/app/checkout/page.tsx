@@ -114,15 +114,91 @@ export default function CheckoutPage() {
         return;
       }
 
+      console.log('🛒 Creando pedido...', {
+        buyer_id: session.session.user.id,
+        cartItems: cartItems.length,
+        total: totalPrice
+      });
+
       // Crear orden usando la función de la base de datos
-      const { data, error } = await (supabase as any).rpc('create_order_from_cart', {
-        p_buyer_id: session.session.user.id,
+      const buyerId = session.session.user.id;
+      console.log('📝 Datos del pedido a crear:', {
+        buyer_id: buyerId,
+        buyer_email: session.session.user.email,
+        cartItems_count: cartItems.length,
+        total: totalPrice,
+        address: address.fullName,
+        payment_method: paymentMethod
+      });
+
+      const { data: orderId, error } = await (supabase as any).rpc('create_order_from_cart', {
+        p_buyer_id: buyerId,
         p_shipping_address: address,
         p_payment_method: paymentMethod,
         p_notes: notes.trim() || null
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Error creando pedido:', {
+          error,
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          buyer_id: buyerId
+        });
+        throw error;
+      }
+
+      console.log('✅ Pedido creado exitosamente:', {
+        orderId,
+        buyer_id: buyerId,
+        timestamp: new Date().toISOString()
+      });
+
+      // Verificar que el pedido se creó correctamente con el buyer_id correcto
+      const { data: verifyOrder, error: verifyError } = await supabase
+        .from('orders')
+        .select('id, buyer_id, total_amount, status, created_at')
+        .eq('id', orderId)
+        .single();
+
+      if (verifyError) {
+        console.error('⚠️ No se pudo verificar el pedido creado:', verifyError);
+      } else {
+        console.log('✅ Verificación del pedido:', {
+          orderId: verifyOrder?.id,
+          buyer_id_in_db: verifyOrder?.buyer_id,
+          buyer_id_expected: buyerId,
+          match: verifyOrder?.buyer_id === buyerId,
+          total: verifyOrder?.total_amount,
+          status: verifyOrder?.status
+        });
+
+        if (verifyOrder?.buyer_id !== buyerId) {
+          console.error('❌ PROBLEMA CRÍTICO: El buyer_id en la BD no coincide con el usuario actual!');
+          alert('Se creó el pedido pero hay un problema con la asociación. Contacta al administrador.');
+        }
+      }
+
+      // Obtener información del pedido para notificaciones
+      const { data: orderData } = await supabase
+        .from('orders')
+        .select(`
+          id,
+          total_amount,
+          order_items (
+            product:products (
+              title,
+              seller_id
+            ),
+            seller_id
+          )
+        `)
+        .eq('id', orderId)
+        .single();
+
+      console.log('📋 Datos del pedido creado:', orderData);
 
       // Enviar email de confirmación (en segundo plano, no bloquea)
       if (session.session.user.email) {
@@ -131,7 +207,7 @@ export default function CheckoutPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             email: session.session.user.email,
-            orderNumber: data,
+            orderNumber: orderId,
             orderDetails: {
               items: cartItems.map(item => ({
                 name: item.product.title,
@@ -145,8 +221,45 @@ export default function CheckoutPage() {
         }).catch(err => console.error('Error enviando email:', err));
       }
 
+      // Enviar notificaciones de WhatsApp a los vendedores (en segundo plano, no bloquea)
+      if (orderData?.order_items && orderData.order_items.length > 0) {
+        // Obtener sellers únicos del pedido
+        const sellerIds = [...new Set(
+          (orderData.order_items as any[])
+            .map((item: any) => item.seller_id)
+            .filter(Boolean)
+        )];
+
+        console.log('📱 Enviando notificaciones WhatsApp a vendedores:', sellerIds);
+
+        // Enviar notificación a cada vendedor
+        for (const sellerId of sellerIds) {
+          fetch('/api/whatsapp/notify-seller', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              sellerId,
+              orderId,
+              orderData: orderData,
+              buyerPhone: address.phone,
+              buyerName: address.fullName,
+            }),
+          })
+          .then(res => res.json())
+          .then(data => {
+            if (data.success) {
+              console.log(`✅ Notificación WhatsApp preparada para vendedor ${sellerId}:`, data.whatsapp_url);
+              // Opcional: En producción, puedes configurar una API de WhatsApp para envío automático
+            } else {
+              console.warn(`⚠️ No se pudo enviar WhatsApp a vendedor ${sellerId}:`, data.error);
+            }
+          })
+          .catch(err => console.error(`❌ Error enviando WhatsApp a vendedor ${sellerId}:`, err));
+        }
+      }
+
       // Redirigir a página de éxito
-      router.push(`/checkout/success?orderId=${data}`);
+      router.push(`/checkout/success?orderId=${orderId}`);
 
     } catch (err: any) {
       alert('Error al procesar el pedido: ' + (err.message || 'Error desconocido'));

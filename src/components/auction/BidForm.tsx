@@ -1,14 +1,15 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui';
+import { Input } from '@/components/ui';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Zap, ShoppingCart } from 'lucide-react';
+import { Loader2, Zap, ShoppingCart, Gavel } from 'lucide-react';
 import { placeBid, buyNow, calculateMinBidIncrement } from '@/lib/services/auctionService';
 import { getSessionWithTimeout } from '@/lib/supabase/client';
 import { formatCurrency } from '@/lib/utils';
+import { supabase } from '@/lib/supabaseClient';
 
 interface BidFormProps {
   productId: string;
@@ -81,6 +82,34 @@ export default function BidForm({
     if (amount < minBid) {
       setError(`El monto mínimo es ${formatCurrency(minBid)}`);
       return;
+    }
+
+    // Validar que la subasta siga activa (verificación en tiempo real)
+    try {
+      const { data: auctionCheck } = await supabase
+        .from('products')
+        .select('auction_status, auction_end_at')
+        .eq('id', productId)
+        .single();
+      
+      if (auctionCheck) {
+        if (auctionCheck.auction_status !== 'active') {
+          setError('Esta subasta ya no está activa');
+          return;
+        }
+        
+        // Verificar que no haya terminado
+        if (auctionCheck.auction_end_at) {
+          const endDate = new Date(auctionCheck.auction_end_at);
+          if (endDate <= new Date()) {
+            setError('Esta subasta ya ha finalizado');
+            return;
+          }
+        }
+      }
+    } catch (checkErr) {
+      console.warn('Error verificando estado de subasta:', checkErr);
+      // Continuar de todos modos
     }
 
     setLoading(true);
@@ -235,25 +264,41 @@ export default function BidForm({
           </Button>
         </div>
 
-        {/* Botón principal de puja */}
-        <Button
-          onClick={handlePlaceBid}
-          disabled={loading || !bidAmount || parseFloat(bidAmount) < minBid}
-          className="w-full"
-          size="lg"
-        >
-          {loading ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Procesando...
-            </>
-          ) : (
-            <>
-              <Zap className="mr-2 h-4 w-4" />
-              Pujar Ahora
-            </>
-          )}
-        </Button>
+        {/* Botones principales grandes - Estilo Copart/IAA */}
+        <div className="space-y-3 pt-2">
+          {/* Botón BID principal */}
+          <Button
+            onClick={handlePlaceBid}
+            disabled={loading || !bidAmount || parseFloat(bidAmount) < minBid}
+            title={loading ? 'Procesando puja...' : !bidAmount ? 'Ingresa un monto' : parseFloat(bidAmount) < minBid ? `Monto mínimo: ${formatCurrency(minBid)}` : ''}
+            className="w-full h-14 text-lg font-bold bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white shadow-lg transform transition-all hover:scale-105"
+            size="lg"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                Procesando...
+              </>
+            ) : (
+              <>
+                <Gavel className="mr-2 h-5 w-5" />
+                BID
+              </>
+            )}
+          </Button>
+
+          {/* Botón MAX BID */}
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => handleQuickBid(suggestedBid + calculatedMinIncrement * 5)}
+            className="w-full h-12 text-base font-semibold border-2 border-purple-600 text-purple-700 hover:bg-purple-50"
+            size="lg"
+          >
+            <Zap className="mr-2 h-4 w-4" />
+            MAX BID
+          </Button>
+        </div>
 
         {/* Botón Compra Ahora */}
         {buyNowPrice && (

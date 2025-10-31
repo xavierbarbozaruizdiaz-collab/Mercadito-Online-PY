@@ -80,14 +80,23 @@ export default function EditProduct() {
         setCondition(product.condition || 'nuevo');
         setCategoryId(product.category_id);
         
-        // Cargar datos de subasta si existen
-        if (product.sale_type === 'auction' && product.attributes?.auction) {
-          const auction = product.attributes.auction;
-          setAuctionStartingPrice(auction.starting_price?.toString() || '');
-          setAuctionBuyNowPrice(auction.buy_now_price?.toString() || '');
-          if (auction.start_date) {
-            // Convertir ISO date a datetime-local format
-            const startDate = new Date(auction.start_date);
+        // Cargar datos de subasta si existen (desde campos directos)
+        if (product.sale_type === 'auction') {
+          // Usar campos directos de la tabla products
+          const startingPrice = product.current_bid || product.price || product.min_bid_increment || 0;
+          setAuctionStartingPrice(startingPrice.toString());
+          
+          // Buscar buy_now_price en attributes si existe, o usar null
+          const buyNowPrice = product.attributes?.auction?.buy_now_price || 
+                            (product.attributes?.buy_now_price) || 
+                            null;
+          if (buyNowPrice) {
+            setAuctionBuyNowPrice(buyNowPrice.toString());
+          }
+          
+          // Fecha de inicio desde auction_start_at
+          if (product.auction_start_at) {
+            const startDate = new Date(product.auction_start_at);
             const localDateTime = new Date(startDate.getTime() - startDate.getTimezoneOffset() * 60000)
               .toISOString()
               .slice(0, 16);
@@ -132,9 +141,15 @@ export default function EditProduct() {
         }
         break;
       case 'price':
-        if (!value || Number(value) <= 0) {
-          errors.price = 'El precio debe ser mayor a 0';
+        // Solo validar precio si NO es subasta
+        if (saleType !== 'auction') {
+          if (!value || Number(value) <= 0) {
+            errors.price = 'El precio debe ser mayor a 0';
+          } else {
+            delete errors.price;
+          }
         } else {
+          // Si es subasta, eliminar cualquier error de precio
           delete errors.price;
         }
         break;
@@ -159,14 +174,19 @@ export default function EditProduct() {
 
   // Validar formulario completo
   const isFormValid = useMemo(() => {
+    // Para subastas, validar precio base en lugar de precio normal
+    const priceValid = saleType === 'auction' 
+      ? (auctionStartingPrice && Number(auctionStartingPrice) > 0 && auctionStartDate)
+      : (priceNumber > 0);
+    
     return (
       title.trim().length >= 3 &&
-      priceNumber > 0 &&
+      priceValid &&
       categoryId &&
       totalImagesCount > 0 &&
       Object.keys(validationErrors).length === 0
     );
-  }, [title, priceNumber, categoryId, totalImagesCount, validationErrors]);
+  }, [title, priceNumber, categoryId, totalImagesCount, validationErrors, saleType, auctionStartingPrice, auctionStartDate]);
 
   // Procesar archivos (común para input y drag&drop)
   function processFiles(files: FileList | File[]) {
@@ -316,16 +336,23 @@ export default function EditProduct() {
           throw new Error('La fecha de inicio de subasta es requerida');
         }
         const startDate = new Date(auctionStartDate);
-        if (startDate < new Date()) {
-          throw new Error('La fecha de inicio debe ser en el futuro');
-        }
+        
+        // Permitir fechas pasadas para pruebas (igual que en new-product)
+        // if (startDate < new Date()) {
+        //   throw new Error('La fecha de inicio debe ser en el futuro');
+        // }
+        
         if (auctionBuyNowPrice && Number(auctionBuyNowPrice) <= Number(auctionStartingPrice)) {
           throw new Error('El precio de compra ahora debe ser mayor que el precio base');
         }
         
         finalPrice = Number(auctionStartingPrice);
         
-        // Preparar atributos de subasta
+        // Calcular fecha de fin (5 minutos para pruebas, igual que new-product)
+        const durationMinutes = 5; // 5 minutos para pruebas - cambiar a 1440 para producción
+        const endDate = new Date(startDate.getTime() + durationMinutes * 60 * 1000);
+        
+        // Preparar atributos de subasta (para compatibilidad, pero usaremos campos directos)
         attributes = {
           auction: {
             starting_price: Number(auctionStartingPrice),
@@ -353,11 +380,43 @@ export default function EditProduct() {
         category_id: categoryId,
       };
       
-      // Solo agregar attributes si es subasta
-      if (attributes) {
-        updateData.attributes = attributes;
+      // Si es subasta, agregar campos directos de subasta (igual que new-product)
+      if (saleType === 'auction') {
+        const startDate = new Date(auctionStartDate);
+        
+        // Logs para debugging de zona horaria
+        const timezoneOffset = startDate.getTimezoneOffset();
+        const paraguayOffset = -240; // UTC-4
+        
+        console.log('🕐 Información de zona horaria (edición):', {
+          horaIngresada: auctionStartDate,
+          horaInterpretadaLocal: startDate.toString(),
+          horaUTC: startDate.toISOString(),
+          offsetZonaHoraria: timezoneOffset,
+          offsetParaguay: paraguayOffset,
+          diferenciaConParaguay: timezoneOffset - paraguayOffset
+        });
+        
+        const durationMinutes = 5; // 5 minutos para pruebas
+        const endDate = new Date(startDate.getTime() + durationMinutes * 60 * 1000);
+        
+        updateData.auction_status = 'scheduled';
+        updateData.auction_start_at = startDate.toISOString();
+        updateData.auction_end_at = endDate.toISOString();
+        updateData.current_bid = finalPrice; // Precio inicial
+        updateData.min_bid_increment = 1000; // Por defecto
+        
+        // También guardar buy_now_price en attributes si existe
+        if (attributes && attributes.auction?.buy_now_price) {
+          updateData.attributes = attributes;
+        }
       } else {
-        // Si cambió de subasta a directa, limpiar attributes de subasta
+        // Si cambió de subasta a directa, limpiar campos de subasta
+        updateData.auction_status = null;
+        updateData.auction_start_at = null;
+        updateData.auction_end_at = null;
+        updateData.current_bid = null;
+        updateData.min_bid_increment = null;
         updateData.attributes = null;
       }
       
@@ -412,11 +471,16 @@ export default function EditProduct() {
       }
 
       // Success
-      showMsg('success', '✅ Producto actualizado correctamente');
+      showMsg('success', '✅ Producto actualizado correctamente. Redirigiendo...');
       
       // Limpiar nuevas imágenes
       imagePreviews.forEach(({ preview }) => URL.revokeObjectURL(preview));
       setImagePreviews([]);
+      
+      // Redirigir al dashboard después de un breve delay
+      setTimeout(() => {
+        router.push('/dashboard');
+      }, 2000);
       
     } catch (err: any) {
       showMsg('error', '❌ ' + (err?.message ?? 'Error al actualizar'));
@@ -495,34 +559,49 @@ export default function EditProduct() {
 
         {/* Precio, Tipo de venta, Condición */}
         <div className="grid md:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Precio (Gs.) *</label>
-            <input
-              type="number"
-              inputMode="numeric"
-              min="0"
-              value={price}
-              onChange={(e) => {
-                setPrice(e.target.value);
-                validateField('price', e.target.value);
-              }}
-              className={`border p-2 w-full rounded ${
-                validationErrors.price ? 'border-red-500' : priceNumber > 0 ? 'border-green-500' : ''
-              }`}
-              required
-            />
-            {validationErrors.price && (
-              <p className="text-red-500 text-sm mt-1">{validationErrors.price}</p>
-            )}
-          </div>
+          {/* Precio - Solo mostrar cuando NO es subasta */}
+          {saleType !== 'auction' && (
+            <div>
+              <label className="block text-sm font-medium mb-1">Precio (Gs.) *</label>
+              <input
+                type="number"
+                inputMode="numeric"
+                min="0"
+                value={price}
+                onChange={(e) => {
+                  setPrice(e.target.value);
+                  if (saleType !== 'auction') {
+                    validateField('price', e.target.value);
+                  }
+                }}
+                className={`border p-2 w-full rounded ${
+                  validationErrors.price ? 'border-red-500' : priceNumber > 0 ? 'border-green-500' : ''
+                }`}
+                required={saleType !== 'auction'}
+              />
+              {validationErrors.price && (
+                <p className="text-red-500 text-sm mt-1">{validationErrors.price}</p>
+              )}
+            </div>
+          )}
 
-          <div className="md:col-span-2">
+          <div className={`md:col-span-${saleType !== 'auction' ? '2' : '3'}`}>
             <label className="block text-sm font-medium mb-3">Tipo de venta *</label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Opción: Venta Directa */}
               <button
                 type="button"
-                onClick={() => setSaleType('direct')}
+                onClick={() => {
+                  setSaleType('direct');
+                  // Limpiar error de validación del precio ya que ahora será requerido
+                  if (validationErrors.price) {
+                    setValidationErrors(prev => {
+                      const newErrors = { ...prev };
+                      delete newErrors.price;
+                      return newErrors;
+                    });
+                  }
+                }}
                 className={`relative p-4 border-2 rounded-lg transition-all text-left ${
                   saleType === 'direct'
                     ? 'border-blue-500 bg-blue-50 shadow-md ring-2 ring-blue-200'
@@ -563,7 +642,18 @@ export default function EditProduct() {
               {/* Opción: Subasta */}
               <button
                 type="button"
-                onClick={() => setSaleType('auction')}
+                onClick={() => {
+                  setSaleType('auction');
+                  // Limpiar error de validación del precio ya que no será requerido
+                  if (validationErrors.price) {
+                    setValidationErrors(prev => {
+                      const newErrors = { ...prev };
+                      delete newErrors.price;
+                      return newErrors;
+                    });
+                  }
+                  console.log('Tipo de venta cambiado a: auction');
+                }}
                 className={`relative p-4 border-2 rounded-lg transition-all text-left ${
                   saleType === 'auction'
                     ? 'border-yellow-500 bg-yellow-50 shadow-md ring-2 ring-yellow-200'
@@ -605,7 +695,7 @@ export default function EditProduct() {
 
           {/* Campos específicos de subasta */}
           {saleType === 'auction' && (
-            <div className="md:col-span-2 bg-yellow-50 border border-yellow-200 rounded-lg p-4 space-y-4">
+            <div className="md:col-span-3 bg-yellow-50 border border-yellow-200 rounded-lg p-4 space-y-4">
               <h3 className="font-semibold text-yellow-900 mb-3">🔨 Información de la Subasta</h3>
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
@@ -619,32 +709,49 @@ export default function EditProduct() {
                     className="border p-2 w-full rounded"
                     required={saleType === 'auction'}
                   />
-                  <p className="text-xs text-gray-500 mt-1">Precio mínimo de la subasta</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Este es el precio mínimo desde el cual los compradores podrán hacer pujas. La primera puja debe ser igual o mayor a este monto.
+                  </p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Compra ahora (Gs.)</label>
+                  <label className="block text-sm font-medium mb-1">Compra ahora (Gs.) (Opcional)</label>
                   <input
                     type="number"
-                    placeholder="Ej: 200000 (opcional)"
+                    placeholder="Ej: 200000"
                     min="0"
                     value={auctionBuyNowPrice}
                     onChange={(e) => setAuctionBuyNowPrice(e.target.value)}
                     className="border p-2 w-full rounded"
                   />
-                  <p className="text-xs text-gray-500 mt-1">Precio para compra inmediata (opcional)</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Si lo configuras, un comprador podrá comprar el producto inmediatamente a este precio sin esperar el final de la subasta. Debe ser mayor que el precio base.
+                  </p>
                 </div>
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium mb-1">Fecha de inicio de subasta *</label>
+                  <label className="block text-sm font-medium mb-1">Fecha y hora de inicio *</label>
                   <input
                     type="datetime-local"
                     value={auctionStartDate}
                     onChange={(e) => setAuctionStartDate(e.target.value)}
                     className="border p-2 w-full rounded"
                     required={saleType === 'auction'}
-                    min={new Date().toISOString().slice(0, 16)}
+                    // Remover min para permitir fechas pasadas en pruebas
+                    // min={new Date().toISOString().slice(0, 16)}
                   />
-                  <p className="text-xs text-gray-500 mt-1">Cuándo comenzará la subasta</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    La subasta comenzará automáticamente en esta fecha y hora. Duración para pruebas: 5 minutos desde el inicio. Puedes seleccionar una fecha pasada para iniciar inmediatamente.
+                  </p>
                 </div>
+              </div>
+              <div className="mt-4 bg-yellow-100 border border-yellow-300 rounded p-3">
+                <h4 className="font-semibold text-yellow-900 mb-2">¿Cómo funcionan las subastas?</h4>
+                <ul className="text-sm text-yellow-800 space-y-1 list-disc list-inside">
+                  <li>Los compradores pujan incrementando el precio</li>
+                  <li>Duración: 5 minutos desde la fecha de inicio (modo prueba)</li>
+                  <li>Quien ofrezca el precio más alto al finalizar gana</li>
+                  <li>Si configuraste "Compra ahora", alguien puede comprarlo inmediatamente</li>
+                  <li>Puedes usar una fecha pasada para iniciar la subasta inmediatamente</li>
+                </ul>
               </div>
             </div>
           )}

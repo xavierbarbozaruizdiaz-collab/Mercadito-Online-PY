@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ShoppingCart, Plus, Minus, Trash2, ArrowLeft, Package, Truck, CreditCard, AlertCircle } from 'lucide-react';
+import { ShoppingCart, Plus, Minus, Trash2, ArrowLeft, Package, Truck, CreditCard, AlertCircle, Eye } from 'lucide-react';
 
 type CartItem = {
   id: string;
@@ -185,45 +185,62 @@ export function CartPage() {
         return;
       }
 
-      // Cargar productos - Intentar con stock_quantity primero, si falla intentar sin él
-      let productsData: any[] | null = null;
-
-      // Intentar primero con stock_quantity (si existe)
-      const tryWithStock = await (supabase as any)
+      // Cargar productos - Sin stock_quantity para evitar error 400
+      // Ya que stock_quantity puede no existir en la tabla
+      console.log('🛒 Cargando productos del carrito:', { 
+        productIds, 
+        count: productIds.length,
+        userId: session.session.user.id 
+      });
+      
+      const { data: productsDataRaw, error: productsError } = await (supabase as any)
         .from('products')
-        .select('id, title, price, cover_url, status, stock_quantity')
+        .select('id, title, price, cover_url, status')
         .in('id', productIds);
 
-      if (tryWithStock.error && tryWithStock.error.message?.includes('stock_quantity')) {
-        // Si stock_quantity no existe, intentar sin él
-        console.warn('⚠️ stock_quantity no existe aún, continuando sin validación de inventario. Ejecuta add_stock_quantity_column.sql para habilitarlo.');
-        const tryWithoutStock = await (supabase as any)
+      let productsData: any[] | null = null;
+
+      if (productsError) {
+        console.error('❌ Error cargando productos:', {
+          error: productsError,
+          code: productsError.code,
+          message: productsError.message,
+          details: productsError.details,
+          hint: productsError.hint,
+          productIds
+        });
+        
+        // Intentar con menos campos si falla
+        const { data: simpleProducts, error: simpleError } = await (supabase as any)
           .from('products')
-          .select('id, title, price, cover_url, status')
+          .select('id, title, price, cover_url')
           .in('id', productIds);
         
-        if (tryWithoutStock.error) {
-          console.error('Error loading products:', tryWithoutStock.error);
-          setError(`Error al cargar los productos: ${tryWithoutStock.error.message}`);
+        if (simpleError) {
+          console.error('❌ Error en query simple también:', simpleError);
+          setError(`Error al cargar los productos: ${simpleError.message || 'Error desconocido'}. Por favor, intenta recargar la página.`);
           setCartItems([]);
           setLoading(false);
           return;
         }
         
+        productsData = ((simpleProducts || []) as any[]).map((p: any) => ({
+          ...p,
+          status: 'active',
+          stock_quantity: undefined,
+        }));
+      } else {
         // Agregar stock_quantity como undefined para que el código funcione
-        productsData = ((tryWithoutStock.data || []) as any[]).map((p: any) => ({
+        productsData = ((productsDataRaw || []) as any[]).map((p: any) => ({
           ...p,
           stock_quantity: undefined,
         }));
-      } else if (tryWithStock.error) {
-        console.error('Error loading products:', tryWithStock.error);
-        setError(`Error al cargar los productos: ${tryWithStock.error.message}`);
-        setCartItems([]);
-        setLoading(false);
-        return;
-      } else {
-        productsData = tryWithStock.data;
       }
+      
+      console.log('✅ Productos cargados del carrito:', {
+        count: productsData?.length || 0,
+        products: productsData?.map((p: any) => ({ id: p.id, title: p.title, price: p.price }))
+      });
 
       // Combinar cart items con productos
       const productsMap = new Map();
@@ -476,9 +493,21 @@ export function CartPage() {
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-base sm:text-lg text-gray-900 mb-1 line-clamp-2 hover:text-blue-600 transition-colors">
-                        {item.product.title}
-                      </h3>
+                      <Link
+                        href={`/products/${item.product.id}`}
+                        className="block group"
+                      >
+                        <h3 className="font-semibold text-base sm:text-lg text-gray-900 mb-1 line-clamp-2 group-hover:text-blue-600 transition-colors cursor-pointer">
+                          {item.product.title}
+                        </h3>
+                      </Link>
+                      <Link
+                        href={`/products/${item.product.id}`}
+                        className="text-xs text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1 mt-1"
+                      >
+                        <Eye className="w-3 h-3" />
+                        Ver detalles del producto
+                      </Link>
                       <div className="mb-3">
                         <p className="text-gray-600 text-sm">
                           {item.product.price.toLocaleString('es-PY')} Gs. c/u

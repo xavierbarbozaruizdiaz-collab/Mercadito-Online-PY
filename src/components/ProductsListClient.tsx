@@ -1,10 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabaseClient';
 import SearchBar from '@/components/SearchBar';
+import AuctionTimer from '@/components/auction/AuctionTimer';
+import { Clock, Users, Gavel } from 'lucide-react';
 
 type Product = { 
   id: string; 
@@ -18,6 +20,12 @@ type Product = {
   seller_id: string;
   store_id: string | null;
   created_at: string;
+  // Campos de subasta
+  auction_status?: 'scheduled' | 'active' | 'ended' | 'cancelled';
+  auction_start_at?: string;
+  auction_end_at?: string;
+  current_bid?: number;
+  total_bids?: number;
   seller?: {
     id: string;
     first_name: string | null;
@@ -40,7 +48,8 @@ type FilterOptions = {
   maxPrice: string;
   condition: string;
   saleType: string;
-  sortBy: 'price_asc' | 'price_desc' | 'date_desc' | 'date_asc' | 'title_asc';
+  auctionFilter: '' | 'active' | 'ending_soon';
+  sortBy: 'price_asc' | 'price_desc' | 'date_desc' | 'date_asc' | 'title_asc' | 'auction_ending' | 'auction_bids';
 };
 
 export default function ProductsListClient() {
@@ -56,6 +65,7 @@ export default function ProductsListClient() {
     maxPrice: '',
     condition: '',
     saleType: '',
+    auctionFilter: '',
     sortBy: 'date_desc'
   });
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -159,14 +169,78 @@ export default function ProductsListClient() {
           category_id,
           seller_id,
           store_id,
-          created_at
+          created_at,
+          auction_status,
+          auction_start_at,
+          auction_end_at,
+          current_bid,
+          total_bids
         `)
         .or('status.is.null,status.eq.active'); // Incluir productos sin status o activos
 
-      // Filtro de búsqueda - se maneja desde el header ahora
-      // Mantener por si se pasa desde URL params o prop
+      // Por defecto, excluir subastas de la página principal
+      // Solo mostrar subastas si se filtra explícitamente por 'auction'
+      if (!filters.saleType || filters.saleType !== 'auction') {
+        query = query.neq('sale_type', 'auction');
+      }
+
+      // Filtro de búsqueda - incluye título, descripción, y también busca por vendedor/tienda
+      // Primero, si hay búsqueda, intentar encontrar stores y sellers que coincidan
+      let matchingStoreIds: string[] = [];
+      let matchingSellerIds: string[] = [];
+      
       if (filters.search.trim()) {
-        query = query.or(`title.ilike.%${filters.search}%,description.ilike.%${filters.search}%`);
+        const searchTerm = filters.search.trim();
+        
+        try {
+          // Buscar stores que coincidan con el nombre
+          const { data: matchingStores } = await supabase
+            .from('stores')
+            .select('id, seller_id')
+            .or(`name.ilike.%${searchTerm}%`)
+            .eq('is_active', true)
+            .limit(100);
+          
+          if (matchingStores) {
+            matchingStoreIds = matchingStores.map((s: any) => s.id);
+            matchingSellerIds = matchingStores.map((s: any) => s.seller_id).filter(Boolean);
+          }
+          
+          // Buscar sellers (profiles) que coincidan con el nombre
+          const { data: matchingProfiles } = await supabase
+            .from('profiles')
+            .select('id')
+            .or(`first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`)
+            .eq('role', 'seller')
+            .limit(100);
+          
+          if (matchingProfiles) {
+            matchingSellerIds = [...new Set([...matchingSellerIds, ...matchingProfiles.map((p: any) => p.id)])];
+          }
+        } catch (err) {
+          console.warn('Error buscando stores/sellers:', err);
+          // Continuar con la búsqueda normal si falla
+        }
+        
+        // Construir filtro de búsqueda que incluya:
+        // 1. Título y descripción del producto
+        // 2. Productos de stores que coincidan
+        // 3. Productos de sellers que coincidan
+        const searchConditions: string[] = [
+          `title.ilike.%${searchTerm}%`,
+          `description.ilike.%${searchTerm}%`
+        ];
+        
+        // Agregar condiciones para stores y sellers si hay coincidencias
+        if (matchingStoreIds.length > 0) {
+          searchConditions.push(`store_id.in.(${matchingStoreIds.join(',')})`);
+        }
+        
+        if (matchingSellerIds.length > 0) {
+          searchConditions.push(`seller_id.in.(${matchingSellerIds.join(',')})`);
+        }
+        
+        query = query.or(searchConditions.join(','));
       }
 
       // Filtro de categoría
@@ -194,6 +268,19 @@ export default function ProductsListClient() {
         query = query.eq('sale_type', filters.saleType);
       }
 
+      // Filtros especiales para subastas
+      if (filters.auctionFilter === 'active') {
+        query = query.eq('sale_type', 'auction').eq('auction_status', 'active');
+      } else if (filters.auctionFilter === 'ending_soon') {
+        const now = new Date();
+        const oneHourFromNow = new Date(now.getTime() + 60 * 60 * 1000);
+        query = query
+          .eq('sale_type', 'auction')
+          .eq('auction_status', 'active')
+          .gte('auction_end_at', now.toISOString())
+          .lte('auction_end_at', oneHourFromNow.toISOString());
+      }
+
       // Ordenamiento
       switch (filters.sortBy) {
         case 'price_asc':
@@ -210,6 +297,12 @@ export default function ProductsListClient() {
           break;
         case 'title_asc':
           query = query.order('title', { ascending: true });
+          break;
+        case 'auction_ending':
+          query = query.order('auction_end_at', { ascending: true });
+          break;
+        case 'auction_bids':
+          query = query.order('total_bids', { ascending: false });
           break;
       }
 
@@ -300,11 +393,56 @@ export default function ProductsListClient() {
         }
 
         // Enriquecer productos (todos, no solo los primeros 50)
-        const enrichedProducts = (productsData as any[]).map((product: any) => ({
+        let enrichedProducts = (productsData as any[]).map((product: any) => ({
           ...product,
           seller: sellersMap[product.seller_id] || null,
           store: storesMap[product.store_id] || null,
+          // Asegurar valores por defecto para subastas
+          auction_status: product.auction_status || null,
+          auction_start_at: product.auction_start_at || null,
+          auction_end_at: product.auction_end_at || null,
+          current_bid: product.current_bid || null,
+          total_bids: product.total_bids || 0,
         }));
+
+        // Filtro adicional por nombre de vendedor o tienda (si hay búsqueda)
+        if (filters.search.trim()) {
+          const searchLower = filters.search.toLowerCase();
+          enrichedProducts = enrichedProducts.filter((product: any) => {
+            // Buscar en título y descripción (ya se hizo en la query, pero mantenemos por si acaso)
+            const matchesProduct = 
+              product.title?.toLowerCase().includes(searchLower) ||
+              product.description?.toLowerCase().includes(searchLower);
+            
+            // Buscar en nombre del vendedor
+            const matchesSeller = 
+              product.seller?.display_name?.toLowerCase().includes(searchLower) ||
+              product.seller?.first_name?.toLowerCase().includes(searchLower) ||
+              product.seller?.last_name?.toLowerCase().includes(searchLower);
+            
+            // Buscar en nombre de la tienda
+            const matchesStore = 
+              product.store?.name?.toLowerCase().includes(searchLower);
+            
+            return matchesProduct || matchesSeller || matchesStore;
+          });
+        }
+
+        // Ordenamiento adicional para subastas (si es necesario ordenar por fecha de fin)
+        if (filters.sortBy === 'auction_ending') {
+          enrichedProducts.sort((a: any, b: any) => {
+            if (!a.auction_end_at && !b.auction_end_at) return 0;
+            if (!a.auction_end_at) return 1;
+            if (!b.auction_end_at) return -1;
+            return new Date(a.auction_end_at).getTime() - new Date(b.auction_end_at).getTime();
+          });
+        } else if (filters.sortBy === 'auction_bids') {
+          enrichedProducts.sort((a: any, b: any) => {
+            const bidsA = a.total_bids || 0;
+            const bidsB = b.total_bids || 0;
+            return bidsB - bidsA;
+          });
+        }
 
         setProducts(enrichedProducts);
       } else {
@@ -336,6 +474,7 @@ export default function ProductsListClient() {
       maxPrice: '',
       condition: '',
       saleType: '',
+      auctionFilter: '',
       sortBy: 'date_desc'
     });
   }
@@ -357,7 +496,7 @@ export default function ProductsListClient() {
             <span>Ver Todas las Tiendas</span>
           </a>
 
-          {/* Ordenamiento */}
+            {/* Ordenamiento */}
           <div className="sm:w-48">
             <select
               value={filters.sortBy}
@@ -369,6 +508,8 @@ export default function ProductsListClient() {
               <option value="price_asc">Precio: menor a mayor</option>
               <option value="price_desc">Precio: mayor a menor</option>
               <option value="title_asc">Nombre A-Z</option>
+              <option value="auction_ending">Subastas: Finalizan pronto</option>
+              <option value="auction_bids">Subastas: Más pujas</option>
             </select>
           </div>
         </div>
@@ -485,6 +626,22 @@ export default function ProductsListClient() {
                 <option value="auction">Subasta</option>
               </select>
             </div>
+
+            {/* Filtro especial para subastas */}
+            {filters.saleType === 'auction' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Filtro de subastas</label>
+                <select
+                  value={filters.auctionFilter}
+                  onChange={(e) => updateFilter('auctionFilter', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Todas las subastas</option>
+                  <option value="active">Solo activas</option>
+                  <option value="ending_soon">Finalizan en menos de 1 hora</option>
+                </select>
+              </div>
+            )}
           </div>
           </div>
         </div>
@@ -527,15 +684,24 @@ export default function ProductsListClient() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
-            {products.map((product) => (
-              <div key={product.id} className="bg-white rounded-lg shadow-sm border overflow-hidden hover:shadow-md transition-shadow">
+            {products.map((product) => {
+              const isAuction = product.sale_type === 'auction';
+              const isActiveAuction = isAuction && product.auction_status === 'active';
+              const auctionEndAt = product.auction_end_at ? new Date(product.auction_end_at).getTime() : 0;
+              const serverNow = Date.now(); // Tiempo actual para el timer
+              const endsInOneHour = isActiveAuction && auctionEndAt > serverNow && auctionEndAt <= serverNow + 60 * 60 * 1000;
+              
+              return (
+              <div key={product.id} className={`bg-white rounded-lg shadow-sm border overflow-hidden hover:shadow-md transition-shadow ${
+                endsInOneHour ? 'ring-2 ring-orange-300 bg-orange-50' : ''
+              }`}>
                 <div className="relative">
                   <img
                     src={product.cover_url ?? 'https://placehold.co/400x300?text=Producto'}
                     alt={product.title}
                     className="w-full h-48 object-cover"
                   />
-                  <div className="absolute top-2 left-2">
+                  <div className="absolute top-2 left-2 flex flex-col gap-1">
                     <span className={`px-2 py-1 text-xs rounded-full ${
                       product.condition === 'nuevo' 
                         ? 'bg-green-100 text-green-800' 
@@ -546,15 +712,28 @@ export default function ProductsListClient() {
                       {product.condition === 'nuevo' ? 'Nuevo' : 
                        product.condition === 'usado_como_nuevo' ? 'Usado como nuevo' : 'Usado'}
                     </span>
+                    {endsInOneHour && (
+                      <span className="px-2 py-1 text-xs rounded-full bg-red-100 text-red-800 animate-pulse flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        Finaliza pronto
+                      </span>
+                    )}
                   </div>
-                  <div className="absolute top-2 right-2">
-                    <span className={`px-2 py-1 text-xs rounded-full ${
-                      product.sale_type === 'auction' 
+                  <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
+                    <span className={`px-2 py-1 text-xs rounded-full flex items-center gap-1 ${
+                      isAuction 
                         ? 'bg-purple-100 text-purple-800' 
                         : 'bg-blue-100 text-blue-800'
                     }`}>
-                      {product.sale_type === 'auction' ? 'Subasta' : 'Directa'}
+                      {isAuction && <Gavel className="h-3 w-3" />}
+                      {isAuction ? 'Subasta' : 'Directa'}
                     </span>
+                    {isActiveAuction && product.total_bids !== undefined && product.total_bids > 0 && (
+                      <span className="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800 flex items-center gap-1">
+                        <Users className="h-3 w-3" />
+                        {product.total_bids} {product.total_bids === 1 ? 'puja' : 'pujas'}
+                      </span>
+                    )}
                   </div>
                 </div>
                 
@@ -562,6 +741,19 @@ export default function ProductsListClient() {
                   <h3 className="font-semibold text-lg mb-2 line-clamp-2">{product.title}</h3>
                   {product.description && (
                     <p className="text-gray-600 text-sm mb-3 line-clamp-2">{product.description}</p>
+                  )}
+                  
+                  {/* Timer para subastas activas */}
+                  {isActiveAuction && product.auction_end_at && auctionEndAt > serverNow && (
+                    <div className="mb-3 pb-3 border-b border-gray-200">
+                      <AuctionTimer
+                        endAtMs={auctionEndAt}
+                        serverNowMs={serverNow}
+                        variant="compact"
+                        size="md"
+                        tickMs={1000}
+                      />
+                    </div>
                   )}
                   
                   {/* Información del vendedor/tienda */}
@@ -603,20 +795,32 @@ export default function ProductsListClient() {
                     </div>
                   )}
                   
-                  <div className="flex justify-between items-center">
-                    <p className="text-xl font-bold text-green-600">
-                      {product.price.toLocaleString('es-PY')} Gs.
-                    </p>
+                  <div className="flex flex-col gap-2">
+                    <div className="flex justify-between items-center">
+                      {isAuction && isActiveAuction ? (
+                        <div className="flex flex-col">
+                          <span className="text-xs text-gray-500">Puja actual</span>
+                          <p className="text-xl font-bold text-purple-600">
+                            {(product.current_bid || product.price).toLocaleString('es-PY')} Gs.
+                          </p>
+                        </div>
+                      ) : (
+                        <p className="text-xl font-bold text-green-600">
+                          {product.price.toLocaleString('es-PY')} Gs.
+                        </p>
+                      )}
+                    </div>
                     <a
-                      href={`/products/${product.id}`}
-                      className="px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 transition-colors"
+                      href={isAuction ? `/auctions/${product.id}` : `/products/${product.id}`}
+                      className="px-3 py-2 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 transition-colors text-center font-medium"
                     >
-                      Ver detalles
+                      {isAuction ? 'Ver subasta' : 'Ver detalles'}
                     </a>
                   </div>
                 </div>
         </div>
-      ))}
+              );
+            })}
           </div>
         </>
       )}

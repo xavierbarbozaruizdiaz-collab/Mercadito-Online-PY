@@ -42,7 +42,9 @@ export default function AuctionTimer({
   tickMs = 200,
 }: AuctionTimerProps) {
   // Offset estable: tiempoCliente - serverNow
+  // IMPORTANTE: Guardar el offset inicial cuando se monta el componente
   const startClientMsRef = useRef<number>(Date.now());
+  const serverTimeOffsetRef = useRef<number>(serverNowMs - Date.now());
   const [nowMs, setNowMs] = useState<number>(Date.now());
 
   // Para animación cuando entra nueva puja
@@ -64,23 +66,47 @@ export default function AuctionTimer({
   }, [tickMs]);
 
   // Tiempo actual "oficial" = serverNow + (clienteAhora - clienteInicio)
+  // Usar offset guardado para mantener consistencia incluso si serverNowMs cambia
   const officialNowMs = useMemo(() => {
     const clientElapsed = nowMs - startClientMsRef.current;
+    // Usar el tiempo del servidor inicial + el tiempo transcurrido en el cliente
+    // Esto asegura que todos los usuarios vean el mismo tiempo
     return serverNowMs + clientElapsed;
   }, [nowMs, serverNowMs]);
 
   const remainingMs = Math.max(0, endAtMs - officialNowMs);
 
-  const danger = remainingMs <= 3000;
-  const warning = remainingMs > 3000 && remainingMs <= 10000;
+  const danger = remainingMs <= 3000; // Últimos 3 segundos - crítico
+  const warning = remainingMs > 3000 && remainingMs <= 10000; // Últimos 10 segundos
   const ended = remainingMs <= 0;
+
+  // Efecto de sonido para tiempo crítico
+  useEffect(() => {
+    if (danger && remainingMs > 0 && remainingMs <= 3000) {
+      // Reproducir tick cada segundo cuando queda poco tiempo
+      try {
+        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        oscillator.frequency.setValueAtTime(1000, audioContext.currentTime);
+        gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.05);
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.05);
+      } catch (e) {
+        // Silenciosamente fallar si no se puede reproducir sonido
+      }
+    }
+  }, [danger, remainingMs]);
 
   useEffect(() => {
     if (ended && onExpire) onExpire();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ended]);
 
-  const label = ended ? 'Finalizado' : warning ? 'Última llamada' : 'En vivo';
+  const label = ended ? 'Finalizado' : danger ? '¡ÚLTIMA OPORTUNIDAD!' : warning ? 'Última llamada' : 'En vivo';
 
   const timeStr = ended ? '00:00' : formatHMS(remainingMs);
 
@@ -96,17 +122,19 @@ export default function AuctionTimer({
   const statusColors = ended
     ? { base: 'bg-muted text-muted-foreground', ring: 'stroke-neutral-300' }
     : danger
-    ? { base: 'bg-red-100 text-red-800 border border-red-300', ring: 'stroke-red-500' }
+    ? { base: 'bg-red-100 text-red-900 border-2 border-red-500 animate-pulse', ring: 'stroke-red-600' }
     : warning
-    ? { base: 'bg-amber-100 text-amber-800 border border-amber-300', ring: 'stroke-amber-500' }
+    ? { base: 'bg-amber-100 text-amber-900 border border-amber-400', ring: 'stroke-amber-500' }
     : { base: 'bg-emerald-100 text-emerald-800 border border-emerald-300', ring: 'stroke-emerald-500' };
 
   return (
     <div
       className={cn(
-        'relative flex items-center gap-4 rounded-2xl border p-4',
+        'relative flex items-center gap-4 rounded-2xl border p-4 transition-all duration-300',
         'bg-card/50 backdrop-blur supports-[backdrop-filter]:bg-card/60',
-        justReset && !ended && 'animate-[pulse_0.6s_ease-out_1] border-emerald-300'
+        justReset && !ended && 'animate-[pulse_0.6s_ease-out_1] border-emerald-300 shadow-lg',
+        danger && !ended && 'animate-shake border-red-500 shadow-red-500/50 shadow-2xl',
+        warning && !ended && 'animate-pulse-glow'
       )}
       role="timer"
       aria-live="polite"

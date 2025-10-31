@@ -155,14 +155,14 @@ export default async function ProductPage(
   const category = p.categories && p.categories.length > 0 ? p.categories[0] : null;
 
   // Preparar array de imágenes: si hay imágenes en product_images, usarlas; si no, usar cover_url
-  const images = (productImages && productImages.length > 0) 
-    ? productImages.map((img: any) => img.url).sort((a: string, b: string) => {
-        // Ordenar por idx si está disponible
-        const imgA = productImages.find((img: any) => img.url === a);
-        const imgB = productImages.find((img: any) => img.url === b);
-        return (imgA?.idx || 0) - (imgB?.idx || 0);
-      })
-    : (p.cover_url ? [p.cover_url] : []);
+        const images = (productImages && productImages.length > 0) 
+          ? productImages.map((img: any) => img.url).sort((a: string, b: string) => {
+              // Ordenar por idx si está disponible
+              const imgA = productImages.find((img: any) => img.url === a) as any;
+              const imgB = productImages.find((img: any) => img.url === b) as any;
+              return (imgA?.idx || 0) - (imgB?.idx || 0);
+            })
+          : (p.cover_url ? [p.cover_url] : []);
   
   // Si no hay imágenes, usar placeholder
   const displayImages = images.length > 0 ? images : ['https://placehold.co/800x600?text=Producto'];
@@ -250,13 +250,26 @@ export default async function ProductPage(
               </div>
             )}
 
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+            <div className={`${p.sale_type === 'auction' ? 'bg-yellow-50 border-yellow-200' : 'bg-green-50 border-green-200'} border rounded-lg p-4`}>
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-green-600 font-medium">Precio</p>
-                  <p className="text-3xl font-bold text-green-700">
+                  {p.sale_type === 'auction' && (
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-lg">🔨</span>
+                      <span className="text-xs bg-yellow-500 text-white px-2 py-1 rounded-full font-bold">SUBASTA</span>
+                    </div>
+                  )}
+                  <p className={`text-sm ${p.sale_type === 'auction' ? 'text-yellow-600' : 'text-green-600'} font-medium`}>
+                    {p.sale_type === 'auction' ? 'Precio base' : 'Precio'}
+                  </p>
+                  <p className={`text-3xl font-bold ${p.sale_type === 'auction' ? 'text-yellow-700' : 'text-green-700'}`}>
                     {Number(p.price).toLocaleString('es-PY')} Gs.
                   </p>
+                  {p.sale_type === 'auction' && (
+                    <p className="text-xs text-yellow-600 mt-1">
+                      Los compradores pueden ofertar. El mejor precio gana.
+                    </p>
+                  )}
                 </div>
                 <div className="text-right">
                   <p className="text-sm text-gray-500">Publicado</p>

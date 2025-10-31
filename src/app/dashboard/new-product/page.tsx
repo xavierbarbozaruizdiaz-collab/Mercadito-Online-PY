@@ -182,9 +182,15 @@ export default function NewProduct() {
         }
         break;
       case 'price':
-        if (!value || Number(value) <= 0) {
-          errors.price = 'El precio debe ser mayor a 0';
+        // Solo validar precio si NO es subasta
+        if (saleType !== 'auction') {
+          if (!value || Number(value) <= 0) {
+            errors.price = 'El precio debe ser mayor a 0';
+          } else {
+            delete errors.price;
+          }
         } else {
+          // Si es subasta, eliminar cualquier error de precio
           delete errors.price;
         }
         break;
@@ -209,16 +215,21 @@ export default function NewProduct() {
 
   // Validar formulario completo
   const isFormValid = useMemo(() => {
+    // Para subastas, validar precio base en lugar de precio normal
+    const priceValid = saleType === 'auction' 
+      ? (auctionStartingPrice && Number(auctionStartingPrice) > 0 && auctionStartDate)
+      : (priceNumber > 0);
+    
     return (
       title.trim().length >= 3 &&
-      priceNumber > 0 &&
+      priceValid &&
       categoryId &&
       imagePreviews.length > 0 &&
       // Si el usuario tiene tiendas, debe elegir una
       ((stores?.length || 0) === 0 || !!storeId) &&
       Object.keys(validationErrors).length === 0
     );
-  }, [title, priceNumber, categoryId, imagePreviews.length, validationErrors, stores?.length, storeId]);
+  }, [title, priceNumber, categoryId, imagePreviews.length, validationErrors, stores?.length, storeId, saleType, auctionStartingPrice, auctionStartDate]);
 
   // Procesar archivos (común para input y drag&drop)
   function processFiles(files: FileList | File[]) {
@@ -386,9 +397,10 @@ export default function NewProduct() {
           throw new Error('La fecha de inicio de subasta es requerida');
         }
         const startDate = new Date(auctionStartDate);
-        if (startDate < new Date()) {
-          throw new Error('La fecha de inicio debe ser en el futuro');
-        }
+        // Permitir fechas pasadas para pruebas (comentar para producción)
+        // if (startDate < new Date()) {
+        //   throw new Error('La fecha de inicio debe ser en el futuro');
+        // }
         if (auctionBuyNowPrice && Number(auctionBuyNowPrice) <= Number(auctionStartingPrice)) {
           throw new Error('El precio de compra ahora debe ser mayor que el precio base');
         }
@@ -452,16 +464,49 @@ export default function NewProduct() {
         auction: saleType === 'auction' ? cleanAttributes.auction : null,
       });
 
-      // Calcular fecha de fin de subasta (24 horas por defecto)
+      // Calcular fecha de fin de subasta
       let auctionStartAt: string | null = null;
       let auctionEndAt: string | null = null;
       
       if (saleType === 'auction') {
+        // auctionStartDate viene del input datetime-local como "YYYY-MM-DDTHH:mm"
+        // Este formato se interpreta como hora LOCAL del navegador
+        // JavaScript automáticamente convierte a UTC al usar toISOString()
+        
         const startDate = new Date(auctionStartDate);
+        
+        // Logs para debugging de zona horaria
+        const timezoneOffset = startDate.getTimezoneOffset(); // en minutos
+        const paraguayOffset = -240; // UTC-4 = -240 minutos (o -180 para UTC-3 en horario de verano)
+        
+        console.log('🕐 Información de zona horaria:', {
+          horaIngresada: auctionStartDate,
+          horaInterpretadaLocal: startDate.toString(),
+          horaUTC: startDate.toISOString(),
+          offsetZonaHoraria: timezoneOffset,
+          offsetParaguay: paraguayOffset,
+          diferenciaConParaguay: timezoneOffset - paraguayOffset,
+          esCorrecto: Math.abs(timezoneOffset - paraguayOffset) <= 60 // tolerancia de 1 hora
+        });
+        
+        // Si el offset no coincide con Paraguay, advertir (pero continuar)
+        if (Math.abs(timezoneOffset - paraguayOffset) > 60) {
+          console.warn('⚠️ ADVERTENCIA: La zona horaria del navegador no coincide con Paraguay (UTC-4). Puede haber diferencias en las fechas.');
+        }
+        
         auctionStartAt = startDate.toISOString();
-        // Duración por defecto: 24 horas (1440 minutos)
-        const durationMinutes = 1440;
+        
+        // Duración para pruebas: 5 minutos (300 segundos)
+        // Cambiar a 1440 para producción (24 horas)
+        const durationMinutes = 5; // 5 minutos para pruebas - cambiar a 1440 para producción
         auctionEndAt = new Date(startDate.getTime() + durationMinutes * 60 * 1000).toISOString();
+        
+        console.log('📅 Fechas de subasta configuradas:', {
+          inicioLocal: auctionStartDate,
+          inicioUTC: auctionStartAt,
+          finUTC: auctionEndAt,
+          duracionMinutos: durationMinutes
+        });
       }
 
       // 1. Insertar producto
@@ -481,7 +526,17 @@ export default function NewProduct() {
       
       // Agregar campos de subasta si aplica
       if (saleType === 'auction') {
-        productData.auction_status = 'scheduled';
+        // Determinar el estado inicial de la subasta
+        // Si la fecha de inicio ya pasó o está muy cerca (dentro de 2 minutos), activar inmediatamente
+        const startDate = new Date(auctionStartAt);
+        const now = new Date();
+        const timeDiff = startDate.getTime() - now.getTime();
+        const twoMinutes = 2 * 60 * 1000; // 2 minutos de tolerancia
+        
+        // Si la fecha ya pasó o está dentro de 2 minutos, activar inmediatamente
+        const shouldBeActive = timeDiff <= twoMinutes;
+        
+        productData.auction_status = shouldBeActive ? 'active' : 'scheduled';
         productData.auction_start_at = auctionStartAt;
         productData.auction_end_at = auctionEndAt;
         productData.current_bid = finalPrice; // Precio inicial
@@ -492,6 +547,14 @@ export default function NewProduct() {
         if (auctionBuyNowPrice && Number(auctionBuyNowPrice) > 0) {
           productData.buy_now_price = Number(auctionBuyNowPrice);
         }
+        
+        console.log('🎯 Estado inicial de subasta:', {
+          auction_status: productData.auction_status,
+          startAt: auctionStartAt,
+          now: now.toISOString(),
+          timeDiff: timeDiff,
+          shouldBeActive
+        });
       }
       
       console.log('💾 Guardando producto:', {
@@ -717,6 +780,14 @@ export default function NewProduct() {
               type="button"
               onClick={() => {
                 setSaleType('auction');
+                // Limpiar error de validación del precio ya que no será requerido
+                if (validationErrors.price) {
+                  setValidationErrors(prev => {
+                    const newErrors = { ...prev };
+                    delete newErrors.price;
+                    return newErrors;
+                  });
+                }
                 console.log('Tipo de venta cambiado a: auction');
               }}
               className={`relative p-4 border-2 rounded-lg transition-all text-left ${
@@ -760,126 +831,58 @@ export default function NewProduct() {
 
         {/* Precio y Condición */}
         <div className="grid md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">
-              {saleType === 'auction' ? 'Precio base (Gs.)' : 'Precio (Gs.)'} *
-            </label>
-            <input
-              type="number"
-              inputMode="numeric"
-              min="0"
-              value={price}
-              onChange={(e) => {
-                setPrice(e.target.value);
-                validateField('price', e.target.value);
-              }}
-              className={`border p-2 w-full rounded ${
-                validationErrors.price ? 'border-red-500' : priceNumber > 0 ? 'border-green-500' : ''
-              }`}
-              required
-            />
-            {validationErrors.price && (
-              <p className="text-red-500 text-sm mt-1">{validationErrors.price}</p>
-            )}
-          </div>
-
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium mb-3">Tipo de venta *</label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Opción: Venta Directa */}
-              <button
-                type="button"
-                onClick={() => {
-                  setSaleType('direct');
-                  console.log('Tipo de venta cambiado a: direct');
+          {/* Solo mostrar precio si NO es subasta */}
+          {saleType !== 'auction' && (
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Precio (Gs.) *
+              </label>
+              <input
+                type="number"
+                inputMode="numeric"
+                min="0"
+                value={price}
+                onChange={(e) => {
+                  setPrice(e.target.value);
+                  if (saleType !== 'auction') {
+                    validateField('price', e.target.value);
+                  }
                 }}
-                className={`relative p-4 border-2 rounded-lg transition-all text-left ${
-                  saleType === 'direct'
-                    ? 'border-blue-500 bg-blue-50 shadow-md ring-2 ring-blue-200'
-                    : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'
+                className={`border p-2 w-full rounded ${
+                  validationErrors.price ? 'border-red-500' : priceNumber > 0 ? 'border-green-500' : ''
                 }`}
-              >
-                <div className="flex items-start gap-3">
-                  <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center mt-0.5 ${
-                    saleType === 'direct' 
-                      ? 'border-blue-500 bg-blue-500' 
-                      : 'border-gray-300 bg-white'
-                  }`}>
-                    {saleType === 'direct' && (
-                      <div className="w-2 h-2 rounded-full bg-white"></div>
-                    )}
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xl">💰</span>
-                      <h3 className={`font-semibold ${
-                        saleType === 'direct' ? 'text-blue-900' : 'text-gray-900'
-                      }`}>
-                        Precio Fijo
-                      </h3>
-                      {saleType === 'direct' && (
-                        <span className="text-xs bg-blue-500 text-white px-2 py-0.5 rounded-full">Seleccionado</span>
-                      )}
-                    </div>
-                    <p className={`text-sm ${
-                      saleType === 'direct' ? 'text-blue-700' : 'text-gray-600'
-                    }`}>
-                      El comprador paga el precio establecido directamente. Ideal para ventas rápidas.
-                    </p>
-                  </div>
-                </div>
-              </button>
-
-              {/* Opción: Subasta */}
-              <button
-                type="button"
-                onClick={() => {
-                  setSaleType('auction');
-                  console.log('Tipo de venta cambiado a: auction');
-                }}
-                className={`relative p-4 border-2 rounded-lg transition-all text-left ${
-                  saleType === 'auction'
-                    ? 'border-yellow-500 bg-yellow-50 shadow-md ring-2 ring-yellow-200'
-                    : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'
-                }`}
-              >
-                <div className="flex items-start gap-3">
-                  <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center mt-0.5 ${
-                    saleType === 'auction' 
-                      ? 'border-yellow-500 bg-yellow-500' 
-                      : 'border-gray-300 bg-white'
-                  }`}>
-                    {saleType === 'auction' && (
-                      <div className="w-2 h-2 rounded-full bg-white"></div>
-                    )}
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xl">🔨</span>
-                      <h3 className={`font-semibold ${
-                        saleType === 'auction' ? 'text-yellow-900' : 'text-gray-900'
-                      }`}>
-                        Subasta
-                      </h3>
-                      {saleType === 'auction' && (
-                        <span className="text-xs bg-yellow-500 text-white px-2 py-0.5 rounded-full">Seleccionado</span>
-                      )}
-                    </div>
-                    <p className={`text-sm ${
-                      saleType === 'auction' ? 'text-yellow-700' : 'text-gray-600'
-                    }`}>
-                      Los compradores ofertan y el mejor precio gana. Puedes establecer precio mínimo y "compra ahora".
-                    </p>
-                  </div>
-                </div>
-              </button>
+                required={saleType !== 'auction'}
+              />
+              {validationErrors.price && (
+                <p className="text-red-500 text-sm mt-1">{validationErrors.price}</p>
+              )}
             </div>
-          </div>
+          )}
 
-          {/* Campos específicos de subasta */}
+          <div>
+            <label className="block text-sm font-medium mb-1">Condición *</label>
+            <select
+              value={condition}
+              onChange={(e) => setCondition(e.target.value as any)}
+              className="border p-2 w-full rounded"
+              required
+            >
+              <option value="nuevo">Nuevo</option>
+              <option value="usado_como_nuevo">Usado como nuevo</option>
+              <option value="usado">Usado</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Campos específicos de subasta */}
           {saleType === 'auction' && (
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 space-y-4">
-              <h3 className="font-semibold text-yellow-900 mb-3">🔨 Información de la Subasta</h3>
+              <div className="mb-4">
+                <h3 className="font-semibold text-yellow-900 mb-2">🔨 Información de la Subasta</h3>
+                <p className="text-sm text-yellow-800">
+                  Configura los detalles de tu subasta. Los compradores podrán pujar desde el precio base.
+                </p>
+              </div>
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-1">Precio base (Gs.) *</label>
@@ -892,50 +895,55 @@ export default function NewProduct() {
                     className="border p-2 w-full rounded"
                     required={saleType === 'auction'}
                   />
-                  <p className="text-xs text-gray-500 mt-1">Precio mínimo de la subasta</p>
+                  <p className="text-xs text-gray-600 mt-1 font-medium">💰 Precio inicial</p>
+                  <p className="text-xs text-gray-500">
+                    Este es el precio mínimo desde el cual los compradores podrán hacer pujas. La primera puja debe ser igual o mayor a este monto.
+                  </p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Compra ahora (Gs.)</label>
+                  <label className="block text-sm font-medium mb-1">Compra ahora (Gs.) <span className="text-gray-400 font-normal">(Opcional)</span></label>
                   <input
                     type="number"
-                    placeholder="Ej: 200000 (opcional)"
+                    placeholder="Ej: 200000"
                     min="0"
                     value={auctionBuyNowPrice}
                     onChange={(e) => setAuctionBuyNowPrice(e.target.value)}
                     className="border p-2 w-full rounded"
                   />
-                  <p className="text-xs text-gray-500 mt-1">Precio para compra inmediata (opcional)</p>
+                  <p className="text-xs text-gray-600 mt-1 font-medium">⚡ Compra inmediata</p>
+                  <p className="text-xs text-gray-500">
+                    Si lo configuras, un comprador podrá comprar el producto inmediatamente a este precio sin esperar el final de la subasta. Debe ser mayor que el precio base.
+                  </p>
                 </div>
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium mb-1">Fecha de inicio de subasta *</label>
+                  <label className="block text-sm font-medium mb-1">Fecha y hora de inicio *</label>
                   <input
                     type="datetime-local"
                     value={auctionStartDate}
                     onChange={(e) => setAuctionStartDate(e.target.value)}
                     className="border p-2 w-full rounded"
                     required={saleType === 'auction'}
-                    min={new Date().toISOString().slice(0, 16)}
+                    // Remover min para permitir fechas pasadas en pruebas
+                    // min={new Date().toISOString().slice(0, 16)}
                   />
-                  <p className="text-xs text-gray-500 mt-1">Cuándo comenzará la subasta</p>
+                  <p className="text-xs text-gray-600 mt-1 font-medium">📅 Inicio de la subasta</p>
+                  <p className="text-xs text-gray-500">
+                    La subasta comenzará automáticamente en esta fecha y hora. <strong>Duración para pruebas: 5 minutos</strong> desde el inicio. Puedes seleccionar una fecha pasada para iniciar inmediatamente.
+                  </p>
                 </div>
+              </div>
+              <div className="mt-4 p-3 bg-yellow-100 border border-yellow-300 rounded-lg">
+                <p className="text-xs text-yellow-900">
+                  <strong>💡 ¿Cómo funcionan las subastas?</strong><br/>
+                  • Los compradores pujan incrementando el precio<br/>
+                  • <strong>Duración: 5 minutos</strong> desde la fecha de inicio (modo prueba)<br/>
+                  • Quien ofrezca el precio más alto al finalizar gana<br/>
+                  • Si configuraste "Compra ahora", alguien puede comprarlo inmediatamente<br/>
+                  • Puedes usar una fecha pasada para iniciar la subasta inmediatamente
+                </p>
               </div>
             </div>
           )}
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Condición</label>
-            <select
-              className="border p-2 w-full rounded"
-              value={condition}
-              onChange={(e) => setCondition(e.target.value as 'nuevo' | 'usado_como_nuevo' | 'usado')}
-              required
-            >
-              <option value="nuevo">Nuevo</option>
-              <option value="usado_como_nuevo">Usado como nuevo</option>
-              <option value="usado">Usado</option>
-            </select>
-          </div>
-        </div>
 
         {/* Tienda / Publicar desde */}
         <div>

@@ -125,20 +125,29 @@ export default function Dashboard() {
           await loadSellerStats(session.session.user.id);
         }
 
+        // Cargar productos SIN caché para asegurar datos actualizados
         const { data, error } = await supabase
           .from('products')
           .select('id, title, price, cover_url, created_at, sale_type')
           .eq('seller_id', session.session.user.id)
           .order('created_at', { ascending: false });
 
-        if (error) throw error;
+        if (error) {
+          console.error('❌ Error al cargar productos:', error);
+          throw error;
+        }
+        
         const productsData = (data || []) as Product[];
-        console.log('📦 Productos cargados:', {
+        console.log('📦 Productos cargados desde BD:', {
           total: productsData.length,
           auctions: productsData.filter(p => p.sale_type === 'auction').length,
           direct: productsData.filter(p => p.sale_type === 'direct').length,
+          productIds: productsData.map(p => p.id),
           products: productsData.map(p => ({ id: p.id, title: p.title, sale_type: p.sale_type }))
         });
+        
+        // Los productos ya están filtrados por seller_id, así que confiamos en la query
+        // Si hay productos eliminados, no deberían aparecer por RLS
         setAllProducts(productsData);
         setProducts(productsData);
       } catch (err) {
@@ -322,21 +331,170 @@ export default function Dashboard() {
     setDeletingId(productId);
     
     try {
+      console.log('🗑️ Eliminando producto:', productId);
+      
+      // 0. Verificar que el producto existe y que el usuario es el dueño
+      const { data: session } = await supabase.auth.getSession();
+      if (!session?.session?.user?.id) {
+        throw new Error('No hay sesión activa');
+      }
+      
+      const userId = session.session.user.id;
+      
+      // Verificar que el producto existe y pertenece al usuario
+      const { data: productToDelete, error: checkError } = await supabase
+        .from('products')
+        .select('id, seller_id, title')
+        .eq('id', productId)
+        .single();
+      
+      if (checkError || !productToDelete) {
+        console.error('❌ Producto no encontrado o error al verificar:', checkError);
+        throw new Error('Producto no encontrado');
+      }
+      
+      if (productToDelete.seller_id !== userId) {
+        console.error('❌ El producto no pertenece al usuario actual');
+        console.log('Producto seller_id:', productToDelete.seller_id);
+        console.log('Usuario actual:', userId);
+        throw new Error('No tienes permiso para eliminar este producto');
+      }
+      
+      console.log('✅ Verificación: Producto pertenece al usuario. Eliminando...', {
+        productId,
+        title: productToDelete.title,
+        sellerId: productToDelete.seller_id,
+        currentUserId: userId
+      });
+      
       // 1. Obtener imágenes del producto para eliminarlas del storage
       const { data: images } = await supabase
         .from('product_images')
         .select('url')
         .eq('product_id', productId);
 
-      // 2. Eliminar producto (esto eliminará automáticamente las imágenes por CASCADE)
-      const { error } = await supabase
-        .from('products')
-        .delete()
-        .eq('id', productId);
+      console.log('📸 Imágenes encontradas:', images?.length || 0);
 
-      if (error) throw error;
+      // 2. Verificar sesión antes de DELETE
+      const { data: currentSession } = await supabase.auth.getSession();
+      console.log('🔐 Sesión actual:', {
+        hasSession: !!currentSession?.session,
+        userId: currentSession?.session?.user?.id,
+        email: currentSession?.session?.user?.email
+      });
+      
+      if (!currentSession?.session) {
+        throw new Error('No hay sesión activa. Por favor, inicia sesión nuevamente.');
+      }
+      
+      // 2. Eliminar producto - Usar solo ID, dejar que RLS verifique seller_id
+      console.log('🔍 Intentando DELETE...');
+      console.log('Verificando que auth.uid() coincide:', {
+        productSellerId: productToDelete.seller_id,
+        currentUserId: currentSession.session.user.id,
+        match: productToDelete.seller_id === currentSession.session.user.id
+      });
+      
+      // IMPORTANTE: No usar .eq('seller_id') en el DELETE
+      // La política RLS ya verifica que auth.uid() = seller_id
+      // Si agregamos .eq('seller_id'), puede causar conflictos con RLS
+      let deleteError: any = null;
+      let count: number | null = null;
+      
+      try {
+        // Intentar DELETE simple
+        const deleteResult = await supabase
+          .from('products')
+          .delete({ count: 'exact' })
+          .eq('id', productId); // Solo filtrar por ID, RLS manejará el seller_id
+        
+        deleteError = deleteResult.error;
+        count = deleteResult.count;
+        
+        console.log('📊 Resultado del DELETE:', {
+          error: deleteError,
+          count,
+          countType: typeof count,
+          hasError: !!deleteError,
+          errorCode: deleteError?.code,
+          errorMessage: deleteError?.message
+        });
+        
+        // Si count es 0, intentar usar función SQL que evita problemas de RLS
+        if ((count === 0 || count === null) && !deleteError) {
+          console.warn('⚠️ DELETE retornó count: 0. Intentando con función SQL...');
+          
+          // Usar función SQL que tiene SECURITY DEFINER para evitar problemas de RLS
+          const { data: rpcResult, error: rpcError } = await supabase
+            .rpc('delete_user_product', { product_id_to_delete: productId });
+          
+          if (rpcError) {
+            console.error('❌ Error al usar función SQL:', rpcError);
+            // Continuar con el error original
+          } else if (rpcResult === true) {
+            console.log('✅ Producto eliminado usando función SQL');
+            count = 1; // Marcar como exitoso
+          } else {
+            console.error('❌ Función SQL retornó false - el producto no se eliminó');
+          }
+        }
+      } catch (err: any) {
+        deleteError = err;
+        console.error('❌ Error capturado en DELETE:', err);
+      }
 
-      // 3. Eliminar imágenes del storage
+      if (deleteError) {
+        console.error('❌ Error al eliminar producto:', deleteError);
+        console.error('Detalles del error:', {
+          code: deleteError.code,
+          message: deleteError.message,
+          details: deleteError.details,
+          hint: deleteError.hint
+        });
+        throw deleteError;
+      }
+
+      console.log('🗑️ DELETE ejecutado. Resultado:', { count, type: typeof count });
+
+      // Si count es 0 o null, verificar si la función SQL ya lo resolvió
+      if (count === 0 || count === null) {
+        // Verificar si el producto todavía existe (por si la función SQL no funcionó)
+        const { data: finalCheck } = await supabase
+          .from('products')
+          .select('id, seller_id, title')
+          .eq('id', productId)
+          .single();
+        
+        if (finalCheck) {
+          // El producto todavía existe - esto significa que ni el DELETE ni la función SQL funcionaron
+          console.error('❌ CRÍTICO: DELETE no eliminó ningún registro');
+          console.error('Posibles causas:');
+          console.error('1. La política RLS está bloqueando el DELETE');
+          console.error('2. El seller_id no coincide (aunque verificamos antes)');
+          console.error('Producto que intentamos eliminar:', {
+            productId,
+            userId,
+            productSellerId: productToDelete.seller_id,
+            match: productToDelete.seller_id === userId
+          });
+          console.error('El producto todavía existe:', finalCheck);
+          throw new Error(`No se pudo eliminar el producto. Posible problema de permisos RLS. Producto ID: ${productId}, Seller ID: ${finalCheck.seller_id}, Usuario: ${userId}`);
+        } else {
+          // El producto ya no existe - la función SQL funcionó, aunque count sea 0
+          console.log('✅ El producto fue eliminado correctamente por la función SQL');
+          count = 1; // Actualizar count para continuar con el flujo normal
+        }
+      }
+      
+      // Si llegamos aquí, la eliminación fue exitosa (count > 0)
+      if (count > 0) {
+        console.log('✅ Producto eliminado correctamente. Registros eliminados:', count);
+      }
+
+      // Esperar un momento para que la transacción se complete
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // 4. Eliminar imágenes del storage
       if (images && images.length > 0) {
         const fileNames = images.map((img: { url: string }) => {
           const url = img.url;
@@ -350,16 +508,80 @@ export default function Dashboard() {
             .remove(fileNames.filter((name): name is string => name !== null));
 
           if (storageError) {
-            console.warn('Error eliminando imágenes del storage:', storageError);
+            console.warn('⚠️ Error eliminando imágenes del storage:', storageError);
+          } else {
+            console.log('✅ Imágenes eliminadas del storage');
           }
         }
       }
 
-      // 4. Actualizar lista local
+      // 5. Actualizar lista local
       setAllProducts(prev => prev.filter(p => p.id !== productId));
       setProducts(prev => prev.filter(p => p.id !== productId));
 
+      // 6. Recargar productos desde la base de datos para asegurar sincronización
+      console.log('🔄 Recargando productos desde la base de datos...');
+      if (userId) {
+        // Esperar un poco más para asegurar que la eliminación se complete
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        const { data: refreshedProducts, error: reloadError } = await supabase
+          .from('products')
+          .select('id, title, price, cover_url, created_at, sale_type')
+          .eq('seller_id', userId)
+          .order('created_at', { ascending: false });
+
+        if (reloadError) {
+          console.error('❌ Error al recargar productos:', reloadError);
+        } else if (refreshedProducts) {
+          // Verificar que el producto eliminado no esté en la lista
+          const deletedProductStillExists = refreshedProducts.some(p => p.id === productId);
+          if (deletedProductStillExists) {
+            console.error('⚠️ ADVERTENCIA: El producto eliminado todavía aparece en la lista recargada');
+            console.log('Producto problemático ID:', productId);
+            console.log('Total productos recargados:', refreshedProducts.length);
+            // Continuar de todos modos, pero mostrar advertencia
+          } else {
+            console.log('✅ Producto confirmado como eliminado - no aparece en lista recargada');
+          }
+          
+          console.log('✅ Productos recargados:', refreshedProducts.length);
+          setAllProducts(refreshedProducts as Product[]);
+          // Aplicar filtro actual
+          if (filterType === 'direct') {
+            setProducts(refreshedProducts.filter((p: any) => p.sale_type === 'direct') as Product[]);
+          } else if (filterType === 'auction') {
+            setProducts(refreshedProducts.filter((p: any) => p.sale_type === 'auction') as Product[]);
+          } else {
+            setProducts(refreshedProducts as Product[]);
+          }
+        }
+      }
+
+      // Verificar una vez más antes de mostrar éxito
+      const { data: finalVerify } = await supabase
+        .from('products')
+        .select('id')
+        .eq('id', productId)
+        .single();
+      
+      if (finalVerify) {
+        // El producto todavía existe - verificar si count indica éxito
+        if (count && count > 0) {
+          console.error('⚠️ El producto todavía existe después del DELETE');
+          alert('⚠️ No se pudo confirmar la eliminación. Por favor, verifica en la base de datos o contacta al administrador.');
+        } else {
+          // Count es 0 pero el producto existe - hubo un error real
+          throw new Error('No se pudo eliminar el producto. El producto todavía existe en la base de datos.');
+        }
+      } else {
+        // El producto fue eliminado exitosamente (verificado en la base de datos)
+        console.log('✅ Eliminación confirmada: el producto ya no existe en la base de datos');
+        alert('✅ Producto eliminado correctamente');
+      }
+
     } catch (err: any) {
+      console.error('❌ Error completo al eliminar:', err);
       alert('Error al eliminar producto: ' + err.message);
     } finally {
       setDeletingId(null);

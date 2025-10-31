@@ -140,62 +140,61 @@ export default function BidHistory({ productId, realtime = true }: BidHistoryPro
       </div>
 
       <div className="h-[400px] overflow-y-auto space-y-2 pr-4">
-          {sortedBids.map((bid, index) => {
-            const isHighest = index === 0;
-            const isMyBidFlag = isMyBid(bid);
-            const timeAgo = formatDistanceToNow(new Date(bid.bid_time), {
-              addSuffix: true,
-              locale: es,
-            });
+        {sortedBids.map((bid, index) => {
+          const isHighest = index === 0;
+          const isMyBidFlag = isMyBid(bid);
+          const timeAgo = formatDistanceToNow(new Date(bid.bid_time), {
+            addSuffix: true,
+            locale: es,
+          });
 
-            return (
-              <div
-                key={bid.id}
-                className={`
-                  flex items-center gap-3 p-3 rounded-lg border
-                  ${isHighest ? 'bg-emerald-50 border-emerald-200' : 'bg-background'}
-                  ${isMyBidFlag ? 'ring-2 ring-primary' : ''}
-                `}
-              >
-                {/* Avatar */}
-                <Avatar
-                  size="md"
-                  fallback={getBidderInitials(bid)}
-                  className={isMyBidFlag ? 'bg-primary text-primary-foreground' : ''}
-                />
+          return (
+            <div
+              key={bid.id}
+              className={`
+                flex items-center gap-3 p-3 rounded-lg border
+                ${isHighest ? 'bg-emerald-50 border-emerald-200' : 'bg-background'}
+                ${isMyBidFlag ? 'ring-2 ring-primary' : ''}
+              `}
+            >
+              {/* Avatar */}
+              <Avatar
+                size="md"
+                fallback={getBidderInitials(bid)}
+                className={isMyBidFlag ? 'bg-primary text-primary-foreground' : ''}
+              />
 
-                {/* Información */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="font-medium text-sm truncate">
-                      {getBidderName(bid)}
-                    </p>
-                    {isHighest && (
-                      <Badge variant="success" size="sm">
-                        Mayor
-                      </Badge>
-                    )}
-                    {isMyBidFlag && (
-                      <Badge variant="secondary" size="sm">
-                        Tu puja
-                      </Badge>
-                    )}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {timeAgo}
+              {/* Información */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <p className="font-medium text-sm truncate">
+                    {getBidderName(bid)}
                   </p>
+                  {isHighest && (
+                    <Badge variant="success" size="sm">
+                      Mayor
+                    </Badge>
+                  )}
+                  {isMyBidFlag && (
+                    <Badge variant="secondary" size="sm">
+                      Tu puja
+                    </Badge>
+                  )}
                 </div>
-
-                {/* Monto */}
-                <div className="text-right">
-                  <p className="font-bold text-lg">
-                    {formatCurrency(bid.amount)}
-                  </p>
-                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {timeAgo}
+                </p>
               </div>
-            );
-          })}
-        </div>
+
+              {/* Monto */}
+              <div className="text-right">
+                <p className="font-bold text-lg">
+                  {formatCurrency(bid.amount)}
+                </p>
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       {highestBid && (

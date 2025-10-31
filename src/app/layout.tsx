@@ -4,6 +4,7 @@ import "./globals.css";
 import Link from "next/link";
 import CartButton from "@/components/CartButton";
 import UserMenu from "@/components/UserMenu";
+import AuctionsNavLink from "@/components/AuctionsNavLink";
 
 export const metadata: Metadata = {
   title: {
@@ -103,7 +104,7 @@ export default function RootLayout({
               
               {/* Espacio central - Opciones disponibles */}
               <div className="hidden md:flex flex-1 justify-center items-center gap-4">
-                {/* TODO: Agregar componente aquí - ver opciones más abajo */}
+                <AuctionsNavLink />
               </div>
               
               {/* Acciones derecha */}

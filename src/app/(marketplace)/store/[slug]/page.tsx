@@ -9,6 +9,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
+import { supabase } from '@/lib/supabaseClient';
 import { 
   Card, 
   CardContent, 
@@ -77,6 +78,34 @@ export default function StoreProfilePage() {
     total: 0,
     per_page: 12,
   });
+  
+  // Estados para filtros y categorías
+  const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [priceSort, setPriceSort] = useState<string>('');
+  const [conditionFilter, setConditionFilter] = useState<string>('');
+
+  // Función para cargar categorías
+  const loadCategories = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('categories')
+        .select('id, name')
+        .eq('is_active', true)
+        .order('name', { ascending: true });
+      
+      if (error) {
+        console.error('❌ Error cargando categorías:', error);
+        setCategories([]);
+      } else {
+        setCategories(data || []);
+      }
+    } catch (err) {
+      console.error('❌ Error cargando categorías:', err);
+      setCategories([]);
+    }
+  };
 
   // Función para cargar productos de la tienda
   const loadStoreProducts = async (currentStoreId: string, page: number = 1, currentSellerId?: string) => {
@@ -90,18 +119,48 @@ export default function StoreProfilePage() {
         return;
       }
       
-      // No filtrar por status para incluir productos sin ese campo
-      const result = await getStoreProducts(currentStoreId || '', {
+      // Construir opciones de filtrado
+      const options: any = {
         page,
         limit: 12,
-        // No pasar status: 'active' - algunos productos pueden no tener ese campo
         sellerId: currentSellerId,
-      });
+      };
       
-      console.log('✅ Loaded products:', result.products?.length, 'total:', result.total);
-      console.log('📦 Products data:', result.products);
+      // Agregar filtro de categoría si está seleccionada
+      if (selectedCategory) {
+        options.category_id = selectedCategory;
+      }
       
-      setStoreProducts(result.products || []);
+      // No filtrar por status para incluir productos sin ese campo
+      const result = await getStoreProducts(currentStoreId || '', options);
+      
+      // Aplicar filtros adicionales en el cliente
+      let filteredProducts = result.products || [];
+      
+      // Filtro de búsqueda
+      if (searchQuery) {
+        filteredProducts = filteredProducts.filter((p: any) => 
+          p.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          p.description?.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+      }
+      
+      // Filtro de condición
+      if (conditionFilter) {
+        filteredProducts = filteredProducts.filter((p: any) => p.condition === conditionFilter);
+      }
+      
+      // Ordenamiento por precio
+      if (priceSort === 'asc') {
+        filteredProducts.sort((a: any, b: any) => a.price - b.price);
+      } else if (priceSort === 'desc') {
+        filteredProducts.sort((a: any, b: any) => b.price - a.price);
+      }
+      
+      console.log('✅ Loaded products:', filteredProducts.length, 'total:', result.total);
+      console.log('📦 Products data:', filteredProducts);
+      
+      setStoreProducts(filteredProducts);
       setProductsPagination({
         page,
         total_pages: result.total_pages,
@@ -164,6 +223,18 @@ export default function StoreProfilePage() {
       loadStoreAndGetIds();
     }
   }, [storeSlug, isAdminView]);
+
+  // Cargar categorías al montar el componente
+  useEffect(() => {
+    loadCategories();
+  }, []);
+
+  // Recargar productos cuando cambian los filtros
+  useEffect(() => {
+    if (storeId && sellerId) {
+      loadStoreProducts(storeId, 1, sellerId);
+    }
+  }, [selectedCategory, searchQuery, priceSort, conditionFilter]);
 
   const { 
     profile, 
@@ -310,29 +381,46 @@ export default function StoreProfilePage() {
       )}
 
       {/* Header del perfil */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="relative bg-gray-100 shadow-sm border-b overflow-hidden">
+        {/* Imagen de portada */}
+        {store.cover_image_url ? (
+          <div className="absolute inset-0">
+            <Image
+              src={store.cover_image_url}
+              alt={`Portada de ${store.name}`}
+              fill
+              className="object-cover"
+              priority
+            />
+            {/* Overlay para mejor contraste */}
+            <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/10 to-white/90" />
+          </div>
+        ) : (
+          <div className="absolute inset-0 bg-gradient-to-br from-gray-200 to-gray-300" />
+        )}
+        
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
           <div className="flex flex-col md:flex-row items-start md:items-center space-y-4 md:space-y-0 md:space-x-6">
             {/* Logo */}
-            <div className="relative">
+            <div className="relative z-10">
               <Avatar
                 src={store.logo_url || undefined}
                 fallback={store.name.charAt(0).toUpperCase()}
                 size="xl"
-                className="border-4 border-white shadow-lg"
+                className="border-4 border-white shadow-xl w-32 h-32 md:w-40 md:h-40"
               />
               {((store as any).is_verified) && (
-                <div className="absolute -bottom-2 -right-2 bg-blue-600 text-white rounded-full p-1">
-                  <CheckCircle className="w-5 h-5" />
+                <div className="absolute -bottom-2 -right-2 bg-blue-600 text-white rounded-full p-1.5 shadow-lg">
+                  <CheckCircle className="w-6 h-6 md:w-7 md:h-7" />
                 </div>
               )}
             </div>
 
             {/* Información principal */}
-            <div className="flex-1">
+            <div className="flex-1 relative z-10">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between">
                 <div>
-                  <h1 className="text-3xl font-bold text-gray-900 flex items-center">
+                  <h1 className="text-3xl md:text-4xl font-bold text-gray-900 flex items-center drop-shadow-sm">
                     {store.name}
                     {((store as any).is_verified) && (
                       <Badge variant="success" size="sm" className="ml-2">
@@ -558,6 +646,8 @@ export default function StoreProfilePage() {
                   <div className="relative">
                     <input
                       type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
                       placeholder="Buscar en esta tienda..."
                       className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
@@ -568,18 +658,36 @@ export default function StoreProfilePage() {
                   
                   {/* Filtros rápidos */}
                   <div className="flex flex-wrap gap-2">
-                    <select className="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
-                      <option>Todas las categorías</option>
+                    <select 
+                      value={selectedCategory}
+                      onChange={(e) => setSelectedCategory(e.target.value)}
+                      className="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value="">Todas las categorías</option>
+                      {categories.map((cat) => (
+                        <option key={cat.id} value={cat.id}>
+                          {cat.name}
+                        </option>
+                      ))}
                     </select>
-                    <select className="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
-                      <option>Precio</option>
-                      <option>Menor a mayor</option>
-                      <option>Mayor a menor</option>
+                    <select 
+                      value={priceSort}
+                      onChange={(e) => setPriceSort(e.target.value)}
+                      className="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value="">Precio</option>
+                      <option value="asc">Menor a mayor</option>
+                      <option value="desc">Mayor a menor</option>
                     </select>
-                    <select className="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
-                      <option>Condición</option>
-                      <option>Nuevo</option>
-                      <option>Usado</option>
+                    <select 
+                      value={conditionFilter}
+                      onChange={(e) => setConditionFilter(e.target.value)}
+                      className="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value="">Condición</option>
+                      <option value="nuevo">Nuevo</option>
+                      <option value="usado">Usado</option>
+                      <option value="usado_como_nuevo">Usado como nuevo</option>
                     </select>
                   </div>
                 </div>
