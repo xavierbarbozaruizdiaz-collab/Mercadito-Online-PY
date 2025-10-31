@@ -150,7 +150,6 @@ jobs:
       - name: 📢 Notify deployment success
         uses: 8398a7/action-slack@v3
         continue-on-error: true  # No fallar si Slack no está configurado
-        if: ${{ secrets.SLACK_WEBHOOK_URL != '' }}  # Solo ejecutar si el webhook está configurado
         with:
           status: success
           text: '🚀 Mercadito Online PY deployed successfully to production!'
@@ -165,7 +164,6 @@ jobs:
       - name: 📢 Notify deployment failure
         uses: 8398a7/action-slack@v3
         continue-on-error: true  # No fallar si Slack no está configurado
-        if: ${{ secrets.SLACK_WEBHOOK_URL != '' }}  # Solo ejecutar si el webhook está configurado
         with:
           status: failure
           text: '❌ Mercadito Online PY deployment failed!'
