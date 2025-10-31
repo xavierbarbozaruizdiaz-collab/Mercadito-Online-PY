@@ -48,6 +48,7 @@ export default function NewProduct() {
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [dragActive, setDragActive] = useState(false);
   const [hoveredImage, setHoveredImage] = useState<number | null>(null);
+  const [imageErrors, setImageErrors] = useState<Record<number, boolean>>({});
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
@@ -242,10 +243,30 @@ export default function NewProduct() {
       showMsg('error', `Solo puedes agregar ${remaining} imagen(es) más`);
     }
 
-    const newPreviews = toAdd.map(file => ({
-      file,
-      preview: URL.createObjectURL(file)
-    }));
+    const newPreviews = toAdd.map((file, index) => {
+      try {
+        // Validar que el archivo sea realmente una imagen válida
+        if (!file.type.startsWith('image/')) {
+          throw new Error(`El archivo ${file.name} no es una imagen válida`);
+        }
+        
+        const previewUrl = URL.createObjectURL(file);
+        
+        // Verificar que el blob URL se creó correctamente
+        if (!previewUrl || previewUrl === 'null' || previewUrl === 'undefined') {
+          throw new Error(`No se pudo crear la vista previa para ${file.name}`);
+        }
+        
+        return {
+          file,
+          preview: previewUrl
+        };
+      } catch (error) {
+        console.error(`❌ Error procesando imagen ${file.name}:`, error);
+        showMsg('error', `Error al procesar ${file.name}. Intenta con otra imagen.`);
+        return null;
+      }
+    }).filter((preview): preview is ImagePreview => preview !== null);
 
     setImagePreviews(prev => [...prev, ...newPreviews]);
     
@@ -431,29 +452,72 @@ export default function NewProduct() {
         auction: saleType === 'auction' ? cleanAttributes.auction : null,
       });
 
+      // Calcular fecha de fin de subasta (24 horas por defecto)
+      let auctionStartAt: string | null = null;
+      let auctionEndAt: string | null = null;
+      
+      if (saleType === 'auction') {
+        const startDate = new Date(auctionStartDate);
+        auctionStartAt = startDate.toISOString();
+        // Duración por defecto: 24 horas (1440 minutos)
+        const durationMinutes = 1440;
+        auctionEndAt = new Date(startDate.getTime() + durationMinutes * 60 * 1000).toISOString();
+      }
+
       // 1. Insertar producto
+      const productData: any = {
+        title: title.trim(),
+        description: description.trim() || null,
+        price: finalPrice,
+        sale_type: saleType, // Asegurar que sale_type se guarde correctamente
+        condition,
+        category_id: categoryId,
+        seller_id,
+        // Guardar tienda si fue seleccionada
+        store_id: storeId || null,
+        // Guardar atributos específicos de la categoría y subasta
+        attributes: Object.keys(cleanAttributes).length > 0 ? cleanAttributes : null,
+      };
+      
+      // Agregar campos de subasta si aplica
+      if (saleType === 'auction') {
+        productData.auction_status = 'scheduled';
+        productData.auction_start_at = auctionStartAt;
+        productData.auction_end_at = auctionEndAt;
+        productData.current_bid = finalPrice; // Precio inicial
+        productData.min_bid_increment = 1000; // Por defecto
+        productData.total_bids = 0;
+        
+        // Si hay precio de compra ahora, guardarlo
+        if (auctionBuyNowPrice && Number(auctionBuyNowPrice) > 0) {
+          productData.buy_now_price = Number(auctionBuyNowPrice);
+        }
+      }
+      
+      console.log('💾 Guardando producto:', {
+        sale_type: saleType,
+        is_auction: saleType === 'auction',
+        productData
+      });
+      
       const { data: newProduct, error: insertError } = await (supabase as any)
         .from('products')
-        .insert({
-          title: title.trim(),
-          description: description.trim() || null,
-          price: finalPrice,
-          sale_type: saleType,
-          condition,
-          category_id: categoryId,
-          seller_id,
-          // Guardar tienda si fue seleccionada
-          store_id: storeId || null,
-          // Guardar atributos específicos de la categoría y subasta
-          attributes: Object.keys(cleanAttributes).length > 0 ? cleanAttributes : null,
-        })
-        .select('id')
+        .insert(productData)
+        .select('id, sale_type') // Seleccionar también sale_type para verificar
         .single();
 
       if (insertError) {
         console.error('❌ Error insertando producto:', insertError);
         throw new Error(insertError.message || 'Error al crear el producto');
       }
+      
+      // Verificar que el producto se guardó correctamente
+      console.log('✅ Producto creado:', {
+        id: newProduct?.id,
+        sale_type_saved: (newProduct as any)?.sale_type,
+        expected_sale_type: saleType,
+        match: (newProduct as any)?.sale_type === saleType
+      });
       
       if (!newProduct) {
         throw new Error('No se pudo crear el producto');
@@ -600,10 +664,106 @@ export default function NewProduct() {
           />
         </div>
 
-        {/* Precio, Tipo de venta, Condición */}
-        <div className="grid md:grid-cols-3 gap-4">
+        {/* Tipo de venta */}
+        <div>
+          <label className="block text-sm font-medium mb-3">Tipo de venta *</label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Opción: Venta Directa */}
+            <button
+              type="button"
+              onClick={() => {
+                setSaleType('direct');
+                console.log('Tipo de venta cambiado a: direct');
+              }}
+              className={`relative p-4 border-2 rounded-lg transition-all text-left ${
+                saleType === 'direct'
+                  ? 'border-blue-500 bg-blue-50 shadow-md ring-2 ring-blue-200'
+                  : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'
+              }`}
+            >
+              <div className="flex items-start gap-3">
+                <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center mt-0.5 ${
+                  saleType === 'direct' 
+                    ? 'border-blue-500 bg-blue-500' 
+                    : 'border-gray-300 bg-white'
+                }`}>
+                  {saleType === 'direct' && (
+                    <div className="w-2 h-2 rounded-full bg-white"></div>
+                  )}
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-xl">💰</span>
+                    <h3 className={`font-semibold ${
+                      saleType === 'direct' ? 'text-blue-900' : 'text-gray-900'
+                    }`}>
+                      Precio Fijo
+                    </h3>
+                    {saleType === 'direct' && (
+                      <span className="text-xs bg-blue-500 text-white px-2 py-0.5 rounded-full">Seleccionado</span>
+                    )}
+                  </div>
+                  <p className={`text-sm ${
+                    saleType === 'direct' ? 'text-blue-700' : 'text-gray-600'
+                  }`}>
+                    El comprador paga el precio establecido directamente. Ideal para ventas rápidas.
+                  </p>
+                </div>
+              </div>
+            </button>
+
+            {/* Opción: Subasta */}
+            <button
+              type="button"
+              onClick={() => {
+                setSaleType('auction');
+                console.log('Tipo de venta cambiado a: auction');
+              }}
+              className={`relative p-4 border-2 rounded-lg transition-all text-left ${
+                saleType === 'auction'
+                  ? 'border-yellow-500 bg-yellow-50 shadow-md ring-2 ring-yellow-200'
+                  : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'
+              }`}
+            >
+              <div className="flex items-start gap-3">
+                <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center mt-0.5 ${
+                  saleType === 'auction' 
+                    ? 'border-yellow-500 bg-yellow-500' 
+                    : 'border-gray-300 bg-white'
+                }`}>
+                  {saleType === 'auction' && (
+                    <div className="w-2 h-2 rounded-full bg-white"></div>
+                  )}
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-xl">🔨</span>
+                    <h3 className={`font-semibold ${
+                      saleType === 'auction' ? 'text-yellow-900' : 'text-gray-900'
+                    }`}>
+                      Subasta
+                    </h3>
+                    {saleType === 'auction' && (
+                      <span className="text-xs bg-yellow-500 text-white px-2 py-0.5 rounded-full">Seleccionado</span>
+                    )}
+                  </div>
+                  <p className={`text-sm ${
+                    saleType === 'auction' ? 'text-yellow-700' : 'text-gray-600'
+                  }`}>
+                    Los compradores ofertan y el mejor precio gana. Puedes establecer precio mínimo y "compra ahora".
+                  </p>
+                </div>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        {/* Precio y Condición */}
+        <div className="grid md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium mb-1">Precio (Gs.) *</label>
+            <label className="block text-sm font-medium mb-1">
+              {saleType === 'auction' ? 'Precio base (Gs.)' : 'Precio (Gs.)'} *
+            </label>
             <input
               type="number"
               inputMode="numeric"
@@ -623,36 +783,95 @@ export default function NewProduct() {
             )}
           </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-1">Tipo de venta</label>
-            <div className="flex gap-2">
+          <div className="md:col-span-2">
+            <label className="block text-sm font-medium mb-3">Tipo de venta *</label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Opción: Venta Directa */}
               <button
                 type="button"
-                className={`px-4 py-2 border-2 rounded transition-colors ${
-                  saleType === 'direct' 
-                    ? 'bg-black text-white border-black' 
-                    : 'bg-white text-black border-gray-300 hover:border-gray-400'
-                }`}
                 onClick={() => {
                   setSaleType('direct');
                   console.log('Tipo de venta cambiado a: direct');
                 }}
+                className={`relative p-4 border-2 rounded-lg transition-all text-left ${
+                  saleType === 'direct'
+                    ? 'border-blue-500 bg-blue-50 shadow-md ring-2 ring-blue-200'
+                    : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'
+                }`}
               >
-                Directa
+                <div className="flex items-start gap-3">
+                  <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center mt-0.5 ${
+                    saleType === 'direct' 
+                      ? 'border-blue-500 bg-blue-500' 
+                      : 'border-gray-300 bg-white'
+                  }`}>
+                    {saleType === 'direct' && (
+                      <div className="w-2 h-2 rounded-full bg-white"></div>
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xl">💰</span>
+                      <h3 className={`font-semibold ${
+                        saleType === 'direct' ? 'text-blue-900' : 'text-gray-900'
+                      }`}>
+                        Precio Fijo
+                      </h3>
+                      {saleType === 'direct' && (
+                        <span className="text-xs bg-blue-500 text-white px-2 py-0.5 rounded-full">Seleccionado</span>
+                      )}
+                    </div>
+                    <p className={`text-sm ${
+                      saleType === 'direct' ? 'text-blue-700' : 'text-gray-600'
+                    }`}>
+                      El comprador paga el precio establecido directamente. Ideal para ventas rápidas.
+                    </p>
+                  </div>
+                </div>
               </button>
+
+              {/* Opción: Subasta */}
               <button
                 type="button"
-                className={`px-4 py-2 border-2 rounded transition-colors ${
-                  saleType === 'auction' 
-                    ? 'bg-black text-white border-black' 
-                    : 'bg-white text-black border-gray-300 hover:border-gray-400'
-                }`}
                 onClick={() => {
                   setSaleType('auction');
                   console.log('Tipo de venta cambiado a: auction');
                 }}
+                className={`relative p-4 border-2 rounded-lg transition-all text-left ${
+                  saleType === 'auction'
+                    ? 'border-yellow-500 bg-yellow-50 shadow-md ring-2 ring-yellow-200'
+                    : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'
+                }`}
               >
-                Subasta
+                <div className="flex items-start gap-3">
+                  <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center mt-0.5 ${
+                    saleType === 'auction' 
+                      ? 'border-yellow-500 bg-yellow-500' 
+                      : 'border-gray-300 bg-white'
+                  }`}>
+                    {saleType === 'auction' && (
+                      <div className="w-2 h-2 rounded-full bg-white"></div>
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xl">🔨</span>
+                      <h3 className={`font-semibold ${
+                        saleType === 'auction' ? 'text-yellow-900' : 'text-gray-900'
+                      }`}>
+                        Subasta
+                      </h3>
+                      {saleType === 'auction' && (
+                        <span className="text-xs bg-yellow-500 text-white px-2 py-0.5 rounded-full">Seleccionado</span>
+                      )}
+                    </div>
+                    <p className={`text-sm ${
+                      saleType === 'auction' ? 'text-yellow-700' : 'text-gray-600'
+                    }`}>
+                      Los compradores ofertan y el mejor precio gana. Puedes establecer precio mínimo y "compra ahora".
+                    </p>
+                  </div>
+                </div>
               </button>
             </div>
           </div>
@@ -913,7 +1132,7 @@ export default function NewProduct() {
           
           {/* Vista previa de imágenes */}
           {imagePreviews.length > 0 && (
-            <div className="grid grid-cols-5 gap-2 mb-3">
+            <div className="grid grid-cols-4 gap-3 mb-3">
               {imagePreviews.map((preview, idx) => (
                 <div 
                   key={idx} 
@@ -931,15 +1150,77 @@ export default function NewProduct() {
                     }
                   }}
                 >
-                  <img
-                    src={preview.preview}
-                    alt={`Preview ${idx + 1}`}
-                    className={`w-full h-24 object-cover rounded border transition-transform ${
-                      hoveredImage === idx ? 'scale-105 shadow-lg' : ''
-                    }`}
-                    onMouseEnter={() => setHoveredImage(idx)}
-                    onMouseLeave={() => setHoveredImage(null)}
-                  />
+                  {imageErrors[idx] ? (
+                    <div className="w-full h-32 sm:h-36 md:h-40 bg-red-50 border-2 border-red-300 rounded flex flex-col items-center justify-center">
+                      <span className="text-4xl mb-2">⚠️</span>
+                      <span className="text-xs text-red-600 text-center px-2">Error al cargar</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          try {
+                            const newUrl = URL.createObjectURL(preview.file);
+                            setImagePreviews(prev => {
+                              const updated = [...prev];
+                              updated[idx] = { ...updated[idx], preview: newUrl };
+                              return updated;
+                            });
+                            setImageErrors(prev => {
+                              const updated = { ...prev };
+                              delete updated[idx];
+                              return updated;
+                            });
+                          } catch (error) {
+                            console.error('❌ No se pudo recrear el blob URL:', error);
+                            showMsg('error', 'No se pudo cargar esta imagen. Elimínala y vuelve a agregarla.');
+                          }
+                        }}
+                        className="mt-2 text-xs bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600"
+                      >
+                        Reintentar
+                      </button>
+                    </div>
+                  ) : (
+                    <img
+                      src={preview.preview}
+                      alt={`Preview ${idx + 1}`}
+                      className={`w-full h-32 sm:h-36 md:h-40 object-cover rounded border-2 transition-transform ${
+                        hoveredImage === idx ? 'scale-105 shadow-lg border-blue-400' : 'border-gray-200'
+                      }`}
+                      onMouseEnter={() => setHoveredImage(idx)}
+                      onMouseLeave={() => setHoveredImage(null)}
+                      onError={(e) => {
+                        console.error(`❌ Error cargando imagen ${idx + 1}:`, preview.preview);
+                        setImageErrors(prev => ({ ...prev, [idx]: true }));
+                        // Intentar recrear el blob URL si falla
+                        try {
+                          URL.revokeObjectURL(preview.preview);
+                          const newUrl = URL.createObjectURL(preview.file);
+                          setImagePreviews(prev => {
+                            const updated = [...prev];
+                            updated[idx] = { ...updated[idx], preview: newUrl };
+                            return updated;
+                          });
+                          // Intentar recargar después de un momento
+                          setTimeout(() => {
+                            const target = e.target as HTMLImageElement;
+                            target.src = newUrl;
+                          }, 100);
+                        } catch (error) {
+                          console.error('❌ No se pudo recrear el blob URL:', error);
+                        }
+                      }}
+                      onLoad={() => {
+                        // Si la imagen carga correctamente, eliminar el error
+                        if (imageErrors[idx]) {
+                          setImageErrors(prev => {
+                            const updated = { ...prev };
+                            delete updated[idx];
+                            return updated;
+                          });
+                        }
+                      }}
+                    />
+                  )}
                   {idx === 0 && (
                     <span className="absolute top-1 left-1 bg-blue-500 text-white text-xs px-1 rounded">
                       Portada
