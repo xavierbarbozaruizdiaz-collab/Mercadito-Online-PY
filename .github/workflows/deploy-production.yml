@@ -8,7 +8,7 @@ on:
     types: [opened, synchronize, reopened]  # Solo en PRs hacia main, no desde feat/*
 
 env:
-  NODE_VERSION: '18'
+  NODE_VERSION: '20'
   VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
   VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
