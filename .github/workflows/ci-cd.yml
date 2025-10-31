@@ -11,6 +11,7 @@ on:
     branches-ignore: ['feat/*', 'feature/*', 'hotfix/*']  # Ignorar branches de desarrollo
   pull_request:
     branches: [ main ]
+    types: [opened, synchronize, reopened]  # Solo en PRs hacia main
 
 jobs:
   # ============================================
@@ -18,7 +19,10 @@ jobs:
   # ============================================
   lint-and-typecheck:
     runs-on: ubuntu-latest
-    if: github.ref != 'refs/heads/feat/core-ecommerce' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/feature/') && !startsWith(github.ref, 'refs/heads/hotfix/')
+    # No ejecutar si viene de branch feat/* (push o PR)
+    if: |
+      (github.event_name == 'push' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/feature/') && !startsWith(github.ref, 'refs/heads/hotfix/')) ||
+      (github.event_name == 'pull_request' && github.head_ref && !startsWith(github.head_ref, 'feat/') && !startsWith(github.head_ref, 'feature/') && !startsWith(github.head_ref, 'hotfix/'))
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -44,7 +48,10 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
     needs: lint-and-typecheck
-    if: github.ref != 'refs/heads/feat/core-ecommerce' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/feature/') && !startsWith(github.ref, 'refs/heads/hotfix/')
+    # No ejecutar si viene de branch feat/* (push o PR)
+    if: |
+      (github.event_name == 'push' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/feature/') && !startsWith(github.ref, 'refs/heads/hotfix/')) ||
+      (github.event_name == 'pull_request' && github.head_ref && !startsWith(github.head_ref, 'feat/') && !startsWith(github.head_ref, 'feature/') && !startsWith(github.head_ref, 'hotfix/'))
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -83,7 +90,10 @@ jobs:
   # ============================================
   security-audit:
     runs-on: ubuntu-latest
-    if: github.ref != 'refs/heads/feat/core-ecommerce' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/feature/') && !startsWith(github.ref, 'refs/heads/hotfix/')
+    # No ejecutar si viene de branch feat/* (push o PR)
+    if: |
+      (github.event_name == 'push' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/feature/') && !startsWith(github.ref, 'refs/heads/hotfix/')) ||
+      (github.event_name == 'pull_request' && github.head_ref && !startsWith(github.head_ref, 'feat/') && !startsWith(github.head_ref, 'feature/') && !startsWith(github.head_ref, 'hotfix/'))
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

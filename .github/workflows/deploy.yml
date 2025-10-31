@@ -7,6 +7,7 @@ on:
     branches-ignore: ['feat/*', 'feature/*', 'hotfix/*']  # Ignorar branches de desarrollo
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened]
 
 env:
   NODE_VERSION: '18'
@@ -16,7 +17,10 @@ env:
 jobs:
   test:
     runs-on: ubuntu-latest
-    if: github.ref != 'refs/heads/feat/core-ecommerce' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/feature/') && !startsWith(github.ref, 'refs/heads/hotfix/')
+    # No ejecutar si viene de branch feat/* (push o PR)
+    if: |
+      (github.event_name == 'push' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/feature/') && !startsWith(github.ref, 'refs/heads/hotfix/')) ||
+      (github.event_name == 'pull_request' && github.head_ref && !startsWith(github.head_ref, 'feat/') && !startsWith(github.head_ref, 'feature/') && !startsWith(github.head_ref, 'hotfix/'))
     steps:
       - uses: actions/checkout@v4
       

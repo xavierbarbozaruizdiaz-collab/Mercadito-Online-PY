@@ -6,6 +6,7 @@ on:
     branches-ignore: ['feat/*', 'feature/*', 'hotfix/*']  # Ignorar branches de desarrollo
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened]  # Solo en PRs hacia main, no desde feat/*
 
 env:
   NODE_VERSION: '18'
@@ -54,7 +55,10 @@ jobs:
   security-audit:
     name: 🔒 Security Audit
     runs-on: ubuntu-latest
-    if: github.ref != 'refs/heads/feat/core-ecommerce' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/feature/') && !startsWith(github.ref, 'refs/heads/hotfix/')
+    # No ejecutar si viene de branch feat/* (push o PR)
+    if: |
+      (github.event_name == 'push' && !startsWith(github.ref, 'refs/heads/feat/') && !startsWith(github.ref, 'refs/heads/feature/') && !startsWith(github.ref, 'refs/heads/hotfix/')) ||
+      (github.event_name == 'pull_request' && !startsWith(github.head_ref, 'feat/') && !startsWith(github.head_ref, 'feature/') && !startsWith(github.head_ref, 'hotfix/'))
     steps:
       - name: 📥 Checkout code
         uses: actions/checkout@v4
@@ -75,7 +79,6 @@ jobs:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
           args: --severity-threshold=high
-        if: ${{ secrets.SNYK_TOKEN != '' }}  # Solo ejecutar si el token está configurado
 
   # ============================================
   # DEPLOYMENT A VERCEL
