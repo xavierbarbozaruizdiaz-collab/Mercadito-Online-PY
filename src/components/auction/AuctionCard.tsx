@@ -86,7 +86,7 @@ export default function AuctionCard({ auction, variant = 'default' }: AuctionCar
                 </div>
               )}
               {isEnded && (
-                <Badge variant="outline" className="text-xs">
+                <Badge variant="default" className="text-xs">
                   Finalizada
                 </Badge>
               )}

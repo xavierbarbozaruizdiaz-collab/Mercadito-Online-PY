@@ -198,7 +198,8 @@ export default function SellerOrdersPage() {
     try {
       setUpdating(orderId);
       
-      const { error } = await supabase
+      // Using 'as any' to bypass Supabase strict type constraint for updates
+      const { error } = await (supabase as any)
         .from('orders')
         .update({ status: newStatus })
         .eq('id', orderId);

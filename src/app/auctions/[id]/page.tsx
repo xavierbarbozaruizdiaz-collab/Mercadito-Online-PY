@@ -342,7 +342,8 @@ export default function AuctionDetailPage() {
             .limit(1);
           
           if (myBids && myBids.length > 0) {
-            const myHighestBid = myBids[0].amount;
+            type BidItem = { amount: number };
+            const myHighestBid = (myBids[0] as BidItem).amount;
             
             // Obtener todas las pujas ordenadas para encontrar posición
             const { data: allBids } = await supabase
@@ -352,9 +353,11 @@ export default function AuctionDetailPage() {
               .eq('is_retracted', false)
               .order('amount', { ascending: false });
             
+            type AllBidItem = { bidder_id: string; amount: number };
+            
             if (allBids) {
               const uniqueBidders = new Map<string, number>();
-              allBids.forEach(bid => {
+              (allBids as AllBidItem[]).forEach(bid => {
                 if (!uniqueBidders.has(bid.bidder_id) || uniqueBidders.get(bid.bidder_id)! < bid.amount) {
                   uniqueBidders.set(bid.bidder_id, bid.amount);
                 }
@@ -401,7 +404,8 @@ export default function AuctionDetailPage() {
           .limit(10);
         
         if (events) {
-          const formattedEvents = events.map(event => {
+          type AuctionEvent = { event_type: string; event_data?: Record<string, any>; server_timestamp: string };
+          const formattedEvents = (events as AuctionEvent[]).map(event => {
             let message = '';
             const data = event.event_data || {};
             
@@ -443,7 +447,8 @@ export default function AuctionDetailPage() {
         .order('idx', { ascending: true });
       
       if (!imagesError && imagesData && imagesData.length > 0) {
-        const imageUrls = imagesData.map(img => img.url).filter(Boolean);
+        type ImageItem = { url: string };
+        const imageUrls = (imagesData as ImageItem[]).map(img => img.url).filter(Boolean);
         setProductImages(imageUrls);
         console.log('📸 Imágenes cargadas:', imageUrls.length);
       } else {
@@ -757,7 +762,7 @@ export default function AuctionDetailPage() {
                           endAtMs={endAtMs}
                           serverNowMs={serverNowMs}
                           variant="full"
-                          size="xl"
+                          size="lg"
                           lastBidAtMs={lastBidTime}
                           onExpire={() => {
                             if (soundEnabled) {
@@ -785,7 +790,7 @@ export default function AuctionDetailPage() {
                         endAtMs={startAtMs}
                         serverNowMs={serverNowMs}
                         variant="full"
-                        size="xl"
+                        size="lg"
                         onExpire={() => {
                           loadAuction();
                         }}

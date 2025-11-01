@@ -557,6 +557,50 @@ export interface Database {
           created_at?: string;
         };
       };
+      reports: {
+        Row: {
+          id: string;
+          reporter_id: string;
+          report_type: 'product' | 'user' | 'store' | 'order' | 'review';
+          target_id: string;
+          reason: string;
+          description: string | null;
+          status: 'pending' | 'under_review' | 'resolved' | 'rejected' | 'dismissed';
+          resolved_by: string | null;
+          resolved_at: string | null;
+          resolution_notes: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          reporter_id: string;
+          report_type: 'product' | 'user' | 'store' | 'order' | 'review';
+          target_id: string;
+          reason: string;
+          description?: string | null;
+          status?: 'pending' | 'under_review' | 'resolved' | 'rejected' | 'dismissed';
+          resolved_by?: string | null;
+          resolved_at?: string | null;
+          resolution_notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          reporter_id?: string;
+          report_type?: 'product' | 'user' | 'store' | 'order' | 'review';
+          target_id?: string;
+          reason?: string;
+          description?: string | null;
+          status?: 'pending' | 'under_review' | 'resolved' | 'rejected' | 'dismissed';
+          resolved_by?: string | null;
+          resolved_at?: string | null;
+          resolution_notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
     };
     Views: {
       [_ in never]: never;

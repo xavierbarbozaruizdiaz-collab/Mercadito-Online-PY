@@ -166,16 +166,19 @@ export default function CheckoutPage() {
       if (verifyError) {
         console.error('⚠️ No se pudo verificar el pedido creado:', verifyError);
       } else {
+        type OrderVerify = { id: string; buyer_id: string; total_amount: number; status: string; created_at: string };
+        const orderTyped = verifyOrder as OrderVerify | null;
+        
         console.log('✅ Verificación del pedido:', {
-          orderId: verifyOrder?.id,
-          buyer_id_in_db: verifyOrder?.buyer_id,
+          orderId: orderTyped?.id,
+          buyer_id_in_db: orderTyped?.buyer_id,
           buyer_id_expected: buyerId,
-          match: verifyOrder?.buyer_id === buyerId,
-          total: verifyOrder?.total_amount,
-          status: verifyOrder?.status
+          match: orderTyped?.buyer_id === buyerId,
+          total: orderTyped?.total_amount,
+          status: orderTyped?.status
         });
 
-        if (verifyOrder?.buyer_id !== buyerId) {
+        if (orderTyped?.buyer_id !== buyerId) {
           console.error('❌ PROBLEMA CRÍTICO: El buyer_id en la BD no coincide con el usuario actual!');
           alert('Se creó el pedido pero hay un problema con la asociación. Contacta al administrador.');
         }
@@ -222,11 +225,14 @@ export default function CheckoutPage() {
       }
 
       // Enviar notificaciones de WhatsApp a los vendedores (en segundo plano, no bloquea)
-      if (orderData?.order_items && orderData.order_items.length > 0) {
+      type OrderDataWithItems = { id: string; total_amount: number; order_items?: Array<{ seller_id: string; product?: { title: string; seller_id: string } }> };
+      const orderTyped = orderData as OrderDataWithItems | null;
+      
+      if (orderTyped?.order_items && orderTyped.order_items.length > 0) {
         // Obtener sellers únicos del pedido
         const sellerIds = [...new Set(
-          (orderData.order_items as any[])
-            .map((item: any) => item.seller_id)
+          orderTyped.order_items
+            .map((item) => item.seller_id)
             .filter(Boolean)
         )];
 

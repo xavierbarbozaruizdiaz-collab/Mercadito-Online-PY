@@ -528,6 +528,9 @@ export default function NewProduct() {
       if (saleType === 'auction') {
         // Determinar el estado inicial de la subasta
         // Si la fecha de inicio ya pasó o está muy cerca (dentro de 2 minutos), activar inmediatamente
+        if (!auctionStartAt) {
+          throw new Error('La fecha de inicio de subasta es requerida');
+        }
         const startDate = new Date(auctionStartAt);
         const now = new Date();
         const timeDiff = startDate.getTime() - now.getTime();
@@ -844,14 +847,14 @@ export default function NewProduct() {
                 value={price}
                 onChange={(e) => {
                   setPrice(e.target.value);
-                  if (saleType !== 'auction') {
+                  if ((saleType as 'direct' | 'auction') !== 'auction') {
                     validateField('price', e.target.value);
                   }
                 }}
                 className={`border p-2 w-full rounded ${
                   validationErrors.price ? 'border-red-500' : priceNumber > 0 ? 'border-green-500' : ''
                 }`}
-                required={saleType !== 'auction'}
+                required={(saleType as 'direct' | 'auction') !== 'auction'}
               />
               {validationErrors.price && (
                 <p className="text-red-500 text-sm mt-1">{validationErrors.price}</p>

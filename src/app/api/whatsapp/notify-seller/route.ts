@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabaseClient';
+import type { Database } from '@/types/database';
 
 /**
  * API Route para enviar notificaciones de WhatsApp a vendedores cuando reciben un pedido
@@ -68,11 +69,22 @@ export async function POST(request: NextRequest) {
     }
 
     // Construir mensaje
-    // @ts-ignore - Supabase types may be incomplete
-    const sellerName = `${(sellerProfile as any).first_name || ''} ${(sellerProfile as any).last_name || ''}`.trim() || 'Vendedor';
-    // @ts-ignore - Supabase types for order_items are incomplete
-    const orderItems = ((orderDetails as any).order_items || [])
-      .map((item: any) => `• ${item.product.title} x${item.quantity} - ${item.total_price.toLocaleString('es-PY')} Gs.`)
+    type Profile = Database['public']['Tables']['profiles']['Row'];
+    type OrderItemWithProduct = {
+      quantity: number;
+      total_price: number;
+      product: { title: string };
+    };
+    type OrderWithItems = Database['public']['Tables']['orders']['Row'] & {
+      order_items: OrderItemWithProduct[];
+    };
+
+    const sellerProfileTyped = sellerProfile as Profile | null;
+    const orderDetailsTyped = orderDetails as OrderWithItems | null;
+
+    const sellerName = `${sellerProfileTyped?.first_name || ''} ${sellerProfileTyped?.last_name || ''}`.trim() || 'Vendedor';
+    const orderItems = (orderDetailsTyped?.order_items || [])
+      .map((item) => `• ${item.product.title} x${item.quantity} - ${item.total_price.toLocaleString('es-PY')} Gs.`)
       .join('\n');
 
     const message = `🛍️ *Nuevo Pedido Recibido*
@@ -82,7 +94,7 @@ export async function POST(request: NextRequest) {
 Has recibido un nuevo pedido:
 
 *Pedido #${orderId.slice(0, 8)}*
-Total: ${((orderDetails as any).total_amount || 0).toLocaleString('es-PY')} Gs.
+Total: ${(orderDetailsTyped?.total_amount || 0).toLocaleString('es-PY')} Gs.
 
 *Productos:*
 ${orderItems}
@@ -154,20 +166,21 @@ Puedes ver y gestionar este pedido desde tu panel de vendedor.
 
     // Guardar notificación en la base de datos (opcional)
     try {
-      await supabase
+      // Using 'as any' to bypass Supabase strict type constraint for inserts
+      await (supabase as any)
         .from('notifications')
         .insert({
           user_id: sellerId,
           type: 'order_received',
           title: 'Nuevo Pedido',
           message: `Pedido #${orderId.slice(0, 8)} de ${buyerName}`,
-          metadata: {
+          data: {
             order_id: orderId,
             buyer_name: buyerName,
             buyer_phone: buyerPhone,
             whatsapp_url: whatsappUrl,
           },
-          read: false,
+          is_read: false,
         });
     } catch (notifError) {
       console.warn('No se pudo guardar notificación en BD (tabla puede no existir):', notifError);

@@ -44,6 +44,7 @@ export interface AuctionProduct {
   winner_id?: string;
   total_bids: number;
   seller_id: string;
+  created_at?: string; // Fecha de creación del producto
   attributes?: {
     auction?: {
       starting_price: number;

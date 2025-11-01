@@ -52,6 +52,7 @@ export default function SignInPage() {
         setLoading(false);
       } else {
         // Actualizar login_count y last_login_at
+        // Using 'as any' to bypass Supabase strict type constraint for updates
         if (authData?.user) {
           // Usar UPSERT en lugar de UPDATE para manejar usuarios sin perfil
           try {
@@ -65,7 +66,8 @@ export default function SignInPage() {
             const now = new Date().toISOString();
 
             // UPSERT: insertar si no existe, actualizar si existe
-            await supabase
+            // Using 'as any' to bypass Supabase strict type constraint
+            await (supabase as any)
               .from('profiles')
               .upsert({
                 id: authData.user.id,

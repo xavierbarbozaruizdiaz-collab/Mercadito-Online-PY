@@ -17,6 +17,7 @@ import {
   type PaymentStatus,
 } from '@/lib/services/orderAdminService';
 import { supabase } from '@/lib/supabaseClient';
+import type { Database } from '@/types/database';
 
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<OrderAdmin[]>([]);
@@ -121,7 +122,8 @@ export default function AdminOrdersPage() {
               .eq('id', id)
               .single();
 
-            return data ? { id: (data as { id: string; email: string }).id, email: (data as { id: string; email: string }).email } : null;
+            type Profile = Database['public']['Tables']['profiles']['Row'];
+            return data ? { id: (data as Profile).id, email: (data as Profile).email } : null;
           })
         );
 
