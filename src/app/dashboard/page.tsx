@@ -184,10 +184,12 @@ export default function Dashboard() {
 
       // Procesar datos
       const products = productsData || [];
-      const activeProducts = products.filter((p: any) => !p.status || p.status === 'active');
+      type ProductItem = { status?: string };
+      const activeProducts = products.filter((p: ProductItem) => !p.status || p.status === 'active').length;
 
       // Agrupar order_items por order_id para obtener órdenes únicas
-      const orderMap = new Map();
+      type OrderData = { id: string; status: string; total_amount: number; created_at: string; buyer_id?: string };
+      const orderMap = new Map<string, OrderData>();
       const customerSet = new Set<string>();
       let totalRevenue = 0;
       let monthlyRevenue = 0;
@@ -215,8 +217,10 @@ export default function Dashboard() {
                 buyer_id: item.order.buyer_id
               });
             }
-            const order = orderMap.get(orderId);
-            order.total_amount += item.total_price;
+            const order = orderMap.get(orderId)!;
+            if (order) {
+              order.total_amount += item.total_price;
+            }
             totalRevenue += item.total_price;
             
             if (item.order.buyer_id) {
@@ -261,8 +265,8 @@ export default function Dashboard() {
         });
       }
 
-      const orders = Array.from(orderMap.values());
-      const pendingOrders = orders.filter((o: any) => o.status === 'pending');
+      const orders: OrderData[] = Array.from(orderMap.values());
+      const pendingOrders = orders.filter((o) => o.status === 'pending');
 
       // Obtener órdenes recientes
       const recentOrders = orders
@@ -289,7 +293,8 @@ export default function Dashboard() {
       const averageOrderValue = orders.length > 0 ? totalRevenue / orders.length : 0;
 
       // Generar notificaciones
-      const notifications = [];
+      type NotificationItem = { type: 'order' | 'product' | 'review'; message: string; priority: 'high' | 'medium' | 'low'; link: string };
+      const notifications: NotificationItem[] = [];
       if (pendingOrders.length > 0) {
         notifications.push({
           type: 'order' as const,
@@ -303,7 +308,7 @@ export default function Dashboard() {
 
       setStats({
         totalProducts: products.length,
-        activeProducts: activeProducts.length,
+        activeProducts: activeProducts,
         totalOrders: orders.length,
         pendingOrders: pendingOrders.length,
         totalRevenue,

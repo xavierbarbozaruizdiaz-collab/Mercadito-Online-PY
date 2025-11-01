@@ -59,11 +59,8 @@ export default function AuctionsPage() {
         case 'all':
           // Para "TODAS", mostrar por fecha de creación (más recientes primero)
           sorted.sort((a, b) => {
-            type AuctionWithCreated = AuctionProduct & { created_at?: string };
-            const aAuction = a as AuctionWithCreated;
-            const bAuction = b as AuctionWithCreated;
-            const aDate = aAuction.created_at ? new Date(aAuction.created_at).getTime() : 0;
-            const bDate = bAuction.created_at ? new Date(bAuction.created_at).getTime() : 0;
+            const aDate = a.created_at ? new Date(a.created_at).getTime() : 0;
+            const bDate = b.created_at ? new Date(b.created_at).getTime() : 0;
             return bDate - aDate; // Más recientes primero
           });
           break;
@@ -82,11 +79,8 @@ export default function AuctionsPage() {
           break;
         case 'recent':
           sorted.sort((a, b) => {
-            type AuctionWithCreated = AuctionProduct & { created_at?: string };
-            const aAuction = a as AuctionWithCreated;
-            const bAuction = b as AuctionWithCreated;
-            const aDate = aAuction.created_at ? new Date(aAuction.created_at).getTime() : 0;
-            const bDate = bAuction.created_at ? new Date(bAuction.created_at).getTime() : 0;
+            const aDate = a.created_at ? new Date(a.created_at).getTime() : 0;
+            const bDate = b.created_at ? new Date(b.created_at).getTime() : 0;
             return bDate - aDate; // Más recientes primero
           });
           break;
