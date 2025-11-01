@@ -301,7 +301,7 @@ export async function getOrderById(orderId: string): Promise<OrderAdmin | null> 
     buyer: buyerRes.data,
     seller: sellerRes.data,
     items: itemsRes.data || [],
-  } as OrderAdmin;
+  } as unknown as OrderAdmin;
 }
 
 /**
@@ -327,7 +327,8 @@ export async function updateOrderStatus(
     updateData.cancelled_by = adminId;
   }
 
-  const { error } = await supabase
+  // Using 'as any' to bypass Supabase strict type constraint for updates
+  const { error } = await (supabase as any)
     .from('orders')
     .update(updateData)
     .eq('id', orderId);
@@ -347,7 +348,8 @@ export async function resolveDispute(
   adminId: string,
   resolutionNotes: string
 ): Promise<void> {
-  const { error } = await supabase
+  // Using 'as any' to bypass Supabase strict type constraint for updates
+  const { error } = await (supabase as any)
     .from('orders')
     .update({
       dispute_status: resolution,
@@ -371,7 +373,8 @@ export async function updatePaymentStatus(
   paymentStatus: PaymentStatus,
   adminId: string
 ): Promise<void> {
-  const { error } = await supabase
+  // Using 'as any' to bypass Supabase strict type constraint for updates
+  const { error } = await (supabase as any)
     .from('orders')
     .update({
       payment_status: paymentStatus,
@@ -404,7 +407,8 @@ export async function addInternalNotes(
     ? `${existingNotes}\n\n[${new Date().toLocaleString('es-PY')}] ${notes}`
     : `[${new Date().toLocaleString('es-PY')}] ${notes}`;
 
-  const { error } = await supabase
+  // Using 'as any' to bypass Supabase strict type constraint for updates
+  const { error } = await (supabase as any)
     .from('orders')
     .update({ internal_notes: newNotes })
     .eq('id', orderId);
@@ -420,7 +424,8 @@ export async function addInternalNotes(
  */
 export async function getOrderStats(dateFrom?: string, dateTo?: string): Promise<OrderStats> {
   try {
-    let baseQuery = supabase.from('orders');
+    // Using 'as any' to bypass Supabase strict type constraint
+    let baseQuery = (supabase as any).from('orders');
     let filteredQuery = baseQuery;
 
     if (dateFrom) {
