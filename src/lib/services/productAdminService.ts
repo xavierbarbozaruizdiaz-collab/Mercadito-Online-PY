@@ -187,7 +187,8 @@ export async function approveProduct(
   productId: string,
   adminId: string
 ): Promise<void> {
-  const { error } = await supabase
+  // Using 'as any' to bypass Supabase strict type constraint for updates
+  const { error } = await (supabase as any)
     .from('products')
     .update({
       approval_status: 'approved',
@@ -211,7 +212,8 @@ export async function rejectProduct(
   adminId: string,
   reason?: string
 ): Promise<void> {
-  const { error } = await supabase
+  // Using 'as any' to bypass Supabase strict type constraint for updates
+  const { error } = await (supabase as any)
     .from('products')
     .update({
       approval_status: 'rejected',
@@ -240,7 +242,8 @@ export async function updateProduct(
     category_id: string;
   }>
 ): Promise<void> {
-  const { error } = await supabase
+  // Using 'as any' to bypass Supabase strict type constraint for updates
+  const { error } = await (supabase as any)
     .from('products')
     .update(updates)
     .eq('id', productId);
@@ -280,7 +283,7 @@ export async function deleteProduct(productId: string): Promise<void> {
         const match = url.match(/products\/([^\/]+)\/(.+)$/);
         return match ? `${match[1]}/${match[2]}` : null;
       })
-      .filter(Boolean);
+      .filter((fileName): fileName is string => fileName !== null);
 
     if (fileNames.length > 0) {
       const { error: storageError } = await supabase.storage
