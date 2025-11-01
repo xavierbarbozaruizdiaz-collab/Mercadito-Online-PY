@@ -132,18 +132,14 @@ export default function AdminReportsPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('No autenticado');
 
-      type ReportsUpdate = Database['public']['Tables']['reports']['Update'];
-      
-      const updateData: ReportsUpdate = {
-        status: resolution,
-        resolved_by: user.id,
-        resolved_at: new Date().toISOString(),
-        resolution_notes: resolutionNotes,
-      };
-      
       const { error } = await supabase
         .from('reports')
-        .update(updateData)
+        .update({
+          status: resolution,
+          resolved_by: user.id,
+          resolved_at: new Date().toISOString(),
+          resolution_notes: resolutionNotes,
+        } as Database['public']['Tables']['reports']['Update'])
         .eq('id', selectedReport.id);
 
       if (error) throw error;
