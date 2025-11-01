@@ -16,7 +16,6 @@ import {
   Plus, 
   Edit, 
   Eye, 
-  Trash2, 
   TrendingUp, 
   Users, 
   DollarSign,
@@ -24,8 +23,7 @@ import {
   Store,
   Settings,
   BarChart3,
-  Bell,
-  MessageSquare
+  Bell
 } from 'lucide-react';
 
 // ============================================
@@ -125,22 +123,25 @@ export default function SellerDashboard() {
         const orders = ordersResult.data || [];
 
         // Calcular estadísticas
+        type ProductItem = { status: string };
+        type OrderItem = { status: string; total_amount: number; created_at: string; buyer_id: string };
+        
         const totalProducts = products.length;
-        const activeProducts = products.filter((p: any) => p.status === 'active').length;
+        const activeProducts = products.filter((p: ProductItem) => p.status === 'active').length;
         const totalOrders = orders.length;
-        const pendingOrders = orders.filter((o: any) => o.status === 'pending').length;
-        const totalRevenue = orders.reduce((sum: number, order: any) => sum + order.total_amount, 0);
+        const pendingOrders = orders.filter((o: OrderItem) => o.status === 'pending').length;
+        const totalRevenue = orders.reduce((sum: number, order: OrderItem) => sum + order.total_amount, 0);
         
         const currentMonth = new Date().getMonth();
         const currentYear = new Date().getFullYear();
         const monthlyRevenue = orders
-          .filter((order: any) => {
+          .filter((order: OrderItem) => {
             const orderDate = new Date(order.created_at);
             return orderDate.getMonth() === currentMonth && orderDate.getFullYear() === currentYear;
           })
-          .reduce((sum: number, order: any) => sum + order.total_amount, 0);
+          .reduce((sum: number, order: OrderItem) => sum + order.total_amount, 0);
 
-        const uniqueCustomers = new Set(orders.map((o: any) => o.buyer_id)).size;
+        const uniqueCustomers = new Set(orders.map((o: OrderItem) => o.buyer_id)).size;
         const conversionRate = totalProducts > 0 ? (totalOrders / totalProducts) * 100 : 0;
 
         setStats({
@@ -592,7 +593,7 @@ function QuickAction({ title, description, icon: Icon, href, color }: QuickActio
 // ============================================
 
 interface CreateStoreFormProps {
-  onCreateStore: (data: any) => Promise<any>;
+  onCreateStore: (data: { name: string; slug: string; description?: string; location?: string; contact_email?: string; contact_phone?: string }) => Promise<{ id: string } | null>;
 }
 
 function CreateStoreForm({ onCreateStore }: CreateStoreFormProps) {

@@ -5,7 +5,7 @@
 
 import { useWishlist } from '@/lib/hooks/useWishlist';
 import { useAuth } from '@/lib/hooks/useAuth';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Card, CardContent } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import EmptyState from '@/components/ui/EmptyState';

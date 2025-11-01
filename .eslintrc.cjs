@@ -19,6 +19,16 @@ module.exports = {
       rules: {
         '@typescript-eslint/no-var-requires': 'off',
         'import/no-commonjs': 'off',
+        '@typescript-eslint/no-require-imports': 'off',
+      },
+    },
+    // Archivos .js en scripts
+    {
+      files: ['scripts/**/*.js'],
+      rules: {
+        '@typescript-eslint/no-var-requires': 'off',
+        'import/no-commonjs': 'off',
+        '@typescript-eslint/no-require-imports': 'off',
       },
     },
     // Archivos generados o d.ts

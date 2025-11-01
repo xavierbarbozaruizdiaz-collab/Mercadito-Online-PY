@@ -61,9 +61,11 @@ export default function AdminReportsPage() {
       if (error) throw error;
 
       // Enriquecer con información del objeto denunciado
+      type TargetInfo = { name: string; type: string } | null;
+      
       const enrichedReports = await Promise.all(
         (data || []).map(async (r: any) => {
-          let targetInfo = null;
+          let targetInfo: TargetInfo = null;
           try {
             switch (r.report_type) {
               case 'product':
@@ -72,7 +74,7 @@ export default function AdminReportsPage() {
                   .select('id, title')
                   .eq('id', r.target_id)
                   .single();
-                targetInfo = product ? { name: (product as any).title, type: 'product' } : null;
+                targetInfo = product ? { name: (product as { title: string }).title, type: 'product' } : null;
                 break;
               case 'user':
                 const { data: user } = await supabase
@@ -80,11 +82,13 @@ export default function AdminReportsPage() {
                   .select('id, email, first_name, last_name')
                   .eq('id', r.target_id)
                   .single();
-                targetInfo = user
+                type ProfileData = { first_name?: string; last_name?: string; email: string };
+                const userTyped = user as ProfileData | null;
+                targetInfo = userTyped
                   ? {
-                      name: (user as any).first_name || (user as any).last_name
-                        ? `${(user as any).first_name || ''} ${(user as any).last_name || ''}`.trim()
-                        : (user as any).email,
+                      name: userTyped.first_name || userTyped.last_name
+                        ? `${userTyped.first_name || ''} ${userTyped.last_name || ''}`.trim()
+                        : userTyped.email,
                       type: 'user',
                     }
                   : null;
@@ -95,7 +99,7 @@ export default function AdminReportsPage() {
                   .select('id, name')
                   .eq('id', r.target_id)
                   .single();
-                targetInfo = store ? { name: (store as any).name, type: 'store' } : null;
+                targetInfo = store ? { name: (store as { name: string }).name, type: 'store' } : null;
                 break;
             }
           } catch (err) {
@@ -130,14 +134,16 @@ export default function AdminReportsPage() {
 
       type ReportsUpdate = Database['public']['Tables']['reports']['Update'];
       
+      const updateData: ReportsUpdate = {
+        status: resolution,
+        resolved_by: user.id,
+        resolved_at: new Date().toISOString(),
+        resolution_notes: resolutionNotes,
+      };
+      
       const { error } = await supabase
         .from('reports')
-        .update<ReportsUpdate>({
-          status: resolution,
-          resolved_by: user.id,
-          resolved_at: new Date().toISOString(),
-          resolution_notes: resolutionNotes,
-        })
+        .update(updateData)
         .eq('id', selectedReport.id);
 
       if (error) throw error;
