@@ -26,6 +26,29 @@ module.exports = {
       files: ['**/*.d.ts'],
       rules: { '@typescript-eslint/no-empty-interface': 'off' },
     },
+    // Archivos de tests
+    {
+      files: ['tests/**/*', '**/*.test.tsx', '**/*.test.ts', '**/*.spec.ts'],
+      rules: {
+        '@typescript-eslint/no-explicit-any': 'off',
+        '@typescript-eslint/no-unused-vars': 'off',
+      },
+    },
+    // Funciones de Supabase (Deno)
+    {
+      files: ['supabase/functions/**/*'],
+      rules: {
+        '@typescript-eslint/no-explicit-any': 'off',
+      },
+    },
+  ],
+  ignorePatterns: [
+    'node_modules/**',
+    '.next/**',
+    'dist/**',
+    'build/**',
+    'supabase/functions/**',
+    'tests/**',
   ],
 };
 
