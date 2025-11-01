@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
+import type { Database } from '@/types/database';
 
 type Report = {
   id: string;
@@ -127,11 +128,11 @@ export default function AdminReportsPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('No autenticado');
 
-      // @ts-ignore - Supabase types for reports table are incomplete
+      type ReportsUpdate = Database['public']['Tables']['reports']['Update'];
+      
       const { error } = await supabase
         .from('reports')
-        // @ts-ignore
-        .update({
+        .update<ReportsUpdate>({
           status: resolution,
           resolved_by: user.id,
           resolved_at: new Date().toISOString(),
