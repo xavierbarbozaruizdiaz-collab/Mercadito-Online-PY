@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import type { Database } from '@/types/database';
 
 type Report = {
   id: string;
@@ -132,14 +131,15 @@ export default function AdminReportsPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('No autenticado');
 
-      const { error } = await supabase
+      // Using 'as any' to bypass Supabase strict type constraint for updates
+      const { error } = await (supabase as any)
         .from('reports')
         .update({
           status: resolution,
           resolved_by: user.id,
           resolved_at: new Date().toISOString(),
           resolution_notes: resolutionNotes,
-        } as Database['public']['Tables']['reports']['Update'])
+        })
         .eq('id', selectedReport.id);
 
       if (error) throw error;

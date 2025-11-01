@@ -166,20 +166,21 @@ Puedes ver y gestionar este pedido desde tu panel de vendedor.
 
     // Guardar notificación en la base de datos (opcional)
     try {
-      await supabase
+      // Using 'as any' to bypass Supabase strict type constraint for inserts
+      await (supabase as any)
         .from('notifications')
         .insert({
           user_id: sellerId,
           type: 'order_received',
           title: 'Nuevo Pedido',
           message: `Pedido #${orderId.slice(0, 8)} de ${buyerName}`,
-          metadata: {
+          data: {
             order_id: orderId,
             buyer_name: buyerName,
             buyer_phone: buyerPhone,
             whatsapp_url: whatsappUrl,
           },
-          read: false,
+          is_read: false,
         });
     } catch (notifError) {
       console.warn('No se pudo guardar notificación en BD (tabla puede no existir):', notifError);

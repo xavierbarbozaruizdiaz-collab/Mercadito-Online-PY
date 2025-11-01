@@ -9,7 +9,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useAuth, useStore, useRole } from '@/lib/hooks/useAuth';
 import { supabase } from '@/lib/supabase/client';
-import { formatCurrency, formatNumber, formatDate } from '@/lib/utils';
+import { formatCurrency, formatDate } from '@/lib/utils';
 import SellerAnalytics from '@/components/SellerAnalytics';
 import { 
   Package, 

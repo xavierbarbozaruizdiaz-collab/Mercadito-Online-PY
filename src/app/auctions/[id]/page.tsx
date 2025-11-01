@@ -342,7 +342,8 @@ export default function AuctionDetailPage() {
             .limit(1);
           
           if (myBids && myBids.length > 0) {
-            const myHighestBid = myBids[0].amount;
+            type BidItem = { amount: number };
+            const myHighestBid = (myBids[0] as BidItem).amount;
             
             // Obtener todas las pujas ordenadas para encontrar posición
             const { data: allBids } = await supabase
@@ -352,9 +353,11 @@ export default function AuctionDetailPage() {
               .eq('is_retracted', false)
               .order('amount', { ascending: false });
             
+            type AllBidItem = { bidder_id: string; amount: number };
+            
             if (allBids) {
               const uniqueBidders = new Map<string, number>();
-              allBids.forEach(bid => {
+              (allBids as AllBidItem[]).forEach(bid => {
                 if (!uniqueBidders.has(bid.bidder_id) || uniqueBidders.get(bid.bidder_id)! < bid.amount) {
                   uniqueBidders.set(bid.bidder_id, bid.amount);
                 }
