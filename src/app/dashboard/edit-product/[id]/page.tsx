@@ -20,7 +20,7 @@ export default function EditProduct() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState<string>('');
-  const [saleType, setSaleType] = useState<'direct' | 'auction'>('direct');
+  const [saleType, setSaleType] = useState<'direct' | 'auction' | 'negotiable'>('direct');
   const [condition, setCondition] = useState<'nuevo' | 'usado' | 'usado_como_nuevo'>('nuevo');
   const [categoryId, setCategoryId] = useState<string | null>(null);
   
@@ -568,16 +568,18 @@ export default function EditProduct() {
                 inputMode="numeric"
                 min="0"
                 value={price}
-                onChange={(e) => {
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                   setPrice(e.target.value);
-                  if (saleType !== 'auction') {
+                  // Type assertion to fix TypeScript narrowing issue
+                  const currentSaleType = saleType as 'direct' | 'auction' | 'negotiable';
+                  if (currentSaleType !== 'auction') {
                     validateField('price', e.target.value);
                   }
                 }}
                 className={`border p-2 w-full rounded ${
                   validationErrors.price ? 'border-red-500' : priceNumber > 0 ? 'border-green-500' : ''
                 }`}
-                required={saleType !== 'auction'}
+                required={(saleType as string) !== 'auction'}
               />
               {validationErrors.price && (
                 <p className="text-red-500 text-sm mt-1">{validationErrors.price}</p>
