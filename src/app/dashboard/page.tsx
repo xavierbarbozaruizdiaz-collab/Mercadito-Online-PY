@@ -275,8 +275,8 @@ export default function Dashboard() {
 
       // Top 5 productos más vendidos
       const topProducts = Array.from(productSalesMap.entries())
-        .map(([id, data]) => ({ id, ...data }))
-        .sort((a, b) => b.sold - a.sold)
+        .map(([id, data]) => ({ id, title: data.title || '', cover_url: data.cover_url || null, total_sold: data.sold, revenue: data.revenue }))
+        .sort((a, b) => b.total_sold - a.total_sold)
         .slice(0, 5);
 
       // Tendencias de ventas (ordenadas por fecha)
@@ -293,7 +293,7 @@ export default function Dashboard() {
       const averageOrderValue = orders.length > 0 ? totalRevenue / orders.length : 0;
 
       // Generar notificaciones
-      type NotificationItem = { type: 'order' | 'product' | 'review'; message: string; priority: 'high' | 'medium' | 'low'; link: string };
+      type NotificationItem = { type: 'order' | 'review' | 'stock'; message: string; priority: 'low' | 'medium' | 'high'; link?: string };
       const notifications: NotificationItem[] = [];
       if (pendingOrders.length > 0) {
         notifications.push({
@@ -358,17 +358,20 @@ export default function Dashboard() {
         throw new Error('Producto no encontrado');
       }
       
-      if (productToDelete.seller_id !== userId) {
+      type ProductWithSeller = { id: string; seller_id: string; title: string };
+      const product = productToDelete as ProductWithSeller;
+      
+      if (product.seller_id !== userId) {
         console.error('❌ El producto no pertenece al usuario actual');
-        console.log('Producto seller_id:', productToDelete.seller_id);
+        console.log('Producto seller_id:', product.seller_id);
         console.log('Usuario actual:', userId);
         throw new Error('No tienes permiso para eliminar este producto');
       }
       
       console.log('✅ Verificación: Producto pertenece al usuario. Eliminando...', {
         productId,
-        title: productToDelete.title,
-        sellerId: productToDelete.seller_id,
+        title: product.title,
+        sellerId: product.seller_id,
         currentUserId: userId
       });
       
@@ -395,9 +398,9 @@ export default function Dashboard() {
       // 2. Eliminar producto - Usar solo ID, dejar que RLS verifique seller_id
       console.log('🔍 Intentando DELETE...');
       console.log('Verificando que auth.uid() coincide:', {
-        productSellerId: productToDelete.seller_id,
+        productSellerId: product.seller_id,
         currentUserId: currentSession.session.user.id,
-        match: productToDelete.seller_id === currentSession.session.user.id
+        match: product.seller_id === currentSession.session.user.id
       });
       
       // IMPORTANTE: No usar .eq('seller_id') en el DELETE
@@ -430,7 +433,7 @@ export default function Dashboard() {
           console.warn('⚠️ DELETE retornó count: 0. Intentando con función SQL...');
           
           // Usar función SQL que tiene SECURITY DEFINER para evitar problemas de RLS
-          const { data: rpcResult, error: rpcError } = await supabase
+          const { data: rpcResult, error: rpcError } = await (supabase as any)
             .rpc('delete_user_product', { product_id_to_delete: productId });
           
           if (rpcError) {
@@ -479,11 +482,12 @@ export default function Dashboard() {
           console.error('Producto que intentamos eliminar:', {
             productId,
             userId,
-            productSellerId: productToDelete.seller_id,
-            match: productToDelete.seller_id === userId
+            productSellerId: product.seller_id,
+            match: product.seller_id === userId
           });
           console.error('El producto todavía existe:', finalCheck);
-          throw new Error(`No se pudo eliminar el producto. Posible problema de permisos RLS. Producto ID: ${productId}, Seller ID: ${finalCheck.seller_id}, Usuario: ${userId}`);
+          type FinalCheckProduct = { seller_id: string };
+          throw new Error(`No se pudo eliminar el producto. Posible problema de permisos RLS. Producto ID: ${productId}, Seller ID: ${(finalCheck as FinalCheckProduct).seller_id}, Usuario: ${userId}`);
         } else {
           // El producto ya no existe - la función SQL funcionó, aunque count sea 0
           console.log('✅ El producto fue eliminado correctamente por la función SQL');
@@ -540,7 +544,8 @@ export default function Dashboard() {
           console.error('❌ Error al recargar productos:', reloadError);
         } else if (refreshedProducts) {
           // Verificar que el producto eliminado no esté en la lista
-          const deletedProductStillExists = refreshedProducts.some(p => p.id === productId);
+          type RefreshedProduct = { id: string };
+          const deletedProductStillExists = (refreshedProducts as RefreshedProduct[]).some(p => p.id === productId);
           if (deletedProductStillExists) {
             console.error('⚠️ ADVERTENCIA: El producto eliminado todavía aparece en la lista recargada');
             console.log('Producto problemático ID:', productId);
@@ -997,7 +1002,7 @@ export default function Dashboard() {
                     </h4>
                     <div className="space-y-1">
                       <p className="text-xs text-gray-600">
-                        <span className="font-semibold">{product.sold}</span> vendidos
+                        <span className="font-semibold">{product.total_sold}</span> vendidos
                       </p>
                       <p className="text-xs font-semibold text-green-600">
                         {product.revenue.toLocaleString('es-PY')} Gs.
