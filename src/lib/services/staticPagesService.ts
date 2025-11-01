@@ -68,7 +68,8 @@ export async function createPage(
   is_published: boolean,
   adminId: string
 ): Promise<StaticPage | null> {
-  const { data, error } = await supabase
+  // Using 'as any' to bypass Supabase strict type constraint for inserts
+  const { data, error } = await (supabase as any)
     .from('static_pages')
     .insert({
       slug,
@@ -104,7 +105,8 @@ export async function updatePage(
   },
   adminId: string
 ): Promise<StaticPage | null> {
-  const { data, error } = await supabase
+  // Using 'as any' to bypass Supabase strict type constraint for updates
+  const { data, error } = await (supabase as any)
     .from('static_pages')
     .update({
       ...updates,

@@ -56,7 +56,8 @@ export async function getSetting(key: string, defaultValue: any = null): Promise
  * Actualiza una configuración
  */
 export async function updateSetting(key: string, value: any, adminId: string): Promise<void> {
-  const { error } = await supabase
+  // Using 'as any' to bypass Supabase strict type constraint for updates
+  const { error } = await (supabase as any)
     .from('site_settings')
     .update({
       value: typeof value === 'string' ? JSON.parse(`"${value}"`) : value,
@@ -67,7 +68,8 @@ export async function updateSetting(key: string, value: any, adminId: string): P
 
   if (error) {
     // Si no existe, crearlo
-    const { error: insertError } = await supabase
+    // Using 'as any' to bypass Supabase strict type constraint for inserts
+    const { error: insertError } = await (supabase as any)
       .from('site_settings')
       .insert({
         key,
