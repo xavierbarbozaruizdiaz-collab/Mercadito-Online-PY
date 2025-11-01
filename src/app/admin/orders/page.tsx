@@ -17,6 +17,7 @@ import {
   type PaymentStatus,
 } from '@/lib/services/orderAdminService';
 import { supabase } from '@/lib/supabaseClient';
+import type { Database } from '@/types/database';
 
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<OrderAdmin[]>([]);
