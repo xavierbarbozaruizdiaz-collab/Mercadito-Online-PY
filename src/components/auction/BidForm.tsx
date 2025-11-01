@@ -93,14 +93,17 @@ export default function BidForm({
         .single();
       
       if (auctionCheck) {
-        if (auctionCheck.auction_status !== 'active') {
+        type AuctionCheckType = { auction_status: string; auction_end_at?: string };
+        const auction = auctionCheck as AuctionCheckType;
+        
+        if (auction.auction_status !== 'active') {
           setError('Esta subasta ya no está activa');
           return;
         }
         
         // Verificar que no haya terminado
-        if (auctionCheck.auction_end_at) {
-          const endDate = new Date(auctionCheck.auction_end_at);
+        if (auction.auction_end_at) {
+          const endDate = new Date(auction.auction_end_at);
           if (endDate <= new Date()) {
             setError('Esta subasta ya ha finalizado');
             return;
@@ -305,7 +308,7 @@ export default function BidForm({
           <Button
             onClick={handleBuyNow}
             disabled={buyNowLoading}
-            variant="default"
+            variant="primary"
             className="w-full bg-emerald-600 hover:bg-emerald-700"
             size="lg"
           >

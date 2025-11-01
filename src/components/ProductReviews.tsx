@@ -122,17 +122,17 @@ export default function ProductReviews({
   };
 
   const renderStars = (rating: number, size: 'sm' | 'md' | 'lg' = 'md') => {
-    const stars = [];
     const sizeClass = size === 'sm' ? 'w-3 h-3' : size === 'lg' ? 'w-6 h-6' : 'w-4 h-4';
+    const starElements: React.ReactElement[] = [];
     for (let i = 1; i <= 5; i++) {
-      stars.push(
+      starElements.push(
         <Star
           key={i}
           className={`${sizeClass} ${i <= rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`}
         />
       );
     }
-    return <div className="flex gap-0.5">{stars}</div>;
+    return <div className="flex gap-0.5">{starElements}</div>;
   };
 
   if (loading && reviews.length === 0) {

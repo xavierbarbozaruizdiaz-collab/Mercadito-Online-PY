@@ -265,18 +265,22 @@ export async function getOrderById(orderId: string): Promise<OrderAdmin | null> 
     return null;
   }
 
+  // Type assertion needed due to Supabase strict typing
+  type OrderData = { id: string; buyer_id: string; seller_id?: string | null };
+  const orderTyped = order as unknown as OrderData;
+
   // Enriquecer con información adicional
   const [buyerRes, sellerRes, itemsRes] = await Promise.all([
     supabase
       .from('profiles')
       .select('id, email, first_name, last_name, phone')
-      .eq('id', order.buyer_id)
+      .eq('id', orderTyped.buyer_id)
       .single(),
-    order.seller_id
+    orderTyped.seller_id
       ? supabase
           .from('profiles')
           .select('id, email, first_name, last_name')
-          .eq('id', order.seller_id)
+          .eq('id', orderTyped.seller_id!)
           .single()
       : { data: null },
     supabase
@@ -289,11 +293,11 @@ export async function getOrderById(orderId: string): Promise<OrderAdmin | null> 
         total_price,
         product:products(id, title, cover_url)
       `)
-      .eq('order_id', order.id),
+      .eq('order_id', orderTyped.id),
   ]);
 
   return {
-    ...order,
+    ...(order as Record<string, any>),
     buyer: buyerRes.data,
     seller: sellerRes.data,
     items: itemsRes.data || [],

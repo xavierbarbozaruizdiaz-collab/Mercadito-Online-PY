@@ -332,9 +332,12 @@ async function checkAndUpdateAuctionStatus(productId: string): Promise<void> {
 
     if (fetchError || !auction) return;
 
-    const status = auction.auction_status;
-    const startAt = auction.auction_start_at;
-    const endAt = auction.auction_end_at;
+    type AuctionData = { auction_status: string; auction_start_at?: string; auction_end_at?: string };
+    const auctionData = auction as AuctionData;
+    
+    const status = auctionData.auction_status;
+    const startAt = auctionData.auction_start_at;
+    const endAt = auctionData.auction_end_at;
 
     // Verificar si debería estar activa pero está programada
     if (status === 'scheduled' && startAt) {
@@ -351,7 +354,7 @@ async function checkAndUpdateAuctionStatus(productId: string): Promise<void> {
           const endDate = new Date(endAt);
           if (endDate <= nowDate) {
             // Ya terminó, marcarla como finalizada
-            await supabase
+            await (supabase as any)
               .from('products')
               .update({ 
                 auction_status: 'ended',
@@ -361,7 +364,7 @@ async function checkAndUpdateAuctionStatus(productId: string): Promise<void> {
             console.log(`✅ Subasta ${productId} actualizada a FINALIZADA`);
           } else {
             // Debería estar activa
-            await supabase
+            await (supabase as any)
               .from('products')
               .update({ 
                 auction_status: 'active',
@@ -372,7 +375,7 @@ async function checkAndUpdateAuctionStatus(productId: string): Promise<void> {
           }
         } else {
           // No tiene fecha de fin, solo activar
-          await supabase
+          await (supabase as any)
             .from('products')
             .update({ 
               auction_status: 'active',
@@ -390,7 +393,7 @@ async function checkAndUpdateAuctionStatus(productId: string): Promise<void> {
       const nowDate = new Date();
       
       if (endDate <= nowDate) {
-        await supabase
+        await (supabase as any)
           .from('products')
           .update({ 
             auction_status: 'ended',

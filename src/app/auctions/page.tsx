@@ -57,10 +57,18 @@ export default function AuctionsPage() {
       let sorted = [...data];
       switch (sortBy) {
         case 'all':
-          // Para "TODAS", mostrar por fecha de creación (más recientes primero)
+          // Para "TODAS", mostrar por fecha de inicio o creación (más recientes primero)
           sorted.sort((a, b) => {
-            const aDate = a.created_at ? new Date(a.created_at).getTime() : 0;
-            const bDate = b.created_at ? new Date(b.created_at).getTime() : 0;
+            type AuctionWithDates = { created_at?: string; auction_start_at?: string };
+            const aAuction = a as unknown as AuctionWithDates;
+            const bAuction = b as unknown as AuctionWithDates;
+            // Safe access to optional properties
+            const aDate = (aAuction?.created_at || aAuction?.auction_start_at) 
+              ? new Date(aAuction.created_at || aAuction.auction_start_at || 0).getTime() 
+              : 0;
+            const bDate = (bAuction?.created_at || bAuction?.auction_start_at) 
+              ? new Date(bAuction.created_at || bAuction.auction_start_at || 0).getTime() 
+              : 0;
             return bDate - aDate; // Más recientes primero
           });
           break;
@@ -79,8 +87,11 @@ export default function AuctionsPage() {
           break;
         case 'recent':
           sorted.sort((a, b) => {
-            const aDate = a.created_at ? new Date(a.created_at).getTime() : 0;
-            const bDate = b.created_at ? new Date(b.created_at).getTime() : 0;
+            type AuctionWithDates = { created_at?: string; auction_start_at?: string };
+            const aAuction = a as unknown as AuctionWithDates;
+            const bAuction = b as unknown as AuctionWithDates;
+            const aDate = (aAuction.created_at || aAuction.auction_start_at) ? new Date(aAuction.created_at || aAuction.auction_start_at || 0).getTime() : 0;
+            const bDate = (bAuction.created_at || bAuction.auction_start_at) ? new Date(bAuction.created_at || bAuction.auction_start_at || 0).getTime() : 0;
             return bDate - aDate; // Más recientes primero
           });
           break;

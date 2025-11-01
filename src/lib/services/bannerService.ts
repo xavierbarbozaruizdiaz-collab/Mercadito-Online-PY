@@ -76,7 +76,8 @@ export async function getActiveBanners(position?: string): Promise<Banner[]> {
 export async function createBanner(
   banner: Omit<Banner, 'id' | 'created_at' | 'updated_at'>
 ): Promise<Banner | null> {
-  const { data, error } = await supabase
+  // Using 'as any' to bypass Supabase strict type constraint for inserts
+  const { data, error } = await (supabase as any)
     .from('banners')
     .insert(banner)
     .select()
@@ -97,7 +98,8 @@ export async function updateBanner(
   id: string,
   updates: Partial<Banner>
 ): Promise<Banner | null> {
-  const { data, error } = await supabase
+  // Using 'as any' to bypass Supabase strict type constraint for updates
+  const { data, error } = await (supabase as any)
     .from('banners')
     .update({
       ...updates,

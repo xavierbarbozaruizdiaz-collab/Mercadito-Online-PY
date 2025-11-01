@@ -69,9 +69,10 @@ export async function sendBulkNotification(
     }));
 
     // 4. Insertar todas las notificaciones en batch
-    const { data: notifications, error } = await supabase
+    // Using 'as any' to bypass Supabase strict type constraint for inserts
+    const { data: notifications, error } = await (supabase as any)
       .from('notifications')
-      .insert(notificationInputs as any[])
+      .insert(notificationInputs)
       .select('id, user_id');
 
     if (error) {
@@ -118,7 +119,8 @@ export async function sendBulkNotification(
     // 7. Guardar log de notificación masiva
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      await supabase.from('bulk_notifications').insert({
+      // Using 'as any' to bypass Supabase strict type constraint for inserts
+      await (supabase as any).from('bulk_notifications').insert({
         title: input.title,
         message: input.message,
         notification_type: input.type,
@@ -252,9 +254,8 @@ export async function getBulkNotificationStats(): Promise<{
     supabase.from('bulk_notifications').select('notification_type, recipient_count'),
     supabase
       .from('bulk_notifications')
-      .select('id')
-      .gte('sent_at', thirtyDaysAgo.toISOString())
-      .select('id', { count: 'exact', head: true }),
+      .select('id', { count: 'exact', head: true })
+      .gte('sent_at', thirtyDaysAgo.toISOString()),
   ]);
 
   const all = allData.data || [];
