@@ -27,6 +27,7 @@ import {
   TrendingDown
 } from 'lucide-react';
 import Image from 'next/image';
+import DashboardSidebar from '@/components/DashboardSidebar';
 // import AdminRoleAssigner from '@/components/AdminRoleAssigner'; // Temporalmente comentado
 
 type Product = {
@@ -1046,7 +1047,12 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-[#1A1A1A]">
+    <div className="min-h-screen bg-[#1A1A1A] flex">
+      {/* Barra lateral */}
+      <DashboardSidebar />
+      
+      {/* Contenido principal */}
+      <div className="flex-1 ml-64 p-6">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-0 mb-6">
         <h1 className="text-xl sm:text-2xl font-bold text-gray-200">Panel del vendedor</h1>
         <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
@@ -2078,6 +2084,7 @@ export default function Dashboard() {
       {/* <div className="mt-8">
         <AdminRoleAssigner />
       </div> */}
+      </div>
     </div>
   );
 }
