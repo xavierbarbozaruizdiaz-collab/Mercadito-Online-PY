@@ -151,7 +151,8 @@ jobs:
     name: 🧪 Post-Deployment Tests
     runs-on: ubuntu-latest
     needs: deploy
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/production'
+    if: always() && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/production')  # Ejecutar siempre, incluso si deploy falla
+    continue-on-error: true  # No bloquear workflow
     steps:
       - name: 📥 Checkout code
         uses: actions/checkout@v4
