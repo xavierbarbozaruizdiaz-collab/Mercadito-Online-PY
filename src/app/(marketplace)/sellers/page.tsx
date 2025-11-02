@@ -235,7 +235,7 @@ export default function SellersListPage() {
 
       // Aplicar ordenamiento
       filteredSellers.sort((a, b) => {
-        let aValue: string | number | undefined, bValue: string | number | undefined;
+        let aValue: string | number | Date | undefined, bValue: string | number | Date | undefined;
         
         switch (filters.sort_by) {
           case 'rating':
