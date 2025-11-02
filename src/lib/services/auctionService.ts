@@ -4,6 +4,7 @@
 // ============================================
 
 import { supabase } from '@/lib/supabaseClient';
+import { logger } from '@/lib/utils/logger';
 
 // ============================================
 // TIPOS
@@ -23,6 +24,7 @@ export interface AuctionBid {
     first_name?: string;
     last_name?: string;
     email?: string;
+    city?: string;
   };
 }
 
@@ -31,7 +33,7 @@ export interface AuctionProduct {
   title: string;
   description?: string;
   price: number;
-  cover_url?: string;
+  image_url?: string;
   condition: string;
   sale_type: 'auction';
   auction_status: 'scheduled' | 'active' | 'ended' | 'cancelled';
@@ -76,15 +78,17 @@ export async function getActiveAuctions(filters?: {
   minPrice?: number;
   maxPrice?: number;
   search?: string;
+  seller_id?: string;
 }): Promise<AuctionProduct[]> {
   try {
     const now = new Date().toISOString();
     
         // Primero, obtener todas las subastas (sale_type = 'auction')
         // Solo incluir productos activos o pausados (no archivados/vendidos/eliminados)
+        // Optimizado: solo seleccionar columnas necesarias
         let query = supabase
           .from('products')
-          .select('*')
+          .select('id, title, description, price, image_url:cover_url, condition, sale_type, auction_status, auction_start_at, auction_end_at, current_bid, min_bid_increment, buy_now_price, reserve_price, winner_id, total_bids, seller_id, status, category_id, created_at')
           .eq('sale_type', 'auction')
           // Excluir productos sin seller_id (productos huérfanos/eliminados)
           .not('seller_id', 'is', null);
@@ -109,44 +113,33 @@ export async function getActiveAuctions(filters?: {
       query = query.or(`title.ilike.%${filters.search}%,description.ilike.%${filters.search}%`);
     }
 
+    if (filters?.seller_id) {
+      query = query.eq('seller_id', filters.seller_id);
+    }
+
     const { data, error } = await query;
 
     if (error) {
-      console.error('Error en query de subastas:', error);
+      logger.error('Error en query de subastas', error);
       throw error;
     }
 
-    console.log('🔍 Subastas encontradas (sin filtrar):', data?.length || 0);
+    logger.debug('Subastas encontradas (sin filtrar)', { count: data?.length || 0 });
     
     let refreshedData: any[] | null = null;
     
-    // Log detallado de cada subasta para debuggear
+    // ACTUALIZAR ESTADOS de todas las subastas antes de filtrar
     if (data && data.length > 0) {
-      console.log('📋 Detalles de subastas encontradas:');
-      data.forEach((auction: any, index: number) => {
-        console.log(`Subasta ${index + 1}:`, {
-          id: auction.id,
-          title: auction.title,
-          sale_type: auction.sale_type,
-          auction_status: auction.auction_status,
-          auction_start_at: auction.auction_start_at,
-          auction_end_at: auction.auction_end_at,
-          current_bid: auction.current_bid,
-          price: auction.price
-        });
-      });
-      
-      // ACTUALIZAR ESTADOS de todas las subastas antes de filtrar
-      console.log('🔄 Actualizando estados de subastas...');
+      logger.debug('Actualizando estados de subastas', { count: data.length });
       await Promise.all(
         (data || []).map((auction: any) => checkAndUpdateAuctionStatus(auction.id))
       );
       
       // RECARGAR los datos después de actualizar estados
-      console.log('✅ Estados actualizados, recargando datos...');
+      logger.debug('Estados actualizados, recargando datos');
       const refreshedQuery = supabase
         .from('products')
-        .select('*')
+        .select('id, title, description, price, image_url:cover_url, condition, sale_type, auction_status, auction_start_at, auction_end_at, current_bid, min_bid_increment, buy_now_price, reserve_price, winner_id, total_bids, seller_id, status, category_id, created_at')
         .eq('sale_type', 'auction')
         .not('seller_id', 'is', null)
         .or('status.is.null,status.eq.active,status.eq.paused');
@@ -167,7 +160,7 @@ export async function getActiveAuctions(filters?: {
       const { data: refreshed, error: refreshError } = await refreshedQuery;
       if (!refreshError && refreshed) {
         refreshedData = refreshed;
-        console.log('✅ Datos recargados después de actualizar estados:', refreshedData.length);
+        logger.debug('Datos recargados después de actualizar estados', { count: refreshedData.length });
       }
     }
 
@@ -178,21 +171,21 @@ export async function getActiveAuctions(filters?: {
     const filteredData = dataToFilter.filter((auction: any) => {
       // EXCLUIR si no tiene seller_id (producto huérfano o eliminado incorrectamente)
       if (!auction.seller_id) {
-        console.log(`❌ Subasta "${auction.title}" excluida - sin seller_id (producto huérfano)`);
+        logger.debug('Subasta excluida - sin seller_id', { auctionId: auction.id, title: auction.title });
         return false;
       }
       
       // EXCLUIR si está eliminada, archivada, vendida o cancelada
       const productStatus = auction.status;
       if (productStatus === 'archived' || productStatus === 'sold' || productStatus === 'deleted') {
-        console.log(`❌ Subasta "${auction.title}" excluida - status: ${productStatus}`);
+        logger.debug('Subasta excluida - status inválido', { auctionId: auction.id, status: productStatus });
         return false;
       }
       
       // EXCLUIR si está cancelada o finalizada
       const auctionStatus = auction.auction_status;
       if (auctionStatus === 'cancelled' || auctionStatus === 'ended') {
-        console.log(`❌ Subasta "${auction.title}" excluida - auction_status: ${auctionStatus}`);
+        logger.debug('Subasta excluida - auction_status finalizado', { auctionId: auction.id, status: auctionStatus });
         return false;
       }
       
@@ -205,18 +198,8 @@ export async function getActiveAuctions(filters?: {
       const endAt = auction.auction_end_at;
       const startAt = auction.auction_start_at;
       
-      console.log(`🔎 Filtrando subasta "${auction.title}":`, {
-        status,
-        endAt,
-        startAt,
-        now: Date.now(),
-        endTime: endAt ? new Date(endAt).getTime() : null,
-        startTime: startAt ? new Date(startAt).getTime() : null
-      });
-      
       // Si está finalizada o cancelada, excluirla (ya se filtró arriba pero por seguridad)
       if (status === 'ended' || status === 'cancelled') {
-        console.log(`❌ Subasta "${auction.title}" excluida - finalizada/cancelada`);
         return false;
       }
       
@@ -226,16 +209,15 @@ export async function getActiveAuctions(filters?: {
           const endTime = new Date(endAt).getTime();
           const now = Date.now();
           if (endTime <= now) {
-            console.log(`❌ Subasta "${auction.title}" está activa pero ya terminó`);
+            logger.debug('Subasta activa pero ya terminó', { auctionId: auction.id, endAt });
             return false; // Ya terminó
           }
         }
         // Verificar que el producto no esté archivado/vendido
         if (productStatus === 'archived' || productStatus === 'sold' || productStatus === 'deleted') {
-          console.log(`❌ Subasta "${auction.title}" está activa pero producto está ${productStatus}`);
+          logger.debug('Subasta activa pero producto inválido', { auctionId: auction.id, productStatus });
           return false;
         }
-        console.log(`✅ Subasta "${auction.title}" es activa`);
         return true;
       }
 
@@ -246,27 +228,18 @@ export async function getActiveAuctions(filters?: {
       if (status === 'scheduled') {
         // Si no tiene fecha de inicio, incluirla (para pruebas inmediatas)
         if (!startAt) {
-          console.log(`✅ Subasta "${auction.title}" está programada sin fecha de inicio, se incluye para activación inmediata`);
           return true;
         }
         
         // Si tiene fecha de inicio
         const startTime = new Date(startAt).getTime();
         const now = Date.now();
-        const shouldStart = startTime <= now;
-        
-        console.log(`🔍 Subasta "${auction.title}" está programada. Debería empezar: ${shouldStart}`, {
-          startTime,
-          now,
-          diff: now - startTime,
-          startAtISO: startAt
-        });
         
         // Si tiene fecha de fin, verificar que no haya terminado
         if (endAt) {
           const endTime = new Date(endAt).getTime();
           if (endTime <= now) {
-            console.log(`❌ Subasta "${auction.title}" está programada pero ya terminó`);
+            logger.debug('Subasta programada pero ya terminó', { auctionId: auction.id, endAt });
             return false;
           }
         }
@@ -274,7 +247,6 @@ export async function getActiveAuctions(filters?: {
         // IMPORTANTE: Incluir TODAS las subastas programadas, incluso si tienen fecha futura
         // El usuario debe poder ver las subastas que están próximas a iniciar
         // Solo excluir si la fecha de fin ya pasó
-        console.log(`✅ Subasta "${auction.title}" está programada (se incluye - visible aunque no haya comenzado)`);
         return true;
       }
 
@@ -282,24 +254,20 @@ export async function getActiveAuctions(filters?: {
       if (!status && endAt) {
         const endTime = new Date(endAt).getTime();
         if (endTime > Date.now()) {
-          console.log(`✅ Subasta "${auction.title}" no tiene status pero tiene fecha de fin válida`);
           return true;
         }
-        console.log(`❌ Subasta "${auction.title}" no tiene status y la fecha ya pasó`);
         return false;
       }
 
       // Si no tiene status y no tiene fecha de fin, pero es de tipo subasta, incluirla de todos modos
       if (!status && !endAt && auction.sale_type === 'auction') {
-        console.log(`✅ Subasta "${auction.title}" es tipo subasta pero sin status/fechas configuradas, se incluye`);
         return true;
       }
 
-      console.log(`❌ Subasta "${auction.title}" no cumple ningún criterio`);
       return false;
     });
 
-    console.log('✅ Subastas filtradas (activas):', filteredData.length);
+    logger.debug('Subastas filtradas (activas)', { count: filteredData.length });
 
     // Ordenar por fecha de fin
     filteredData.sort((a: any, b: any) => {
@@ -310,7 +278,7 @@ export async function getActiveAuctions(filters?: {
 
     return filteredData as AuctionProduct[];
   } catch (error) {
-    console.error('Error fetching active auctions:', error);
+    logger.error('Error fetching active auctions', error);
     // Retornar array vacío en lugar de lanzar error para mejor UX
     return [];
   }
@@ -361,7 +329,7 @@ async function checkAndUpdateAuctionStatus(productId: string): Promise<void> {
                 updated_at: now
               })
               .eq('id', productId);
-            console.log(`✅ Subasta ${productId} actualizada a FINALIZADA`);
+            logger.debug('Subasta actualizada a FINALIZADA', { productId });
           } else {
             // Debería estar activa
             await (supabase as any)
@@ -371,7 +339,7 @@ async function checkAndUpdateAuctionStatus(productId: string): Promise<void> {
                 updated_at: now
               })
               .eq('id', productId);
-            console.log(`✅ Subasta ${productId} actualizada a ACTIVA`);
+            logger.debug('Subasta actualizada a ACTIVA', { productId });
           }
         } else {
           // No tiene fecha de fin, solo activar
@@ -382,7 +350,7 @@ async function checkAndUpdateAuctionStatus(productId: string): Promise<void> {
               updated_at: now
             })
             .eq('id', productId);
-          console.log(`✅ Subasta ${productId} actualizada a ACTIVA`);
+          logger.debug('Subasta actualizada a ACTIVA', { productId });
         }
       }
     }
@@ -400,11 +368,11 @@ async function checkAndUpdateAuctionStatus(productId: string): Promise<void> {
             updated_at: now
           })
           .eq('id', productId);
-        console.log(`✅ Subasta ${productId} actualizada a FINALIZADA (ya había terminado)`);
+        logger.debug('Subasta actualizada a FINALIZADA (ya había terminado)', { productId });
       }
     }
   } catch (error) {
-    console.error('Error checking auction status:', error);
+    logger.error('Error checking auction status', error, { productId });
     // No lanzar error, solo loguear
   }
 }
@@ -420,7 +388,7 @@ export async function getAuctionById(productId: string): Promise<AuctionProduct 
     
     const { data, error } = await supabase
       .from('products')
-      .select('*')
+      .select('id, title, description, price, image_url:cover_url, condition, sale_type, auction_status, auction_start_at, auction_end_at, current_bid, min_bid_increment, buy_now_price, reserve_price, winner_id, total_bids, seller_id, status, category_id, created_at, attributes')
       .eq('id', productId)
       .eq('sale_type', 'auction')
       // Excluir productos sin seller_id (productos huérfanos)
@@ -431,7 +399,7 @@ export async function getAuctionById(productId: string): Promise<AuctionProduct 
 
     if (error) {
       if (error.code === 'PGRST116') {
-        console.log('⚠️ Subasta no encontrada o eliminada:', productId);
+        logger.debug('Subasta no encontrada o eliminada', { productId });
         return null;
       }
       throw error;
@@ -443,26 +411,26 @@ export async function getAuctionById(productId: string): Promise<AuctionProduct 
       
       // Excluir si está archivada/vendida/eliminada
       if (product.status === 'archived' || product.status === 'sold' || product.status === 'deleted') {
-        console.log('⚠️ Subasta excluida - status:', product.status);
+        logger.debug('Subasta excluida - status inválido', { productId, status: product.status });
         return null;
       }
       
       // Excluir si está cancelada
       if (product.auction_status === 'cancelled') {
-        console.log('⚠️ Subasta excluida - cancelada');
+        logger.debug('Subasta excluida - cancelada', { productId });
         return null;
       }
       
       // Excluir si no tiene seller_id (por seguridad adicional)
       if (!product.seller_id) {
-        console.log('⚠️ Subasta excluida - sin seller_id');
+        logger.debug('Subasta excluida - sin seller_id', { productId });
         return null;
       }
     }
 
     return data as AuctionProduct;
   } catch (error) {
-    console.error('Error fetching auction:', error);
+    logger.error('Error fetching auction', error, { productId });
     throw error;
   }
 }
@@ -475,10 +443,10 @@ export async function getBidsForAuction(
   limit: number = 20
 ): Promise<AuctionBid[]> {
   try {
-    // Primero obtener las pujas
+    // Primero obtener las pujas (solo columnas necesarias)
     const { data: bidsData, error: bidsError } = await supabase
       .from('auction_bids')
-      .select('*')
+      .select('id, product_id, bidder_id, amount, bid_time, is_auto_bid, is_retracted, created_at')
       .eq('product_id', productId)
       .eq('is_retracted', false)
       .order('amount', { ascending: false })
@@ -497,11 +465,11 @@ export async function getBidsForAuction(
     // Obtener los perfiles de los postores
     const { data: profilesData, error: profilesError } = await supabase
       .from('profiles')
-      .select('id, first_name, last_name, email')
+      .select('id, first_name, last_name, email, city')
       .in('id', bidderIds);
 
     if (profilesError) {
-      console.warn('Error fetching profiles for bids:', profilesError);
+      logger.warn('Error fetching profiles for bids', profilesError);
       // Continuar sin perfiles, pero retornar las pujas
     }
 
@@ -521,12 +489,13 @@ export async function getBidsForAuction(
         first_name: null,
         last_name: null,
         email: null,
+        city: null,
       },
     }));
 
     return bidsWithProfiles as AuctionBid[];
   } catch (error) {
-    console.error('Error fetching bids:', error);
+    logger.error('Error fetching bids', error, { productId });
     throw error;
   }
 }
@@ -540,26 +509,71 @@ export async function placeBid(
   amount: number
 ): Promise<{ bid_id: string; success: boolean; error?: string; version?: number; end_at?: string; server_timestamp?: string; is_duplicate?: boolean }> {
   try {
-    // Generar idempotency key para prevenir pujas duplicadas
-    const idempotencyKey = crypto.randomUUID();
-    const clientSentAt = new Date().toISOString();
-    
-    const { data, error } = await (supabase as any).rpc('place_bid', {
-      p_product_id: productId,
-      p_bidder_id: bidderId,
-      p_amount: amount,
-      p_idempotency_key: idempotencyKey,
-      p_client_sent_at: clientSentAt,
-    });
+    // Rate limiting para pujas
+    try {
+      const { rateLimiter } = await import('@/lib/utils/rateLimit');
+      const limitCheck = await rateLimiter.checkLimit(bidderId, 'BID_PLACE');
+      
+      if (!limitCheck.allowed) {
+        logger.warn('Rate limit excedido para puja', { bidderId, productId, amount, retryAfter: limitCheck.retryAfter });
+        return {
+          bid_id: '',
+          success: false,
+          error: `Has alcanzado el límite de pujas. Intenta de nuevo en ${limitCheck.retryAfter || 60} segundos.`,
+        };
+      }
+    } catch (rateLimitError: any) {
+      // Si el rate limiter falla, loguear pero continuar (degradación elegante)
+      logger.warn('Rate limiter no disponible, continuando sin limitación', rateLimitError);
+    }
 
-    if (error) {
-      console.error('Error placing bid:', error);
+    // Usar lock para prevenir condiciones de carrera (adicional al idempotency key)
+    const { lockManager, getAuctionLockKey } = await import('@/lib/utils/locks');
+    const lockKey = getAuctionLockKey(productId);
+    
+    const result = await lockManager.withLock(
+      lockKey,
+      async () => {
+        // Generar idempotency key para prevenir pujas duplicadas
+        const idempotencyKey = crypto.randomUUID();
+        const clientSentAt = new Date().toISOString();
+        
+        const { data, error } = await (supabase as any).rpc('place_bid', {
+          p_product_id: productId,
+          p_bidder_id: bidderId,
+          p_amount: amount,
+          p_idempotency_key: idempotencyKey,
+          p_client_sent_at: clientSentAt,
+        });
+
+        if (error) {
+          throw error;
+        }
+
+        return data;
+      },
+      10000 // 10 segundos de timeout para el lock
+    );
+
+    if (!result.success) {
+      if (result.error) {
+        logger.error('Error placing bid', result.error, { productId, bidderId, amount });
+        return {
+          bid_id: '',
+          success: false,
+          error: result.error.message || 'Error al colocar la puja',
+        };
+      }
+      // Si no se pudo adquirir el lock (otro proceso está procesando)
+      logger.warn('No se pudo adquirir lock para puja', { productId, bidderId });
       return {
         bid_id: '',
         success: false,
-        error: error.message || 'Error al colocar la puja',
+        error: 'La subasta está siendo procesada. Intenta de nuevo en un momento.',
       };
     }
+
+    const data = result.result;
 
     // La nueva función retorna JSONB con más información
     if (typeof data === 'object' && data !== null && 'bid_id' in data) {
@@ -580,7 +594,7 @@ export async function placeBid(
       success: true,
     };
   } catch (error: any) {
-    console.error('Error placing bid:', error);
+    logger.error('Error placing bid', error, { productId, bidderId, amount });
     return {
       bid_id: '',
       success: false,
@@ -603,7 +617,7 @@ export async function buyNow(
     });
 
     if (error) {
-      console.error('Error in buy now:', error);
+      logger.error('Error in buy now', error, { productId, buyerId });
       return {
         success: false,
         error: error.message || 'Error al realizar compra ahora',
@@ -614,7 +628,7 @@ export async function buyNow(
       success: true,
     };
   } catch (error: any) {
-    console.error('Error in buy now:', error);
+    logger.error('Error in buy now', error, { productId, buyerId });
     return {
       success: false,
       error: error.message || 'Error inesperado',
@@ -629,7 +643,7 @@ export async function getUserBids(userId: string): Promise<Array<AuctionBid & { 
   try {
     const { data: bidsData, error: bidsError } = await supabase
       .from('auction_bids')
-      .select('*')
+      .select('id, product_id, bidder_id, amount, bid_time, is_auto_bid, is_retracted, created_at')
       .eq('bidder_id', userId)
       .eq('is_retracted', false)
       .order('created_at', { ascending: false });
@@ -645,7 +659,7 @@ export async function getUserBids(userId: string): Promise<Array<AuctionBid & { 
     
     const { data: productsData, error: productsError } = await supabase
       .from('products')
-      .select('*')
+      .select('id, title, description, price, cover_url, condition, sale_type, auction_status, auction_start_at, auction_end_at, current_bid, min_bid_increment, buy_now_price, reserve_price, winner_id, total_bids, seller_id, created_at')
       .in('id', productIds)
       .eq('sale_type', 'auction');
 
@@ -661,7 +675,7 @@ export async function getUserBids(userId: string): Promise<Array<AuctionBid & { 
       product: productsMap.get(bid.product_id),
     })) as Array<AuctionBid & { product: AuctionProduct }>;
   } catch (error) {
-    console.error('Error fetching user bids:', error);
+    logger.error('Error fetching user bids', error, { userId });
     throw error;
   }
 }
@@ -696,7 +710,7 @@ export async function getAuctionStats(productId: string): Promise<AuctionStats |
       winner_id: auction.winner_id,
     };
   } catch (error) {
-    console.error('Error getting auction stats:', error);
+    logger.error('Error getting auction stats', error, { productId });
     return null;
   }
 }
@@ -718,7 +732,7 @@ export async function getSellerAuctions(sellerId: string): Promise<AuctionProduc
   try {
     const { data, error } = await supabase
       .from('products')
-      .select('*')
+      .select('id, title, description, price, cover_url, condition, sale_type, auction_status, auction_start_at, auction_end_at, current_bid, min_bid_increment, buy_now_price, reserve_price, winner_id, total_bids, seller_id, created_at')
       .eq('seller_id', sellerId)
       .eq('sale_type', 'auction')
       .order('created_at', { ascending: false });
@@ -727,7 +741,7 @@ export async function getSellerAuctions(sellerId: string): Promise<AuctionProduc
 
     return (data || []) as AuctionProduct[];
   } catch (error) {
-    console.error('Error fetching seller auctions:', error);
+    logger.error('Error fetching seller auctions', error, { sellerId });
     throw error;
   }
 }

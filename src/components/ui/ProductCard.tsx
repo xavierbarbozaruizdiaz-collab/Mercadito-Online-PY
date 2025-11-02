@@ -43,7 +43,7 @@ interface Product {
   compare_price?: number;
   condition: string;
   sale_type: string;
-  cover_url?: string;
+  image_url?: string;
   created_at: string;
   seller_id?: string; // ID del vendedor
   store: {
@@ -240,7 +240,7 @@ export default function ProductCard({
             {/* Imagen del producto */}
             <div className="relative w-24 h-24 flex-shrink-0">
               <Image
-                src={product.cover_url || '/placeholder-product.png'}
+                src={product.image_url || '/placeholder-product.png'}
                 alt={product.title}
                 fill
                 className="object-cover rounded-md"
@@ -264,7 +264,8 @@ export default function ProductCard({
                     {product.title}
                   </h3>
                   
-                  <div className="flex items-center space-x-2 mt-1">
+                  {/* Badges - OCULTOS */}
+                  {/* <div className="flex items-center space-x-2 mt-1">
                     <Badge 
                       variant={getConditionBadgeColor(product.condition)}
                       size="sm"
@@ -277,7 +278,7 @@ export default function ProductCard({
                     >
                       {product.sale_type}
                     </Badge>
-                  </div>
+                  </div> */}
 
                   {showCategory && product.category && (
                     <p className="text-sm text-gray-600 mt-1">
@@ -364,14 +365,14 @@ export default function ProductCard({
       <CardHeader className="p-0">
         <div className="relative w-full h-48">
           <Image
-            src={product.cover_url || '/placeholder-product.png'}
+            src={product.image_url || '/placeholder-product.png'}
             alt={product.title}
             fill
             className="object-cover rounded-t-md"
           />
           
-          {/* Badges */}
-          <div className="absolute top-2 left-2 flex flex-col space-y-1">
+          {/* Badges - OCULTOS */}
+          {/* <div className="absolute top-2 left-2 flex flex-col space-y-1">
             <Badge 
               variant={getConditionBadgeColor(product.condition)}
               size="sm"
@@ -384,7 +385,7 @@ export default function ProductCard({
             >
               {product.sale_type}
             </Badge>
-          </div>
+          </div> */}
 
           {discount > 0 && (
             <Badge 

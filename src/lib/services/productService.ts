@@ -14,6 +14,8 @@ import {
   SearchFilters,
   PaginatedResponse 
 } from '@/types';
+import { validatePageLimit, validatePageNumber, calculateOffset } from '@/lib/utils/pagination';
+import { cache, getProductsCacheKey, invalidateProductCache } from '@/lib/utils/cache';
 
 // ============================================
 // FUNCIONES DE PRODUCTOS
@@ -68,22 +70,114 @@ class ProductServiceImpl implements ProductService {
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       if (authError || !user) throw new Error('Usuario no autenticado');
 
+      // Rate limiting para crear productos
+      try {
+        const { rateLimiter, RATE_LIMITS } = await import('@/lib/utils/rateLimit');
+        const limitCheck = await rateLimiter.checkLimit(user.id, 'PRODUCT_CREATE');
+        
+        if (!limitCheck.allowed) {
+          throw new Error(
+            `Has alcanzado el límite de creación de productos. Intenta de nuevo en ${limitCheck.retryAfter || 60} segundos.`
+          );
+        }
+      } catch (rateLimitError: any) {
+        // Si el rate limiter falla, loguear pero continuar (degradación elegante)
+        const { logger } = await import('@/lib/utils/logger');
+        logger.warn('Rate limiter no disponible, continuando sin limitación', rateLimitError);
+      }
+
+      // Verificar límites de publicación (membresía o tienda)
+      const { checkCanPublishProduct } = await import('@/lib/services/membershipService');
+      
+      // Determinar precio base según tipo de producto
+      let priceBase = data.price;
+      if (data.sale_type === 'auction' && (data as any).auction_starting_price) {
+        priceBase = (data as any).auction_starting_price;
+      }
+      
+      // Validar si puede publicar
+      const canPublish = await checkCanPublishProduct(user.id, priceBase);
+      
+      if (!canPublish.can_publish) {
+        // Construir mensaje de error detallado
+        let errorMessage = canPublish.reason;
+        
+        if (canPublish.suggested_plan_level) {
+          errorMessage += ` Actualiza a ${canPublish.suggested_plan_name || canPublish.suggested_plan_level} para continuar.`;
+        }
+        
+        // Agregar contexto adicional
+        if (canPublish.price_exceeds_limit) {
+          errorMessage += ` Precio actual: ${priceBase.toLocaleString('es-PY')} Gs. Límite: ${canPublish.max_price_base?.toLocaleString('es-PY') || 'N/A'} Gs.`;
+        }
+        
+        if (!canPublish.can_publish_more_products) {
+          errorMessage += ` Productos actuales: ${canPublish.current_products}/${canPublish.max_products || '∞'}`;
+        }
+        
+        throw new Error(errorMessage);
+      }
+
+      // Verificar si tiene tienda (necesaria para almacenar productos)
       const { data: store, error: storeError } = await supabase
         .from('stores')
         .select('id')
         .eq('seller_id', user.id)
         .single();
 
-      if (storeError || !store) throw new Error('Tienda no encontrada');
+      // Si no tiene tienda, crearla automáticamente para usuarios con membresía
+      // (Las tiendas son necesarias para la estructura actual del sistema)
+      let storeId: string;
+      if (storeError || !store) {
+        // Intentar crear tienda automáticamente
+        const { createStore } = await import('@/lib/services/storeService');
+        try {
+          const newStore = await createStore({
+            owner_id: user.id,
+            name: `Tienda de ${user.email?.split('@')[0] || 'Usuario'}`,
+            slug: `tienda-${user.id.slice(0, 8)}`,
+            description: 'Tienda creada automáticamente',
+          });
+          if (!newStore) throw new Error('No se pudo crear la tienda');
+          storeId = newStore.id;
+        } catch (createStoreError: any) {
+          throw new Error('No se pudo crear o encontrar tu tienda. Contacta al administrador.');
+        }
+      } else {
+        storeId = (store as any).id;
+      }
+
+      // Para productos directos: calcular precio con comisión incluida
+      let finalPrice = data.price;
+      let basePrice = data.price;
+      let commissionPercent = 0;
+
+      if (data.sale_type === 'fixed') {
+        try {
+          const { getCommissionForDirectSale, calculatePriceWithCommission } = await import('@/lib/services/commissionService');
+          commissionPercent = await getCommissionForDirectSale(user.id, (store as any).id);
+          basePrice = data.price; // Precio base ingresado por el vendedor
+          finalPrice = calculatePriceWithCommission(basePrice, commissionPercent); // Precio con comisión incluida
+        } catch (commissionError: any) {
+          const { logger } = await import('@/lib/utils/logger');
+          logger.warn('Error calculating commission, using base price', commissionError);
+          // En caso de error, usar precio base sin comisión
+          basePrice = data.price;
+          finalPrice = data.price;
+          commissionPercent = 0;
+        }
+      }
 
       // Crear el producto
       const { data: product, error: productError } = await (supabase as any)
         .from('products')
         .insert({
-          store_id: (store as any).id,
+          store_id: storeId,
           title: data.title,
           description: data.description,
-          price: data.price,
+          price: finalPrice, // Precio mostrado (con comisión si es fixed)
+          base_price: data.sale_type === 'fixed' ? basePrice : null, // Solo para productos fixed
+          commission_percent_applied: data.sale_type === 'fixed' ? commissionPercent : null,
           compare_price: data.compare_price,
           sku: data.sku,
           barcode: data.barcode,
@@ -91,6 +185,7 @@ class ProductServiceImpl implements ProductService {
           condition: data.condition,
           sale_type: data.sale_type,
           stock_quantity: data.stock_quantity,
+          stock_management_enabled: data.sale_type === 'fixed', // Solo validar stock para productos fixed
           weight: data.weight,
           dimensions: data.dimensions,
           tags: data.tags,
@@ -102,6 +197,9 @@ class ProductServiceImpl implements ProductService {
         .single();
 
       if (productError) throw productError;
+
+      // Invalidar cache de productos después de crear
+      invalidateProductCache(product.id);
 
       // Crear variantes si existen
       if (data.variants && data.variants.length > 0) {
@@ -122,7 +220,8 @@ class ProductServiceImpl implements ProductService {
           .insert(variants);
 
         if (variantsError) {
-          console.error('Error creating variants:', variantsError);
+          const { logger } = await import('@/lib/utils/logger');
+          logger.error('Error creating variants', variantsError, { productId: product.id });
         }
       }
 
@@ -133,7 +232,8 @@ class ProductServiceImpl implements ProductService {
 
       return product;
     } catch (error) {
-      console.error('Error creating product:', error);
+      const { logger } = await import('@/lib/utils/logger');
+      logger.error('Error creating product', error);
       throw error;
     }
   }
@@ -141,6 +241,38 @@ class ProductServiceImpl implements ProductService {
   // Actualizar producto
   async updateProduct(id: string, data: UpdateProductForm): Promise<Product> {
     try {
+      // Obtener el usuario actual
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) throw new Error('Usuario no autenticado');
+
+      // Si se está actualizando el precio, validar límites
+      if (data.price !== undefined) {
+        const { checkCanPublishProduct } = await import('@/lib/services/membershipService');
+        
+        // Determinar precio base según tipo
+        let priceBase = data.price;
+        if (data.sale_type === 'auction' && (data as any).auction_starting_price) {
+          priceBase = (data as any).auction_starting_price;
+        }
+        
+        // Validar si puede publicar con el nuevo precio
+        const canPublish = await checkCanPublishProduct(user.id, priceBase);
+        
+        if (!canPublish.can_publish) {
+          let errorMessage = canPublish.reason;
+          
+          if (canPublish.suggested_plan_level) {
+            errorMessage += ` Actualiza a ${canPublish.suggested_plan_name || canPublish.suggested_plan_level} para continuar.`;
+          }
+          
+          if (canPublish.price_exceeds_limit) {
+            errorMessage += ` Precio actual: ${priceBase.toLocaleString('es-PY')} Gs. Límite: ${canPublish.max_price_base?.toLocaleString('es-PY') || 'N/A'} Gs.`;
+          }
+          
+          throw new Error(errorMessage);
+        }
+      }
+
       const { data: product, error } = await (supabase as any)
         .from('products')
         .update({
@@ -166,9 +298,15 @@ class ProductServiceImpl implements ProductService {
         .single();
 
       if (error) throw error;
+      
+      // Invalidar cache después de actualizar
+      invalidateProductCache(product.id);
+      cache.delete(`product:${id}`);
+      
       return product;
     } catch (error) {
-      console.error('Error updating product:', error);
+      const { logger } = await import('@/lib/utils/logger');
+      logger.error('Error updating product', error, { productId: id });
       throw error;
     }
   }
@@ -182,8 +320,13 @@ class ProductServiceImpl implements ProductService {
         .eq('id', id);
 
       if (error) throw error;
+      
+      // Invalidar cache después de eliminar
+      invalidateProductCache(id);
+      cache.delete(`product:${id}`);
     } catch (error) {
-      console.error('Error deleting product:', error);
+      const { logger } = await import('@/lib/utils/logger');
+      logger.error('Error deleting product', error, { productId: id });
       throw error;
     }
   }
@@ -191,10 +334,15 @@ class ProductServiceImpl implements ProductService {
   // Obtener producto con detalles
   async getProduct(id: string): Promise<ProductWithDetails | null> {
     try {
+      const cacheKey = `product:${id}`;
+      const cached = cache.get<ProductWithDetails>(cacheKey);
+      if (cached) return cached;
+
       const { data: product, error } = await supabase
         .from('products')
         .select(`
           *,
+          image_url:cover_url,
           store:stores(*),
           category:categories(*),
           variants:product_variants(*),
@@ -208,9 +356,13 @@ class ProductServiceImpl implements ProductService {
         throw error;
       }
 
-      return product as ProductWithDetails;
+      const result = product as ProductWithDetails;
+      // Cache por 5 minutos para productos individuales
+      cache.set(cacheKey, result, 5 * 60 * 1000);
+      return result;
     } catch (error) {
-      console.error('Error getting product:', error);
+      const { logger } = await import('@/lib/utils/logger');
+      logger.error('Error getting product', error, { productId: id });
       throw error;
     }
   }
@@ -218,14 +370,21 @@ class ProductServiceImpl implements ProductService {
   // Obtener productos con filtros
   async getProducts(filters?: SearchFilters): Promise<PaginatedResponse<Product>> {
     try {
-      const page = filters?.page || 1;
-      const limit = filters?.limit || 20;
-      const offset = (page - 1) * limit;
+      // Validar paginación con límite máximo (mantener default de 20)
+      const page = validatePageNumber(filters?.page);
+      const limit = validatePageLimit(filters?.limit || 20, 60); // Default 20, max 60
+      const offset = calculateOffset(page, limit);
+
+      // Generar key de cache
+      const cacheKey = getProductsCacheKey({ ...filters, page, limit });
+      const cached = cache.get<PaginatedResponse<Product>>(cacheKey);
+      if (cached) return cached;
 
       let query = supabase
         .from('products')
         .select(`
           *,
+          image_url:cover_url,
           store:stores(*),
           category:categories(*),
           images:product_images(*)
@@ -275,17 +434,16 @@ class ProductServiceImpl implements ProductService {
       let { data, error, count } = await query;
 
       // Si hay error relacionado con stock_quantity, continuar sin esa columna
-      // select('*') debería funcionar, pero si hay un problema, ignorarlo
       if (error && error.message?.includes('stock_quantity')) {
-        console.warn('⚠️ stock_quantity no existe en productos. Continuando sin esa columna.');
-        // Con select('*'), esto no debería pasar, pero manejarlo de todas formas
+        const { logger } = await import('@/lib/utils/logger');
+        logger.warn('stock_quantity no existe en productos. Continuando sin esa columna.', undefined, { filters });
       }
 
       if (error && !error.message?.includes('stock_quantity')) {
         throw error;
       }
 
-      return {
+      const result = {
         data: data || [],
         pagination: {
           page,
@@ -294,8 +452,13 @@ class ProductServiceImpl implements ProductService {
           total_pages: Math.ceil((count || 0) / limit),
         },
       };
+
+      // Cache por 2 minutos para listados (más corto porque cambian frecuentemente)
+      cache.set(cacheKey, result, 2 * 60 * 1000);
+      return result;
     } catch (error) {
-      console.error('Error getting products:', error);
+      const { logger } = await import('@/lib/utils/logger');
+      logger.error('Error getting products', error, { filters });
       throw error;
     }
   }
@@ -311,6 +474,7 @@ class ProductServiceImpl implements ProductService {
         .from('products')
         .select(`
           *,
+          image_url:cover_url,
           category:categories(*),
           images:product_images(*)
         `, { count: 'exact' })
@@ -356,6 +520,7 @@ class ProductServiceImpl implements ProductService {
         .from('products')
         .select(`
           *,
+          image_url:cover_url,
           store:stores(*),
           category:categories(*),
           images:product_images(*)
@@ -380,6 +545,7 @@ class ProductServiceImpl implements ProductService {
         .from('products')
         .select(`
           *,
+          image_url:cover_url,
           store:stores(*),
           category:categories(*),
           images:product_images(*)
@@ -455,85 +621,155 @@ class ProductServiceImpl implements ProductService {
       if (error) throw error;
       return data;
     } catch (error) {
-      console.error('Error updating stock:', error);
+      const { logger } = await import('@/lib/utils/logger');
+      logger.error('Error updating stock', error);
       throw error;
     }
   }
 
-  // Disminuir stock
-  async decreaseStock(id: string, quantity: number): Promise<Product> {
+  // Disminuir stock (ahora usa función SQL con registro de movimientos)
+  async decreaseStock(id: string, quantity: number, orderId?: string, notes?: string): Promise<Product> {
     try {
-      // Primero obtener el stock actual
-      const { data: product, error: fetchError } = await supabase
+      const { decreaseStock: decreaseStockFn } = await import('@/lib/services/inventoryService');
+      
+      // Obtener seller_id para el parámetro created_by
+      const { data: productInfo } = await supabase
         .from('products')
-        .select('stock_quantity')
+        .select('seller_id')
         .eq('id', id)
         .single();
+      
+      const success = await decreaseStockFn(
+        id, 
+        quantity, 
+        orderId || undefined, 
+        notes || undefined,
+        (productInfo as any)?.seller_id
+      );
+      
+      if (!success) {
+        throw new Error('No se pudo reducir el stock');
+      }
 
-      if (fetchError) throw fetchError;
-
-      const newQuantity = Math.max(0, (product as any).stock_quantity - quantity);
-
+      // Obtener producto actualizado
       const { data, error } = await (supabase as any)
         .from('products')
-        .update({ stock_quantity: newQuantity })
-        .eq('id', id)
         .select()
+        .eq('id', id)
         .single();
 
       if (error) throw error;
       return data;
     } catch (error) {
-      console.error('Error decreasing stock:', error);
+      const { logger } = await import('@/lib/utils/logger');
+      logger.error('Error decreasing stock', error, { productId: id, quantity });
       throw error;
     }
   }
 
-  // Subir imágenes del producto
+  // Subir imágenes del producto con generación de thumbnails
   async uploadProductImages(productId: string, files: File[]): Promise<ProductImage[]> {
     try {
       const uploadedImages: ProductImage[] = [];
+      const { logger } = await import('@/lib/utils/logger');
 
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${productId}-${Date.now()}-${i}.${fileExt}`;
-        const filePath = `products/${productId}/${fileName}`;
+      // Intentar usar la API de thumbnails si está disponible (server-side)
+      // Si estamos en el cliente, usar método directo (fallback)
+      const isServer = typeof window === 'undefined';
+      
+      if (isServer) {
+        // Server-side: usar API de thumbnails
+        logger.debug('Uploading images via thumbnails API', { productId, fileCount: files.length });
+        
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          const formData = new FormData();
+          formData.append('productId', productId);
+          formData.append('file', file);
 
-        // Subir archivo a Supabase Storage
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('product-images')
-          .upload(filePath, file);
+          try {
+            const response = await fetch('/api/products/upload-images', {
+              method: 'POST',
+              body: formData,
+            });
 
-        if (uploadError) throw uploadError;
+            if (!response.ok) {
+              const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+              throw new Error(errorData.error || 'Error uploading image');
+            }
 
-        // Obtener URL pública
-        const { data: urlData } = supabase.storage
-          .from('product-images')
-          .getPublicUrl(filePath);
-
-        // Crear registro en la base de datos
-        const { data: imageData, error: imageError } = await (supabase as any)
-          .from('product_images')
-          .insert({
-            product_id: productId,
-            url: urlData.publicUrl,
-            alt_text: file.name,
-            sort_order: i,
-            is_cover: i === 0, // La primera imagen es la portada
-          })
-          .select()
-          .single();
-
-        if (imageError) throw imageError;
-        uploadedImages.push(imageData);
+            const result = await response.json();
+            if (result.image) {
+              uploadedImages.push({
+                ...result.image,
+                sort_order: i,
+                is_cover: i === 0,
+              });
+              logger.debug('Image uploaded with thumbnails', { productId, imageId: result.image.id });
+            }
+          } catch (apiError: any) {
+            logger.warn('Thumbnails API failed, using direct upload', apiError);
+            // Fallback al método directo
+            const directUpload = await this.directImageUpload(productId, file, i);
+            uploadedImages.push(directUpload);
+          }
+        }
+      } else {
+        // Client-side: usar método directo (sin thumbnails por ahora)
+        logger.debug('Uploading images directly (client-side)', { productId, fileCount: files.length });
+        
+        for (let i = 0; i < files.length; i++) {
+          const directUpload = await this.directImageUpload(productId, files[i], i);
+          uploadedImages.push(directUpload);
+        }
       }
 
       return uploadedImages;
     } catch (error) {
-      console.error('Error uploading product images:', error);
+      const { logger } = await import('@/lib/utils/logger');
+      logger.error('Error uploading product images', error, { productId });
       throw error;
     }
+  }
+
+  // Método helper para subida directa (sin thumbnails)
+  private async directImageUpload(
+    productId: string,
+    file: File,
+    sortOrder: number
+  ): Promise<ProductImage> {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${productId}-${Date.now()}-${sortOrder}.${fileExt}`;
+    const filePath = `products/${productId}/${fileName}`;
+
+    // Subir archivo a Supabase Storage
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('product-images')
+      .upload(filePath, file);
+
+    if (uploadError) throw uploadError;
+
+    // Obtener URL pública
+    const { data: urlData } = supabase.storage
+      .from('product-images')
+      .getPublicUrl(filePath);
+
+    // Crear registro en la base de datos
+    const { data: imageData, error: imageError } = await (supabase as any)
+      .from('product_images')
+      .insert({
+        product_id: productId,
+        url: urlData.publicUrl,
+        thumbnail_url: urlData.publicUrl, // Fallback: usar misma URL si no hay thumbnail
+        alt_text: file.name,
+        sort_order: sortOrder,
+        is_cover: sortOrder === 0,
+      })
+      .select()
+      .single();
+
+    if (imageError) throw imageError;
+    return imageData;
   }
 
   // Eliminar imagen del producto

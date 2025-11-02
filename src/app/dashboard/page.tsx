@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
+import { logger } from '@/lib/utils/logger';
 import { 
   Package, 
   ShoppingCart, 
@@ -35,6 +36,9 @@ type Product = {
   cover_url: string | null;
   created_at: string;
   sale_type: 'direct' | 'auction';
+  auction_status?: 'scheduled' | 'active' | 'ended' | 'cancelled';
+  auction_end_at?: string;
+  status?: string | null; // 'active', 'paused', 'deleted', etc.
 };
 
 type DashboardStats = {
@@ -71,16 +75,24 @@ type DashboardStats = {
     priority: 'high' | 'medium' | 'low';
     link?: string;
   }>;
+  // Balances del vendedor
+  pendingBalance: number;
+  availableBalance: number;
+  totalEarnings: number;
+  totalCommissionsPaid: number;
 };
 
 export default function Dashboard() {
   const [products, setProducts] = useState<Product[]>([]);
-  const [allProducts, setAllProducts] = useState<Product[]>([]); // Todos los productos sin filtrar
+  const [allProducts, setAllProducts] = useState<Product[]>([]); // Todos los productos sin filtrar (excluyendo subastas finalizadas)
+  const [finishedAuctions, setFinishedAuctions] = useState<Product[]>([]); // Subastas finalizadas
+  const [pausedProducts, setPausedProducts] = useState<Product[]>([]); // Productos pausados
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [reactivatingId, setReactivatingId] = useState<string | null>(null);
   const [role, setRole] = useState<'buyer' | 'seller' | 'admin' | null>(null);
   const [storeStatus, setStoreStatus] = useState<'none' | 'pending' | 'active'>('none');
-  const [filterType, setFilterType] = useState<'all' | 'direct' | 'auction'>('all');
+  const [filterType, setFilterType] = useState<'all' | 'direct' | 'auction' | 'finished_auctions' | 'paused'>('all');
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
   const [storeSlug, setStoreSlug] = useState<string | null>(null);
@@ -125,33 +137,207 @@ export default function Dashboard() {
           await loadSellerStats(session.session.user.id);
         }
 
-        // Cargar productos SIN caché para asegurar datos actualizados
+        // Cargar productos (incluyendo status para detectar pausados)
         const { data, error } = await supabase
           .from('products')
-          .select('id, title, price, cover_url, created_at, sale_type')
+          .select('id, title, price, image_url:cover_url, created_at, sale_type, auction_status, auction_end_at, status')
           .eq('seller_id', session.session.user.id)
           .order('created_at', { ascending: false });
 
         if (error) {
-          console.error('❌ Error al cargar productos:', error);
+          logger.error('Error al cargar productos', error);
           throw error;
         }
         
-        const productsData = (data || []) as Product[];
-        console.log('📦 Productos cargados desde BD:', {
-          total: productsData.length,
-          auctions: productsData.filter(p => p.sale_type === 'auction').length,
-          direct: productsData.filter(p => p.sale_type === 'direct').length,
-          productIds: productsData.map(p => p.id),
-          products: productsData.map(p => ({ id: p.id, title: p.title, sale_type: p.sale_type }))
+        const allProductsData = (data || []) as Product[];
+        
+        // Primero, actualizar estados de subastas que deberían estar finalizadas
+        const now = new Date();
+        const auctionsToUpdate: { id: string; title: string }[] = [];
+        
+        for (const product of allProductsData) {
+          if (product.sale_type === 'auction' && 
+              product.auction_status === 'active' && 
+              product.auction_end_at) {
+            const endDate = new Date(product.auction_end_at);
+            if (endDate <= now) {
+              // Esta subasta debería estar finalizada pero no lo está
+              auctionsToUpdate.push({ id: product.id, title: product.title });
+              try {
+                await (supabase as any)
+                  .from('products')
+                  .update({ 
+                    auction_status: 'ended',
+                    updated_at: new Date().toISOString()
+                  })
+                  .eq('id', product.id);
+                logger.debug('Actualizado estado de subasta a ENDED', { productId: product.id, title: product.title });
+              } catch (updateError) {
+                logger.error('Error al actualizar subasta', updateError, { productId: product.id });
+              }
+            }
+          }
+        }
+        
+        if (auctionsToUpdate.length > 0) {
+          logger.info('Actualizadas subastas que debían estar finalizadas', { count: auctionsToUpdate.length });
+          // Recargar datos después de actualizar
+          const { data: refreshedData } = await supabase
+            .from('products')
+            .select('id, title, price, cover_url, created_at, sale_type, auction_status, auction_end_at')
+            .eq('seller_id', session.session.user.id)
+            .order('created_at', { ascending: false });
+          
+          if (refreshedData) {
+            // Reemplazar los datos con los actualizados
+            allProductsData.length = 0;
+            allProductsData.push(...(refreshedData as Product[]));
+          }
+        }
+        
+        // Separar subastas finalizadas, productos pausados y productos activos
+        const activeProducts: Product[] = [];
+        const endedAuctions: Product[] = [];
+        const paused: Product[] = [];
+        const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); // 30 días atrás
+        const auctionsToDelete: string[] = [];
+        
+        allProductsData.forEach(product => {
+          // Primero verificar si está pausado
+          if (product.status === 'paused') {
+            paused.push(product);
+            return;
+          }
+          
+          if (product.sale_type === 'auction') {
+            // Verificar si la subasta está finalizada
+            const isEnded = product.auction_status === 'ended' || 
+                           product.auction_status === 'cancelled' ||
+                           (product.auction_end_at && new Date(product.auction_end_at) <= now);
+            
+            if (isEnded) {
+              // Verificar si tiene más de 30 días desde que finalizó
+              if (product.auction_end_at) {
+                const endDate = new Date(product.auction_end_at);
+                if (endDate <= thirtyDaysAgo) {
+                  // Esta subasta tiene más de 30 días, marcarla para eliminación
+                  auctionsToDelete.push(product.id);
+                } else {
+                  // Aún está dentro de los 30 días, mostrarla
+                  endedAuctions.push(product);
+                }
+              } else {
+                // Si no tiene fecha de fin pero está finalizada, mantenerla por seguridad
+                endedAuctions.push(product);
+              }
+            } else {
+              activeProducts.push(product);
+            }
+          } else {
+            // Productos con precio fijo siempre van a activos (si no están pausados)
+            activeProducts.push(product);
+          }
         });
         
-        // Los productos ya están filtrados por seller_id, así que confiamos en la query
-        // Si hay productos eliminados, no deberían aparecer por RLS
-        setAllProducts(productsData);
-        setProducts(productsData);
+        // Eliminar subastas que tienen más de 30 días
+        if (auctionsToDelete.length > 0) {
+          logger.info('Eliminando subastas finalizadas con más de 30 días', { count: auctionsToDelete.length });
+          for (const auctionId of auctionsToDelete) {
+            try {
+              // Obtener imágenes antes de eliminar
+              const { data: images } = await supabase
+                .from('product_images')
+                .select('url')
+                .eq('product_id', auctionId);
+              
+              // Eliminar producto
+              await supabase
+                .from('products')
+                .delete()
+                .eq('id', auctionId);
+              
+              // Eliminar imágenes del storage
+              if (images && images.length > 0) {
+                const fileNames = images.map((img: { url: string }) => {
+                  const url = img.url;
+                  const match = url.match(/products\/([^\/]+)\/(.+)$/);
+                  return match ? `${match[1]}/${match[2]}` : null;
+                }).filter(Boolean);
+                
+                if (fileNames.length > 0) {
+                  await supabase.storage
+                    .from('product-images')
+                    .remove(fileNames.filter((name): name is string => name !== null));
+                }
+              }
+              
+              logger.info('Subasta eliminada automáticamente (más de 30 días)', { auctionId });
+            } catch (deleteError) {
+              logger.error('Error al eliminar subasta', deleteError, { auctionId });
+            }
+          }
+          
+          // Recargar productos después de las eliminaciones
+          const { data: cleanedData } = await supabase
+            .from('products')
+            .select('id, title, price, cover_url, created_at, sale_type, auction_status, auction_end_at')
+            .eq('seller_id', session.session.user.id)
+            .order('created_at', { ascending: false });
+          
+          if (cleanedData) {
+            // Recalcular después de eliminar
+            const cleanedProducts = cleanedData as Product[];
+            const cleanedActive: Product[] = [];
+            const cleanedEnded: Product[] = [];
+            
+            cleanedProducts.forEach(product => {
+              if (product.sale_type === 'auction') {
+                const isEnded = product.auction_status === 'ended' || 
+                               product.auction_status === 'cancelled' ||
+                               (product.auction_end_at && new Date(product.auction_end_at) <= now);
+                if (isEnded) {
+                  if (product.auction_end_at) {
+                    const endDate = new Date(product.auction_end_at);
+                    if (endDate > thirtyDaysAgo) {
+                      cleanedEnded.push(product);
+                    }
+                  } else {
+                    cleanedEnded.push(product);
+                  }
+                } else {
+                  cleanedActive.push(product);
+                }
+              } else {
+                cleanedActive.push(product);
+              }
+            });
+            
+            setFinishedAuctions(cleanedEnded);
+            setAllProducts(cleanedActive);
+            setProducts(cleanedActive);
+            return; // Salir temprano ya que actualizamos todo
+          }
+        }
+        
+        logger.debug('Productos cargados desde BD', {
+          total: allProductsData.length,
+          active: activeProducts.length,
+          finishedAuctions: endedAuctions.length,
+          auctions: activeProducts.filter(p => p.sale_type === 'auction').length,
+          direct: activeProducts.filter(p => p.sale_type === 'direct').length,
+        });
+        
+        // Cargar subastas finalizadas por separado
+        setFinishedAuctions(endedAuctions);
+        
+        // Cargar productos pausados por separado
+        setPausedProducts(paused);
+        
+        // Los productos activos (sin subastas finalizadas ni pausados)
+        setAllProducts(activeProducts);
+        setProducts(activeProducts);
       } catch (err) {
-        console.error('Error loading products:', err);
+        logger.error('Error loading products', err);
       } finally {
         setLoading(false);
       }
@@ -303,8 +489,48 @@ export default function Dashboard() {
           link: '/dashboard/orders'
         });
       }
-      // Notificaciones de stock bajo (si existiera stock_quantity)
-      // Por ahora solo órdenes
+      // Cargar alertas de stock bajo
+      try {
+        const { data: stockAlerts } = await (supabase as any)
+          .from('stock_alerts')
+          .select('id, product_id, current_stock, threshold, product:products(id, title, stock_quantity)')
+          .eq('seller_id', sellerId)
+          .eq('is_active', true)
+          .order('created_at', { ascending: false })
+          .limit(10);
+
+        // Agregar notificaciones de stock bajo
+        if (stockAlerts && stockAlerts.length > 0) {
+          stockAlerts.forEach((alert: any) => {
+            const product = alert.product;
+            if (product && product.id) {
+              notifications.push({
+                type: 'stock' as const,
+                message: `⚠️ Stock bajo: "${product.title}" tiene ${alert.current_stock} unidades (umbral: ${alert.threshold})`,
+                priority: alert.current_stock === 0 ? 'high' as const : 'medium' as const,
+                link: `/dashboard/edit-product/${product.id}`,
+              });
+            }
+          });
+        }
+      } catch (stockAlertError) {
+        logger.warn('Error loading stock alerts', stockAlertError);
+        // Continuar sin alertas de stock si hay error
+      }
+
+      // Obtener balance del vendedor
+      const { data: balanceData } = await (supabase as any)
+        .from('seller_balance')
+        .select('pending_balance, available_balance, total_earnings, total_commissions_paid')
+        .eq('seller_id', sellerId)
+        .maybeSingle();
+
+      const balance = balanceData || {
+        pending_balance: 0,
+        available_balance: 0,
+        total_earnings: 0,
+        total_commissions_paid: 0,
+      };
 
       setStats({
         totalProducts: products.length,
@@ -319,12 +545,164 @@ export default function Dashboard() {
         averageOrderValue,
         salesTrend,
         topProducts,
-        notifications
+        notifications,
+        // Balances
+        pendingBalance: balance.pending_balance || 0,
+        availableBalance: balance.available_balance || 0,
+        totalEarnings: balance.total_earnings || 0,
+        totalCommissionsPaid: balance.total_commissions_paid || 0,
       });
     } catch (err) {
-      console.error('Error cargando estadísticas:', err);
+      logger.error('Error cargando estadísticas', err);
     } finally {
       setStatsLoading(false);
+    }
+  }
+
+  async function reactivateProduct(productId: string) {
+    setReactivatingId(productId);
+    
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      if (!session?.session?.user?.id) {
+        throw new Error('No hay sesión activa');
+      }
+
+      const userId = session.session.user.id;
+
+      // Verificar que el producto existe y pertenece al usuario
+      const { data: productToReactivate, error: checkError } = await supabase
+        .from('products')
+        .select('id, seller_id, title, status')
+        .eq('id', productId)
+        .single();
+
+      if (checkError || !productToReactivate) {
+        throw new Error('Producto no encontrado');
+      }
+
+      if ((productToReactivate as any).seller_id !== userId) {
+        throw new Error('No tienes permiso para reactivar este producto');
+      }
+
+      if ((productToReactivate as any).status !== 'paused') {
+        throw new Error('Este producto no está pausado');
+      }
+
+      // Verificar límites de publicación antes de reactivar
+      const { checkCanPublishProduct } = await import('@/lib/services/membershipService');
+      const canPublish = await checkCanPublishProduct(userId, (productToReactivate as any).price || 0);
+
+      if (!canPublish.can_publish || !canPublish.can_publish_more_products) {
+        throw new Error(
+          canPublish.reason || 
+          'No puedes reactivar este producto. Has alcanzado el límite de productos de tu plan. Actualiza tu membresía para reactivar más productos.'
+        );
+      }
+
+      // Reactivar producto
+      const { error: updateError } = await (supabase as any)
+        .from('products')
+        .update({
+          status: 'active',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', productId);
+
+      if (updateError) throw updateError;
+
+      alert('✅ Producto reactivado correctamente');
+      
+      // Recargar productos
+      const { data: refreshedData } = await supabase
+        .from('products')
+        .select('id, title, price, cover_url, created_at, sale_type, auction_status, auction_end_at, status')
+        .eq('seller_id', userId)
+        .order('created_at', { ascending: false });
+
+      if (refreshedData) {
+        const allProductsData = refreshedData as Product[];
+        const activeProducts: Product[] = [];
+        const paused: Product[] = [];
+        const endedAuctions: Product[] = [];
+        const now = new Date();
+        const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+        allProductsData.forEach(product => {
+          if (product.status === 'paused') {
+            paused.push(product);
+            return;
+          }
+
+          if (product.sale_type === 'auction') {
+            const isEnded = product.auction_status === 'ended' || 
+                           product.auction_status === 'cancelled' ||
+                           (product.auction_end_at && new Date(product.auction_end_at) <= now);
+            if (isEnded) {
+              if (product.auction_end_at) {
+                const endDate = new Date(product.auction_end_at);
+                if (endDate > thirtyDaysAgo) {
+                  endedAuctions.push(product);
+                }
+              } else {
+                endedAuctions.push(product);
+              }
+            } else {
+              activeProducts.push(product);
+            }
+          } else {
+            activeProducts.push(product);
+          }
+        });
+
+        setFinishedAuctions(endedAuctions);
+        setPausedProducts(paused);
+        setAllProducts(activeProducts);
+
+        // Aplicar filtro actual
+        if (filterType === 'paused') {
+          setProducts(paused);
+        } else if (filterType === 'direct') {
+          setProducts(activeProducts.filter(p => p.sale_type === 'direct'));
+        } else if (filterType === 'auction') {
+          setProducts(activeProducts.filter(p => p.sale_type === 'auction'));
+        } else {
+          setProducts(activeProducts);
+        }
+      }
+    } catch (err: any) {
+      logger.error('Error reactivando producto', err, { productId });
+      alert('Error al reactivar producto: ' + err.message);
+    } finally {
+      setReactivatingId(null);
+    }
+  }
+
+  async function reactivateAllPausedProducts() {
+    if (!confirm('¿Deseas reactivar todos los productos pausados? Se reactivarán solo los que tu plan actual permita.')) {
+      return;
+    }
+
+    try {
+      const { reactivatePausedProductsOnRenewal } = await import('@/lib/services/productExpirationService');
+      const { data: session } = await supabase.auth.getSession();
+      if (!session?.session?.user?.id) {
+        throw new Error('No hay sesión activa');
+      }
+
+      const result = await reactivatePausedProductsOnRenewal(session.session.user.id);
+      
+      if (result.products_reactivated > 0) {
+        alert(`✅ Se reactivaron ${result.products_reactivated} producto(s). ${result.message}`);
+      } else {
+        alert(`ℹ️ ${result.message}`);
+      }
+
+      // Recargar productos
+      window.location.reload();
+    } catch (err: any) {
+      logger.error('Error reactivando productos pausados', err);
+      alert('Error al reactivar productos: ' + err.message);
     }
   }
 
@@ -336,7 +714,7 @@ export default function Dashboard() {
     setDeletingId(productId);
     
     try {
-      console.log('🗑️ Eliminando producto:', productId);
+      logger.debug('Eliminando producto', { productId });
       
       // 0. Verificar que el producto existe y que el usuario es el dueño
       const { data: session } = await supabase.auth.getSession();
@@ -354,7 +732,7 @@ export default function Dashboard() {
         .single();
       
       if (checkError || !productToDelete) {
-        console.error('❌ Producto no encontrado o error al verificar:', checkError);
+        logger.error('Producto no encontrado o error al verificar', checkError, { productId });
         throw new Error('Producto no encontrado');
       }
       
@@ -362,13 +740,15 @@ export default function Dashboard() {
       const product = productToDelete as ProductWithSeller;
       
       if (product.seller_id !== userId) {
-        console.error('❌ El producto no pertenece al usuario actual');
-        console.log('Producto seller_id:', product.seller_id);
-        console.log('Usuario actual:', userId);
+        logger.warn('El producto no pertenece al usuario actual', { 
+          productId, 
+          productSellerId: product.seller_id, 
+          currentUserId: userId 
+        });
         throw new Error('No tienes permiso para eliminar este producto');
       }
       
-      console.log('✅ Verificación: Producto pertenece al usuario. Eliminando...', {
+      logger.debug('Verificación: Producto pertenece al usuario. Eliminando...', {
         productId,
         title: product.title,
         sellerId: product.seller_id,
@@ -381,11 +761,11 @@ export default function Dashboard() {
         .select('url')
         .eq('product_id', productId);
 
-      console.log('📸 Imágenes encontradas:', images?.length || 0);
+      logger.debug('Imágenes encontradas', { count: images?.length || 0, productId });
 
       // 2. Verificar sesión antes de DELETE
       const { data: currentSession } = await supabase.auth.getSession();
-      console.log('🔐 Sesión actual:', {
+      logger.debug('Sesión actual', {
         hasSession: !!currentSession?.session,
         userId: currentSession?.session?.user?.id,
         email: currentSession?.session?.user?.email
@@ -396,8 +776,8 @@ export default function Dashboard() {
       }
       
       // 2. Eliminar producto - Usar solo ID, dejar que RLS verifique seller_id
-      console.log('🔍 Intentando DELETE...');
-      console.log('Verificando que auth.uid() coincide:', {
+      logger.debug('Intentando DELETE', {
+        productId,
         productSellerId: product.seller_id,
         currentUserId: currentSession.session.user.id,
         match: product.seller_id === currentSession.session.user.id
@@ -419,41 +799,42 @@ export default function Dashboard() {
         deleteError = deleteResult.error;
         count = deleteResult.count;
         
-        console.log('📊 Resultado del DELETE:', {
+        logger.debug('Resultado del DELETE', {
           error: deleteError,
           count,
           countType: typeof count,
           hasError: !!deleteError,
           errorCode: deleteError?.code,
-          errorMessage: deleteError?.message
+          errorMessage: deleteError?.message,
+          productId
         });
         
         // Si count es 0, intentar usar función SQL que evita problemas de RLS
         if ((count === 0 || count === null) && !deleteError) {
-          console.warn('⚠️ DELETE retornó count: 0. Intentando con función SQL...');
+          logger.warn('DELETE retornó count: 0. Intentando con función SQL', { productId });
           
           // Usar función SQL que tiene SECURITY DEFINER para evitar problemas de RLS
           const { data: rpcResult, error: rpcError } = await (supabase as any)
             .rpc('delete_user_product', { product_id_to_delete: productId });
           
           if (rpcError) {
-            console.error('❌ Error al usar función SQL:', rpcError);
+            logger.error('Error al usar función SQL', rpcError, { productId });
             // Continuar con el error original
           } else if (rpcResult === true) {
-            console.log('✅ Producto eliminado usando función SQL');
+            logger.info('Producto eliminado usando función SQL', { productId });
             count = 1; // Marcar como exitoso
           } else {
-            console.error('❌ Función SQL retornó false - el producto no se eliminó');
+            logger.error('Función SQL retornó false - el producto no se eliminó', undefined, { productId });
           }
         }
       } catch (err: any) {
         deleteError = err;
-        console.error('❌ Error capturado en DELETE:', err);
+        logger.error('Error capturado en DELETE', err, { productId });
       }
 
       if (deleteError) {
-        console.error('❌ Error al eliminar producto:', deleteError);
-        console.error('Detalles del error:', {
+        logger.error('Error al eliminar producto', deleteError, {
+          productId,
           code: deleteError.code,
           message: deleteError.message,
           details: deleteError.details,
@@ -462,7 +843,7 @@ export default function Dashboard() {
         throw deleteError;
       }
 
-      console.log('🗑️ DELETE ejecutado. Resultado:', { count, type: typeof count });
+      logger.debug('DELETE ejecutado', { count, type: typeof count, productId });
 
       // Si count es 0 o null, verificar si la función SQL ya lo resolvió
       if (count === 0 || count === null) {
@@ -475,29 +856,33 @@ export default function Dashboard() {
         
         if (finalCheck) {
           // El producto todavía existe - esto significa que ni el DELETE ni la función SQL funcionaron
-          console.error('❌ CRÍTICO: DELETE no eliminó ningún registro');
-          console.error('Posibles causas:');
-          console.error('1. La política RLS está bloqueando el DELETE');
-          console.error('2. El seller_id no coincide (aunque verificamos antes)');
-          console.error('Producto que intentamos eliminar:', {
+          logger.error('CRÍTICO: DELETE no eliminó ningún registro', undefined, {
+            productId,
+            count,
+            posiblesCausas: [
+              'La política RLS está bloqueando el DELETE',
+              'El seller_id no coincide (aunque verificamos antes)'
+            ]
+          });
+          logger.error('Producto que intentamos eliminar todavía existe', undefined, {
             productId,
             userId,
             productSellerId: product.seller_id,
-            match: product.seller_id === userId
+            match: product.seller_id === userId,
+            productoFinal: finalCheck
           });
-          console.error('El producto todavía existe:', finalCheck);
           type FinalCheckProduct = { seller_id: string };
           throw new Error(`No se pudo eliminar el producto. Posible problema de permisos RLS. Producto ID: ${productId}, Seller ID: ${(finalCheck as FinalCheckProduct).seller_id}, Usuario: ${userId}`);
         } else {
           // El producto ya no existe - la función SQL funcionó, aunque count sea 0
-          console.log('✅ El producto fue eliminado correctamente por la función SQL');
+          logger.info('El producto fue eliminado correctamente por la función SQL', { productId });
           count = 1; // Actualizar count para continuar con el flujo normal
         }
       }
       
       // Si llegamos aquí, la eliminación fue exitosa (count > 0)
       if (count > 0) {
-        console.log('✅ Producto eliminado correctamente. Registros eliminados:', count);
+        logger.info('Producto eliminado correctamente', { productId, count });
       }
 
       // Esperar un momento para que la transacción se complete
@@ -517,9 +902,9 @@ export default function Dashboard() {
             .remove(fileNames.filter((name): name is string => name !== null));
 
           if (storageError) {
-            console.warn('⚠️ Error eliminando imágenes del storage:', storageError);
+            logger.warn('Error eliminando imágenes del storage', storageError, { productId });
           } else {
-            console.log('✅ Imágenes eliminadas del storage');
+            logger.debug('Imágenes eliminadas del storage', { productId, imageCount: images?.length || 0 });
           }
         }
       }
@@ -527,43 +912,105 @@ export default function Dashboard() {
       // 5. Actualizar lista local
       setAllProducts(prev => prev.filter(p => p.id !== productId));
       setProducts(prev => prev.filter(p => p.id !== productId));
+      setFinishedAuctions(prev => prev.filter(p => p.id !== productId));
 
       // 6. Recargar productos desde la base de datos para asegurar sincronización
-      console.log('🔄 Recargando productos desde la base de datos...');
+      logger.debug('Recargando productos desde la base de datos', { productId });
       if (userId) {
         // Esperar un poco más para asegurar que la eliminación se complete
         await new Promise(resolve => setTimeout(resolve, 1000));
         
         const { data: refreshedProducts, error: reloadError } = await supabase
           .from('products')
-          .select('id, title, price, cover_url, created_at, sale_type')
+          .select('id, title, price, cover_url, created_at, sale_type, auction_status, auction_end_at')
           .eq('seller_id', userId)
           .order('created_at', { ascending: false });
 
         if (reloadError) {
-          console.error('❌ Error al recargar productos:', reloadError);
+          logger.error('Error al recargar productos', reloadError, { productId });
         } else if (refreshedProducts) {
           // Verificar que el producto eliminado no esté en la lista
           type RefreshedProduct = { id: string };
           const deletedProductStillExists = (refreshedProducts as RefreshedProduct[]).some(p => p.id === productId);
           if (deletedProductStillExists) {
-            console.error('⚠️ ADVERTENCIA: El producto eliminado todavía aparece en la lista recargada');
-            console.log('Producto problemático ID:', productId);
-            console.log('Total productos recargados:', refreshedProducts.length);
+            logger.warn('ADVERTENCIA: El producto eliminado todavía aparece en la lista recargada', undefined, {
+              productId,
+              totalProductosRecargados: refreshedProducts.length
+            });
             // Continuar de todos modos, pero mostrar advertencia
           } else {
-            console.log('✅ Producto confirmado como eliminado - no aparece en lista recargada');
+            logger.debug('Producto confirmado como eliminado - no aparece en lista recargada', { productId });
           }
           
-          console.log('✅ Productos recargados:', refreshedProducts.length);
-          setAllProducts(refreshedProducts as Product[]);
+          const allRefreshed = refreshedProducts as Product[];
+          
+          // Primero, actualizar estados de subastas que deberían estar finalizadas
+          const now = new Date();
+          for (const product of allRefreshed) {
+            if (product.sale_type === 'auction' && 
+                product.auction_status === 'active' && 
+                product.auction_end_at) {
+              const endDate = new Date(product.auction_end_at);
+              if (endDate <= now) {
+                try {
+                  await (supabase as any)
+                    .from('products')
+                    .update({ 
+                      auction_status: 'ended',
+                      updated_at: new Date().toISOString()
+                    })
+                    .eq('id', product.id);
+                } catch (updateError) {
+                  logger.error('Error al actualizar subasta', updateError, { productId: product.id });
+                }
+              }
+            }
+          }
+          
+          // Recargar nuevamente después de las actualizaciones
+          const { data: finalRefreshed } = await supabase
+            .from('products')
+            .select('id, title, price, cover_url, created_at, sale_type, auction_status, auction_end_at')
+            .eq('seller_id', userId)
+            .order('created_at', { ascending: false });
+          
+          const finalProducts = (finalRefreshed || allRefreshed) as Product[];
+          
+          // Separar subastas finalizadas de productos activos
+          const activeRefreshed: Product[] = [];
+          const endedRefreshed: Product[] = [];
+          
+          finalProducts.forEach(product => {
+            if (product.sale_type === 'auction') {
+              const isEnded = product.auction_status === 'ended' || 
+                             product.auction_status === 'cancelled' ||
+                             (product.auction_end_at && new Date(product.auction_end_at) <= now);
+              if (isEnded) {
+                endedRefreshed.push(product);
+              } else {
+                activeRefreshed.push(product);
+              }
+            } else {
+              activeRefreshed.push(product);
+            }
+          });
+          
+          logger.debug('Productos recargados', {
+            total: allRefreshed.length,
+            active: activeRefreshed.length,
+            finished: endedRefreshed.length
+          });
+          
+          setFinishedAuctions(endedRefreshed);
+          setAllProducts(activeRefreshed);
+          
           // Aplicar filtro actual
           if (filterType === 'direct') {
-            setProducts(refreshedProducts.filter((p: any) => p.sale_type === 'direct') as Product[]);
+            setProducts(activeRefreshed.filter((p: any) => p.sale_type === 'direct') as Product[]);
           } else if (filterType === 'auction') {
-            setProducts(refreshedProducts.filter((p: any) => p.sale_type === 'auction') as Product[]);
+            setProducts(activeRefreshed.filter((p: any) => p.sale_type === 'auction') as Product[]);
           } else {
-            setProducts(refreshedProducts as Product[]);
+            setProducts(activeRefreshed);
           }
         }
       }
@@ -578,7 +1025,7 @@ export default function Dashboard() {
       if (finalVerify) {
         // El producto todavía existe - verificar si count indica éxito
         if (count && count > 0) {
-          console.error('⚠️ El producto todavía existe después del DELETE');
+          logger.error('El producto todavía existe después del DELETE', undefined, { productId });
           alert('⚠️ No se pudo confirmar la eliminación. Por favor, verifica en la base de datos o contacta al administrador.');
         } else {
           // Count es 0 pero el producto existe - hubo un error real
@@ -586,12 +1033,12 @@ export default function Dashboard() {
         }
       } else {
         // El producto fue eliminado exitosamente (verificado en la base de datos)
-        console.log('✅ Eliminación confirmada: el producto ya no existe en la base de datos');
+        logger.info('Eliminación confirmada: el producto ya no existe en la base de datos', { productId });
         alert('✅ Producto eliminado correctamente');
       }
 
     } catch (err: any) {
-      console.error('❌ Error completo al eliminar:', err);
+      logger.error('Error completo al eliminar producto', err, { productId });
       alert('Error al eliminar producto: ' + err.message);
     } finally {
       setDeletingId(null);
@@ -599,34 +1046,26 @@ export default function Dashboard() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50 p-4 sm:p-8">
+    <div className="min-h-screen bg-[#1A1A1A]">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-0 mb-6">
-        <h1 className="text-xl sm:text-2xl font-bold">Panel del vendedor</h1>
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-200">Panel del vendedor</h1>
         <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
           <Link
             href="/orders"
-            className="px-3 sm:px-4 py-2 rounded bg-blue-500 text-white hover:bg-blue-600 transition-colors text-sm sm:text-base text-center"
+            className="px-3 sm:px-4 py-2 rounded bg-gray-700 text-white hover:bg-gray-600 transition-colors text-sm sm:text-base text-center"
           >
             📦 Mis pedidos
           </Link>
-          {role === 'seller' && (
-            <Link
-              href="/dashboard/orders"
-              className="px-3 sm:px-4 py-2 rounded bg-green-500 text-white hover:bg-green-600 transition-colors text-sm sm:text-base text-center"
-            >
-              🛒 Mis ventas
-            </Link>
-          )}
           <button
             onClick={() => {
               setFilterType('all');
-              console.log('📦 Mostrando todos los productos:', allProducts.length);
+              logger.debug('Mostrando todos los productos', { count: allProducts.length });
               setProducts(allProducts);
             }}
             className={`px-3 sm:px-4 py-2 rounded transition-colors text-sm sm:text-base text-center ${
               filterType === 'all'
-                ? 'bg-gray-800 text-white hover:bg-gray-900' 
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300 border border-gray-400'
+                ? 'bg-gray-700 text-white hover:bg-gray-600' 
+                : 'bg-gray-800 text-gray-300 hover:bg-gray-700 border border-gray-600'
             }`}
           >
             📦 Todos
@@ -635,17 +1074,16 @@ export default function Dashboard() {
             onClick={() => {
               setFilterType('direct');
               const directProducts = allProducts.filter(p => p.sale_type === 'direct');
-              console.log('💰 Filtrando precios fijos:', {
+              logger.debug('Filtrando precios fijos', {
                 total: allProducts.length,
-                direct: directProducts.length,
-                allProducts: allProducts.map(p => ({ id: p.id, title: p.title, sale_type: p.sale_type }))
+                direct: directProducts.length
               });
               setProducts(directProducts);
             }}
             className={`px-3 sm:px-4 py-2 rounded transition-colors text-sm sm:text-base text-center ${
               filterType === 'direct'
-                ? 'bg-blue-500 text-white hover:bg-blue-600' 
-                : 'bg-blue-100 text-blue-800 hover:bg-blue-200 border border-blue-300'
+                ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                : 'bg-gray-800 text-gray-300 hover:bg-gray-700 border border-gray-600'
             }`}
           >
             💰 Precios fijos
@@ -654,27 +1092,36 @@ export default function Dashboard() {
             onClick={() => {
               setFilterType('auction');
               const auctions = allProducts.filter(p => p.sale_type === 'auction');
-              console.log('🔨 Filtrando subastas:', {
+              logger.debug('Filtrando subastas', {
                 total: allProducts.length,
-                auctions: auctions.length,
-                allProducts: allProducts.map(p => ({ id: p.id, title: p.title, sale_type: p.sale_type }))
+                auctions: auctions.length
               });
               setProducts(auctions);
             }}
             className={`px-3 sm:px-4 py-2 rounded transition-colors text-sm sm:text-base text-center ${
               filterType === 'auction'
-                ? 'bg-yellow-500 text-white hover:bg-yellow-600' 
-                : 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200 border border-yellow-300'
+                ? 'bg-yellow-600 text-white hover:bg-yellow-700' 
+                : 'bg-gray-800 text-gray-300 hover:bg-gray-700 border border-gray-600'
             }`}
           >
             🔨 Mis subastas
           </button>
-          <Link
-            href="/dashboard/new-product"
-            className="px-3 sm:px-4 py-2 rounded bg-black text-white hover:bg-gray-800 transition-colors text-sm sm:text-base text-center"
-          >
-            + Nuevo producto
-          </Link>
+          {finishedAuctions.length > 0 && (
+            <button
+              onClick={() => {
+                setFilterType('finished_auctions');
+                setProducts(finishedAuctions);
+              }}
+              className={`px-3 sm:px-4 py-2 rounded transition-colors text-sm sm:text-base text-center ${
+                filterType === 'finished_auctions'
+                  ? 'bg-gray-700 text-white hover:bg-gray-600' 
+                  : 'bg-gray-800 text-gray-300 hover:bg-gray-700 border border-gray-600'
+              }`}
+              title="Las subastas finalizadas se eliminan automáticamente después de 30 días"
+            >
+              ✓ Finalizadas ({finishedAuctions.length})
+            </button>
+          )}
         </div>
       </div>
 
@@ -687,22 +1134,22 @@ export default function Dashboard() {
               href={notif.link || '#'}
               className={`block p-4 rounded-lg border-l-4 transition-all hover:shadow-md ${
                 notif.priority === 'high' 
-                  ? 'bg-red-50 border-red-500' 
+                  ? 'bg-red-900/30 border-red-500' 
                   : notif.priority === 'medium'
-                  ? 'bg-yellow-50 border-yellow-500'
-                  : 'bg-blue-50 border-blue-500'
+                  ? 'bg-yellow-900/30 border-yellow-500'
+                  : 'bg-blue-900/30 border-blue-500'
               }`}
             >
               <div className="flex items-center gap-3">
                 <Bell className={`w-5 h-5 ${
-                  notif.priority === 'high' ? 'text-red-600' :
-                  notif.priority === 'medium' ? 'text-yellow-600' :
-                  'text-blue-600'
+                  notif.priority === 'high' ? 'text-red-400' :
+                  notif.priority === 'medium' ? 'text-yellow-400' :
+                  'text-blue-400'
                 }`} />
                 <p className={`flex-1 font-medium ${
-                  notif.priority === 'high' ? 'text-red-800' :
-                  notif.priority === 'medium' ? 'text-yellow-800' :
-                  'text-blue-800'
+                  notif.priority === 'high' ? 'text-red-300' :
+                  notif.priority === 'medium' ? 'text-yellow-300' :
+                  'text-blue-300'
                 }`}>
                   {notif.message}
                 </p>
@@ -718,7 +1165,7 @@ export default function Dashboard() {
         <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <Link
             href="/dashboard/new-product"
-            className="bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-lg p-4 shadow-md hover:shadow-lg transition-all flex items-center gap-3 group"
+            className="bg-gradient-to-br from-blue-600 to-blue-700 text-white rounded-lg p-4 shadow-md hover:shadow-lg transition-all flex items-center gap-3 group"
           >
             <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
               <Plus className="w-5 h-5" />
@@ -730,7 +1177,7 @@ export default function Dashboard() {
           </Link>
           <Link
             href="/dashboard/orders"
-            className="bg-gradient-to-br from-green-500 to-green-600 text-white rounded-lg p-4 shadow-md hover:shadow-lg transition-all flex items-center gap-3 group"
+            className="bg-gradient-to-br from-green-600 to-green-700 text-white rounded-lg p-4 shadow-md hover:shadow-lg transition-all flex items-center gap-3 group"
           >
             <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
               <ShoppingCart className="w-5 h-5" />
@@ -741,8 +1188,20 @@ export default function Dashboard() {
             </div>
           </Link>
           <Link
+            href="/dashboard/payouts"
+            className="bg-gradient-to-br from-emerald-600 to-emerald-700 text-white rounded-lg p-4 shadow-md hover:shadow-lg transition-all flex items-center gap-3 group"
+          >
+            <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
+              <DollarSign className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="font-semibold">Retiros</p>
+              <p className="text-xs text-emerald-100">Solicitar pago</p>
+            </div>
+          </Link>
+          <Link
             href="/dashboard/profile"
-            className="bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-lg p-4 shadow-md hover:shadow-lg transition-all flex items-center gap-3 group"
+            className="bg-gradient-to-br from-purple-600 to-purple-700 text-white rounded-lg p-4 shadow-md hover:shadow-lg transition-all flex items-center gap-3 group"
           >
             <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
               <Edit className="w-5 h-5" />
@@ -755,7 +1214,7 @@ export default function Dashboard() {
           {storeSlug ? (
             <Link
               href={`/store/${storeSlug}`}
-              className="bg-gradient-to-br from-orange-500 to-orange-600 text-white rounded-lg p-4 shadow-md hover:shadow-lg transition-all flex items-center gap-3 group"
+              className="bg-gradient-to-br from-orange-600 to-orange-700 text-white rounded-lg p-4 shadow-md hover:shadow-lg transition-all flex items-center gap-3 group"
             >
               <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
                 <Eye className="w-5 h-5" />
@@ -768,7 +1227,7 @@ export default function Dashboard() {
           ) : (
             <Link
               href="/dashboard/profile"
-              className="bg-gradient-to-br from-gray-500 to-gray-600 text-white rounded-lg p-4 shadow-md hover:shadow-lg transition-all flex items-center gap-3 group"
+              className="bg-gradient-to-br from-gray-600 to-gray-700 text-white rounded-lg p-4 shadow-md hover:shadow-lg transition-all flex items-center gap-3 group"
             >
               <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
                 <Eye className="w-5 h-5" />
@@ -787,83 +1246,138 @@ export default function Dashboard() {
         <div className="mb-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
             {/* Total de Productos */}
-            <div className="bg-white rounded-lg border p-4 shadow-sm">
+            <div className="bg-[#252525] rounded-lg border border-gray-700 p-4 shadow-sm">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600 mb-1">Productos</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.totalProducts}</p>
+                  <p className="text-sm text-gray-400 mb-1">Productos</p>
+                  <p className="text-2xl font-bold text-gray-200">{stats.totalProducts}</p>
                   <p className="text-xs text-gray-500 mt-1">{stats.activeProducts} activos</p>
                 </div>
-                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                  <Package className="w-6 h-6 text-blue-600" />
+                <div className="w-12 h-12 bg-blue-900/30 rounded-lg flex items-center justify-center">
+                  <Package className="w-6 h-6 text-blue-400" />
                 </div>
               </div>
             </div>
 
             {/* Órdenes */}
-            <div className="bg-white rounded-lg border p-4 shadow-sm">
+            <div className="bg-[#252525] rounded-lg border border-gray-700 p-4 shadow-sm">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600 mb-1">Órdenes</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.totalOrders}</p>
+                  <p className="text-sm text-gray-400 mb-1">Órdenes</p>
+                  <p className="text-2xl font-bold text-gray-200">{stats.totalOrders}</p>
                   {stats.pendingOrders > 0 && (
-                    <p className="text-xs text-yellow-600 mt-1 flex items-center gap-1">
+                    <p className="text-xs text-yellow-400 mt-1 flex items-center gap-1">
                       <AlertCircle className="w-3 h-3" />
                       {stats.pendingOrders} pendientes
                     </p>
                   )}
                 </div>
-                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                  <ShoppingCart className="w-6 h-6 text-green-600" />
+                <div className="w-12 h-12 bg-green-900/30 rounded-lg flex items-center justify-center">
+                  <ShoppingCart className="w-6 h-6 text-green-400" />
                 </div>
               </div>
             </div>
 
             {/* Ingresos Mensuales */}
-            <div className="bg-white rounded-lg border p-4 shadow-sm">
+            <div className="bg-[#252525] rounded-lg border border-gray-700 p-4 shadow-sm">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600 mb-1">Este mes</p>
-                  <p className="text-xl font-bold text-gray-900">
+                  <p className="text-sm text-gray-400 mb-1">Este mes</p>
+                  <p className="text-xl font-bold text-gray-200">
                     {stats.monthlyRevenue.toLocaleString('es-PY')} Gs.
                   </p>
                   <p className="text-xs text-gray-500 mt-1">Ingresos del mes</p>
                 </div>
-                <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                  <TrendingUp className="w-6 h-6 text-purple-600" />
+                <div className="w-12 h-12 bg-purple-900/30 rounded-lg flex items-center justify-center">
+                  <TrendingUp className="w-6 h-6 text-purple-400" />
                 </div>
               </div>
             </div>
 
             {/* Ingresos Totales */}
-            <div className="bg-white rounded-lg border p-4 shadow-sm">
+            <div className="bg-[#252525] rounded-lg border border-gray-700 p-4 shadow-sm">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600 mb-1">Ingresos Total</p>
-                  <p className="text-xl font-bold text-green-600">
+                  <p className="text-sm text-gray-400 mb-1">Ingresos Total</p>
+                  <p className="text-xl font-bold text-emerald-400">
                     {stats.totalRevenue.toLocaleString('es-PY')} Gs.
                   </p>
                   <p className="text-xs text-gray-500 mt-1">{stats.totalCustomers} clientes</p>
                 </div>
-                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                  <DollarSign className="w-6 h-6 text-green-600" />
+                <div className="w-12 h-12 bg-green-900/30 rounded-lg flex items-center justify-center">
+                  <DollarSign className="w-6 h-6 text-green-400" />
                 </div>
               </div>
             </div>
           </div>
 
+          {/* Balances y Ganancias */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+            {/* Balance Pendiente (en escrow) */}
+            <div className="bg-gradient-to-br from-yellow-900/30 to-yellow-800/20 rounded-lg border border-yellow-700 p-4">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium text-yellow-300">Pendiente</p>
+                <Clock className="w-5 h-5 text-yellow-400" />
+              </div>
+              <p className="text-2xl font-bold text-gray-200 mb-1">
+                {stats.pendingBalance.toLocaleString('es-PY')} Gs.
+              </p>
+              <p className="text-xs text-yellow-400">En escolta (esperando entrega)</p>
+            </div>
+
+            {/* Balance Disponible (listo para retiro) */}
+            <div className="bg-gradient-to-br from-green-900/30 to-green-800/20 rounded-lg border border-green-700 p-4">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium text-green-300">Disponible</p>
+                <DollarSign className="w-5 h-5 text-green-400" />
+              </div>
+              <p className="text-2xl font-bold text-green-400 mb-1">
+                {stats.availableBalance.toLocaleString('es-PY')} Gs.
+              </p>
+              <p className="text-xs text-green-400">Listo para retiro</p>
+            </div>
+
+            {/* Ganancias Totales */}
+            <div className="bg-gradient-to-br from-blue-900/30 to-blue-800/20 rounded-lg border border-blue-700 p-4">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium text-blue-300">Ganancias Totales</p>
+                <TrendingUp className="w-5 h-5 text-blue-400" />
+              </div>
+              <p className="text-2xl font-bold text-gray-200 mb-1">
+                {stats.totalEarnings.toLocaleString('es-PY')} Gs.
+              </p>
+              <p className="text-xs text-blue-400">Histórico de ingresos</p>
+            </div>
+
+            {/* Comisiones Pagadas */}
+            <div className="bg-gradient-to-br from-red-900/30 to-red-800/20 rounded-lg border border-red-700 p-4">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium text-red-300">Comisiones Pagadas</p>
+                <Percent className="w-5 h-5 text-red-400" />
+              </div>
+              <p className="text-2xl font-bold text-gray-200 mb-1">
+                {stats.totalCommissionsPaid.toLocaleString('es-PY')} Gs.
+              </p>
+              <p className="text-xs text-red-400">Total de comisiones cobradas</p>
+            </div>
+          </div>
+
           {/* Métricas de Rendimiento */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-            <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg border border-blue-200 p-4">
+            <div className="bg-gradient-to-br from-blue-900/30 to-blue-800/20 rounded-lg border border-blue-700 p-4">
               <div className="flex items-center justify-between mb-2">
-                <p className="text-sm font-medium text-blue-700">Tasa de Conversión</p>
-                <Target className="w-5 h-5 text-blue-600" />
+                <p className="text-sm font-medium text-blue-300">Tasa de Conversión</p>
+                <Target className="w-5 h-5 text-blue-400" />
               </div>
               <div className="flex items-baseline gap-2">
-                <p className="text-2xl font-bold text-blue-900">
+                <p className="text-2xl font-bold text-gray-200">
                   {stats.conversionRate.toFixed(1)}%
                 </p>
-                <div className="flex items-center gap-1 text-xs text-blue-700">
+                <div className={`flex items-center gap-1 text-xs ${
+                  stats.conversionRate > 10 ? 'text-green-400' :
+                  stats.conversionRate > 5 ? 'text-blue-400' :
+                  'text-red-400'
+                }`}>
                   {stats.conversionRate > 10 ? (
                     <>
                       <ArrowUp className="w-3 h-3" />
@@ -882,35 +1396,35 @@ export default function Dashboard() {
                   )}
                 </div>
               </div>
-              <p className="text-xs text-blue-600 mt-1">
+              <p className="text-xs text-blue-400 mt-1">
                 {stats.totalOrders} ventas / {stats.activeProducts} productos activos
               </p>
             </div>
 
-            <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg border border-purple-200 p-4">
+            <div className="bg-gradient-to-br from-purple-900/30 to-purple-800/20 rounded-lg border border-purple-700 p-4">
               <div className="flex items-center justify-between mb-2">
-                <p className="text-sm font-medium text-purple-700">Ticket Promedio</p>
-                <BarChart3 className="w-5 h-5 text-purple-600" />
+                <p className="text-sm font-medium text-purple-300">Ticket Promedio</p>
+                <BarChart3 className="w-5 h-5 text-purple-400" />
               </div>
-              <p className="text-2xl font-bold text-purple-900 mb-1">
+              <p className="text-2xl font-bold text-gray-200 mb-1">
                 {stats.averageOrderValue.toLocaleString('es-PY')} Gs.
               </p>
-              <p className="text-xs text-purple-600">
+              <p className="text-xs text-purple-400">
                 Por orden realizada
               </p>
             </div>
 
-            <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-lg border border-emerald-200 p-4">
+            <div className="bg-gradient-to-br from-emerald-900/30 to-emerald-800/20 rounded-lg border border-emerald-700 p-4">
               <div className="flex items-center justify-between mb-2">
-                <p className="text-sm font-medium text-emerald-700">Crecimiento Mensual</p>
-                <TrendingUp className="w-5 h-5 text-emerald-600" />
+                <p className="text-sm font-medium text-emerald-300">Crecimiento Mensual</p>
+                <TrendingUp className="w-5 h-5 text-emerald-400" />
               </div>
-              <p className="text-2xl font-bold text-emerald-900 mb-1">
+              <p className="text-2xl font-bold text-gray-200 mb-1">
                 {stats.monthlyRevenue > 0 
                   ? ((stats.monthlyRevenue / Math.max(stats.totalRevenue - stats.monthlyRevenue, 1)) * 100).toFixed(0)
                   : '0'}%
               </p>
-              <p className="text-xs text-emerald-600">
+              <p className="text-xs text-emerald-400">
                 {stats.monthlyRevenue.toLocaleString('es-PY')} Gs. este mes
               </p>
             </div>
@@ -918,10 +1432,10 @@ export default function Dashboard() {
 
           {/* Gráfico de Tendencias de Ventas */}
           {stats.salesTrend.length > 0 && (
-            <div className="bg-white rounded-lg border p-4 shadow-sm mb-4">
+            <div className="bg-[#252525] rounded-lg border border-gray-700 p-4 shadow-sm mb-4">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-                  <BarChart3 className="w-5 h-5 text-gray-600" />
+                <h3 className="font-semibold text-gray-200 flex items-center gap-2">
+                  <BarChart3 className="w-5 h-5 text-gray-400" />
                   Tendencia de Ventas (Últimos 30 días)
                 </h3>
               </div>
@@ -938,14 +1452,14 @@ export default function Dashboard() {
                           title={`${new Date(day.date).toLocaleDateString('es-PY')}: ${day.revenue.toLocaleString('es-PY')} Gs.`}
                         />
                       </div>
-                      <p className="text-xs text-gray-500 transform -rotate-45 origin-top-left whitespace-nowrap mt-2" style={{ writingMode: 'vertical-rl' }}>
+                      <p className="text-xs text-gray-400 transform -rotate-45 origin-top-left whitespace-nowrap mt-2" style={{ writingMode: 'vertical-rl' }}>
                         {new Date(day.date).getDate()}/{new Date(day.date).getMonth() + 1}
                       </p>
                     </div>
                   );
                 })}
               </div>
-              <div className="mt-4 flex items-center justify-between text-xs text-gray-600">
+              <div className="mt-4 flex items-center justify-between text-xs text-gray-400">
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-1">
                     <div className="w-3 h-3 bg-blue-500 rounded"></div>
@@ -959,15 +1473,15 @@ export default function Dashboard() {
 
           {/* Productos Más Vendidos */}
           {stats.topProducts.length > 0 && (
-            <div className="bg-white rounded-lg border p-4 shadow-sm mb-4">
+            <div className="bg-[#252525] rounded-lg border border-gray-700 p-4 shadow-sm mb-4">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                <h3 className="font-semibold text-gray-200 flex items-center gap-2">
                   <Star className="w-5 h-5 text-yellow-500" />
                   Productos Más Vendidos
                 </h3>
                 <Link
                   href="/dashboard"
-                  className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                  className="text-sm text-blue-400 hover:text-blue-300 font-medium"
                 >
                   Ver todos →
                 </Link>
@@ -977,9 +1491,9 @@ export default function Dashboard() {
                   <Link
                     key={product.id}
                     href={`/products/${product.id}`}
-                    className="group bg-gray-50 rounded-lg p-3 hover:bg-gray-100 transition-all hover:shadow-md"
+                    className="group bg-gray-800 rounded-lg p-3 hover:bg-gray-700 transition-all hover:shadow-md"
                   >
-                    <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-gray-200 mb-2">
+                    <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-gray-700 mb-2">
                       {product.cover_url ? (
                         <Image
                           src={product.cover_url}
@@ -990,21 +1504,21 @@ export default function Dashboard() {
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
-                          <Package className="w-8 h-8 text-gray-400" />
+                          <Package className="w-8 h-8 text-gray-500" />
                         </div>
                       )}
                       <div className="absolute top-2 left-2 bg-yellow-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
                         #{idx + 1}
                       </div>
                     </div>
-                    <h4 className="font-medium text-sm text-gray-900 line-clamp-2 mb-1 group-hover:text-blue-600 transition-colors">
+                    <h4 className="font-medium text-sm text-gray-200 line-clamp-2 mb-1 group-hover:text-blue-400 transition-colors">
                       {product.title}
                     </h4>
                     <div className="space-y-1">
-                      <p className="text-xs text-gray-600">
+                      <p className="text-xs text-gray-400">
                         <span className="font-semibold">{product.total_sold}</span> vendidos
                       </p>
-                      <p className="text-xs font-semibold text-green-600">
+                      <p className="text-xs font-semibold text-emerald-400">
                         {product.revenue.toLocaleString('es-PY')} Gs.
                       </p>
                     </div>
@@ -1016,15 +1530,15 @@ export default function Dashboard() {
 
           {/* Órdenes Recientes */}
           {stats.recentOrders.length > 0 && (
-            <div className="bg-white rounded-lg border p-4 shadow-sm">
+            <div className="bg-[#252525] rounded-lg border border-gray-700 p-4 shadow-sm">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-                  <Clock className="w-5 h-5 text-gray-600" />
+                <h3 className="font-semibold text-gray-200 flex items-center gap-2">
+                  <Clock className="w-5 h-5 text-gray-400" />
                   Órdenes Recientes
                 </h3>
                 <Link
                   href="/dashboard/orders"
-                  className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                  className="text-sm text-blue-400 hover:text-blue-300 font-medium"
                 >
                   Ver todas →
                 </Link>
@@ -1034,7 +1548,7 @@ export default function Dashboard() {
                   <Link
                     key={order.id}
                     href="/dashboard/orders"
-                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                    className="flex items-center justify-between p-3 bg-gray-800 rounded-lg hover:bg-gray-700 transition-colors"
                   >
                     <div className="flex items-center gap-3">
                       <div className={`w-2 h-2 rounded-full ${
@@ -1045,24 +1559,24 @@ export default function Dashboard() {
                         'bg-gray-400'
                       }`} />
                       <div>
-                        <p className="text-sm font-medium text-gray-900">
+                        <p className="text-sm font-medium text-gray-200">
                           Orden #{order.id.slice(0, 8)}
                         </p>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-gray-400">
                           {new Date(order.created_at).toLocaleDateString('es-PY')}
                         </p>
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm font-semibold text-gray-900">
+                      <p className="text-sm font-semibold text-gray-200">
                         {order.total_amount.toLocaleString('es-PY')} Gs.
                       </p>
                       <span className={`text-xs px-2 py-1 rounded ${
-                        order.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                        order.status === 'confirmed' ? 'bg-blue-100 text-blue-800' :
-                        order.status === 'shipped' ? 'bg-purple-100 text-purple-800' :
-                        order.status === 'delivered' ? 'bg-green-100 text-green-800' :
-                        'bg-gray-100 text-gray-800'
+                        order.status === 'pending' ? 'bg-yellow-900/50 text-yellow-300' :
+                        order.status === 'confirmed' ? 'bg-blue-900/50 text-blue-300' :
+                        order.status === 'shipped' ? 'bg-purple-900/50 text-purple-300' :
+                        order.status === 'delivered' ? 'bg-green-900/50 text-green-300' :
+                        'bg-gray-700 text-gray-300'
                       }`}>
                         {order.status === 'pending' ? 'Pendiente' :
                          order.status === 'confirmed' ? 'Confirmado' :
@@ -1081,178 +1595,270 @@ export default function Dashboard() {
 
       {/* Enlaces de configuración */}
       <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Link
-              href="/dashboard/profile"
-              className="bg-white rounded-lg border p-4 hover:shadow-md transition-shadow"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center text-2xl">
-                  👤
+            {/* Ocultar "Mi Perfil & Tienda" cuando la tienda está activa */}
+            {storeStatus !== 'active' && (
+              <Link
+                href="/dashboard/profile"
+                className="bg-[#252525] rounded-lg border border-gray-700 p-4 hover:shadow-md transition-shadow"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-full bg-purple-900/30 flex items-center justify-center text-2xl">
+                    👤
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-200">Mi Perfil</h3>
+                    <p className="text-sm text-gray-400">Foto de perfil, portada, información personal</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900">Mi Perfil {storeStatus === 'active' ? '& Tienda' : ''}</h3>
-                  <p className="text-sm text-gray-600">Foto de perfil, portada, información personal{storeStatus === 'active' ? ' y datos de tienda' : ''}</p>
-                </div>
-              </div>
-            </Link>
+              </Link>
+            )}
             <Link
               href="/dashboard/my-bids"
-              className="bg-white rounded-lg border p-4 hover:shadow-md transition-shadow"
+              className="bg-[#252525] rounded-lg border border-gray-700 p-4 hover:shadow-md transition-shadow"
             >
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center text-2xl">
+                <div className="w-12 h-12 rounded-full bg-emerald-900/30 flex items-center justify-center text-2xl">
                   🔨
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-900">Mis Pujas</h3>
-                  <p className="text-sm text-gray-600">Historial de pujas, subastas ganadas y activas</p>
+                  <h3 className="font-semibold text-gray-200">Mis Pujas</h3>
+                  <p className="text-sm text-gray-400">Historial de pujas, subastas ganadas y activas</p>
                 </div>
               </div>
             </Link>
         {role !== 'seller' ? (
-          <Link href="/dashboard/become-seller" className="bg-white rounded-lg border p-4 hover:shadow-md transition-shadow">
+          <Link href="/dashboard/become-seller" className="bg-[#252525] rounded-lg border border-gray-700 p-4 hover:shadow-md transition-shadow">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-2xl">🏪</div>
+              <div className="w-12 h-12 rounded-full bg-blue-900/30 flex items-center justify-center text-2xl">🏪</div>
               <div>
-                <h3 className="font-semibold text-gray-900">Convertirme en Tienda</h3>
-                <p className="text-sm text-gray-600">Suscripción y solicitud de verificación del local</p>
+                <h3 className="font-semibold text-gray-200">Convertirme en Tienda</h3>
+                <p className="text-sm text-gray-400">Suscripción y solicitud de verificación del local</p>
               </div>
             </div>
           </Link>
         ) : storeStatus === 'pending' ? (
-          <Link href="/dashboard/profile" className="bg-white rounded-lg border p-4 hover:shadow-md transition-shadow">
+          <Link href="/dashboard/profile" className="bg-[#252525] rounded-lg border border-gray-700 p-4 hover:shadow-md transition-shadow">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-yellow-100 flex items-center justify-center text-2xl">⏳</div>
+              <div className="w-12 h-12 rounded-full bg-yellow-900/30 flex items-center justify-center text-2xl">⏳</div>
               <div>
-                <h3 className="font-semibold text-gray-900">Verificación en proceso</h3>
-                <p className="text-sm text-gray-600">Configura tu tienda mientras validamos el lugar</p>
+                <h3 className="font-semibold text-gray-200">Verificación en proceso</h3>
+                <p className="text-sm text-gray-400">Configura tu tienda mientras validamos el lugar</p>
               </div>
             </div>
           </Link>
-        ) : (
-          <Link href="/dashboard/profile" className="bg-white rounded-lg border p-4 hover:shadow-md transition-shadow">
+        ) : storeStatus !== 'active' ? (
+          // Ocultar "Información de Tienda" cuando la tienda está activa
+          <Link href="/dashboard/profile" className="bg-[#252525] rounded-lg border border-gray-700 p-4 hover:shadow-md transition-shadow">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-2xl">🏪</div>
+              <div className="w-12 h-12 rounded-full bg-blue-900/30 flex items-center justify-center text-2xl">🏪</div>
               <div>
-                <h3 className="font-semibold text-gray-900">Información de Tienda</h3>
-                <p className="text-sm text-gray-600">Logo, portada, contacto, ubicación, rubros</p>
+                <h3 className="font-semibold text-gray-200">Información de Tienda</h3>
+                <p className="text-sm text-gray-400">Logo, portada, contacto, ubicación, rubros</p>
               </div>
             </div>
           </Link>
-        )}
+        ) : null}
       </div>
 
       {loading ? (
         <div className="flex justify-center items-center h-32">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-400"></div>
         </div>
-      ) : products.length === 0 ? (
+      ) : (filterType === 'finished_auctions' ? finishedAuctions.length === 0 : 
+           filterType === 'paused' ? pausedProducts.length === 0 :
+           products.length === 0) ? (
         <div className="text-center py-12">
-          <div className="text-6xl mb-4">📦</div>
-          <h2 className="text-xl font-medium text-gray-600 mb-2">No tienes productos aún</h2>
-          <p className="text-gray-500 mb-6">Comienza agregando tu primer producto</p>
-          <Link
-            href="/dashboard/new-product"
-            className="px-6 py-3 rounded bg-black text-white hover:bg-gray-800 transition-colors"
-          >
-            Crear mi primer producto
-          </Link>
+          <div className="text-6xl mb-4">
+            {filterType === 'finished_auctions' ? '✓' : 
+             filterType === 'paused' ? '⏸️' :
+             '📦'}
+          </div>
+          <h2 className="text-xl font-medium text-gray-400 mb-2">
+            {filterType === 'finished_auctions' 
+              ? 'No tienes subastas finalizadas' 
+              : filterType === 'paused'
+              ? 'No tienes productos pausados'
+              : 'No tienes productos aún'}
+          </h2>
+          <p className="text-gray-500 mb-6">
+            {filterType === 'finished_auctions'
+              ? 'Las subastas finalizadas aparecerán aquí durante 30 días antes de eliminarse automáticamente'
+              : filterType === 'paused'
+              ? 'Todos tus productos están activos actualmente'
+              : 'Comienza agregando tu primer producto'}
+          </p>
+          {filterType !== 'finished_auctions' && filterType !== 'paused' && (
+            <Link
+              href="/dashboard/new-product"
+              className="px-6 py-3 rounded bg-gray-700 text-white hover:bg-gray-600 transition-colors"
+            >
+              Crear mi primer producto
+            </Link>
+          )}
+          {filterType === 'paused' && (
+            <button
+              onClick={() => {
+                setFilterType('all');
+                setProducts(allProducts);
+              }}
+              className="px-6 py-3 rounded bg-gray-700 text-white hover:bg-gray-600 transition-colors"
+            >
+              Ver todos los productos
+            </button>
+          )}
         </div>
       ) : (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">
+            <h2 className="text-lg font-semibold text-gray-200">
               {filterType === 'all' 
                 ? 'Mis productos' 
                 : filterType === 'direct' 
                 ? 'Precios fijos' 
-                : 'Mis subastas'} ({products.length})
+                : filterType === 'auction'
+                ? 'Mis subastas'
+                : filterType === 'paused'
+                ? 'Productos Pausados'
+                : 'Subastas Finalizadas'} ({
+                filterType === 'finished_auctions' ? finishedAuctions.length :
+                filterType === 'paused' ? pausedProducts.length :
+                products.length
+              })
             </h2>
             {filterType === 'auction' && products.length > 0 && (
-              <span className="text-sm text-yellow-600 bg-yellow-50 px-3 py-1 rounded-full border border-yellow-200">
+              <span className="text-sm text-yellow-400 bg-yellow-900/30 px-3 py-1 rounded-full border border-yellow-700">
                 🔨 {products.length} {products.length === 1 ? 'subasta activa' : 'subastas activas'}
               </span>
             )}
+            {filterType === 'finished_auctions' && finishedAuctions.length > 0 && (
+              <span className="text-sm text-gray-400 bg-gray-800 px-3 py-1 rounded-full border border-gray-600">
+                ✓ {finishedAuctions.length} {finishedAuctions.length === 1 ? 'subasta finalizada' : 'subastas finalizadas'}
+              </span>
+            )}
             {filterType === 'direct' && products.length > 0 && (
-              <span className="text-sm text-blue-600 bg-blue-50 px-3 py-1 rounded-full border border-blue-200">
+              <span className="text-sm text-blue-400 bg-blue-900/30 px-3 py-1 rounded-full border border-blue-700">
                 💰 {products.length} {products.length === 1 ? 'producto con precio fijo' : 'productos con precio fijo'}
+              </span>
+            )}
+            {filterType === 'paused' && pausedProducts.length > 0 && (
+              <span className="text-sm text-orange-400 bg-orange-900/30 px-3 py-1 rounded-full border border-orange-700">
+                ⏸️ {pausedProducts.length} {pausedProducts.length === 1 ? 'producto pausado' : 'productos pausados'}
               </span>
             )}
           </div>
           {filterType === 'auction' && products.length === 0 && (
-            <div className="text-center py-12 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <div className="text-center py-12 bg-yellow-900/20 border border-yellow-700 rounded-lg">
               <div className="text-6xl mb-4">🔨</div>
-              <h2 className="text-xl font-medium text-gray-600 mb-2">No tienes subastas</h2>
+              <h2 className="text-xl font-medium text-gray-400 mb-2">No tienes subastas</h2>
               <p className="text-gray-500 mb-6">Crea una nueva subasta desde el formulario de producto</p>
               <Link
                 href="/dashboard/new-product"
-                className="px-6 py-3 rounded bg-black text-white hover:bg-gray-800 transition-colors inline-block"
+                className="px-6 py-3 rounded bg-gray-700 text-white hover:bg-gray-600 transition-colors inline-block"
               >
                 Crear subasta
               </Link>
             </div>
           )}
           {filterType === 'direct' && products.length === 0 && (
-            <div className="text-center py-12 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="text-center py-12 bg-blue-900/20 border border-blue-700 rounded-lg">
               <div className="text-6xl mb-4">💰</div>
-              <h2 className="text-xl font-medium text-gray-600 mb-2">No tienes productos con precio fijo</h2>
+              <h2 className="text-xl font-medium text-gray-400 mb-2">No tienes productos con precio fijo</h2>
               <p className="text-gray-500 mb-6">Crea un nuevo producto desde el formulario</p>
               <Link
                 href="/dashboard/new-product"
-                className="px-6 py-3 rounded bg-black text-white hover:bg-gray-800 transition-colors inline-block"
+                className="px-6 py-3 rounded bg-gray-700 text-white hover:bg-gray-600 transition-colors inline-block"
               >
                 Crear producto
               </Link>
             </div>
           )}
-          {products.length > 0 && (
+          {/* Banner de productos pausados */}
+          {pausedProducts.length > 0 && filterType !== 'paused' && (
+            <div className="mb-6 bg-orange-900/30 border border-orange-700 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <div className="text-orange-400 text-xl">⏸️</div>
+                <div className="flex-1">
+                  <p className="text-sm text-orange-300 font-medium mb-1">
+                    Tienes {pausedProducts.length} producto(s) pausado(s)
+                  </p>
+                  <p className="text-xs text-orange-400 mb-3">
+                    Estos productos fueron pausados automáticamente porque tu membresía expiró o porque excediste los límites de tu plan.
+                  </p>
+                  <div className="flex gap-2 flex-wrap">
+                    <button
+                      onClick={() => {
+                        setFilterType('paused');
+                        setProducts(pausedProducts);
+                      }}
+                      className="px-4 py-2 bg-orange-600 text-white rounded hover:bg-orange-700 transition-colors text-sm font-medium"
+                    >
+                      Ver productos pausados
+                    </button>
+                    <button
+                      onClick={reactivateAllPausedProducts}
+                      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm font-medium"
+                    >
+                      🔄 Reactivar todos
+                    </button>
+                    <Link
+                      href="/memberships"
+                      className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors text-sm font-medium"
+                    >
+                      💎 Actualizar membresía
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Vista para productos pausados */}
+          {filterType === 'paused' && (
+            <>
+              <div className="mb-6 bg-orange-900/30 border border-orange-700 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="text-lg font-semibold text-orange-300 mb-2">
+                      ⏸️ Productos Pausados ({pausedProducts.length})
+                    </h3>
+                    <p className="text-sm text-orange-400">
+                      Estos productos fueron pausados automáticamente. Reactívalos individualmente o actualiza tu membresía para reactivarlos todos.
+                    </p>
+                  </div>
+                  <button
+                    onClick={reactivateAllPausedProducts}
+                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm font-medium"
+                  >
+                    🔄 Reactivar todos
+                  </button>
+                </div>
+              </div>
+              {pausedProducts.length === 0 && (
+                <div className="text-center py-12">
+                  <div className="text-6xl mb-4">✅</div>
+                  <h2 className="text-xl font-medium text-gray-400 mb-2">
+                    No tienes productos pausados
+                  </h2>
+                  <p className="text-gray-500 mb-6">
+                    Todos tus productos están activos
+                  </p>
+                </div>
+              )}
+            </>
+          )}
+
+          {(filterType === 'finished_auctions' ? finishedAuctions.length > 0 : 
+            filterType === 'paused' ? pausedProducts.length > 0 :
+            products.length > 0) && (
             <>
               {/* Vista Rápida de Productos - Mini Grid */}
-              {role === 'seller' && (
-                <div className="mb-6 bg-white rounded-lg border p-4 shadow-sm">
+              {role === 'seller' && filterType !== 'finished_auctions' && filterType !== 'paused' && (
+                <div className="mb-6 bg-[#252525] rounded-lg border border-gray-700 p-4 shadow-sm">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-                      <Package className="w-5 h-5 text-gray-600" />
+                    <h3 className="font-semibold text-gray-200 flex items-center gap-2">
+                      <Package className="w-5 h-5 text-gray-400" />
                       Vista Rápida de Productos
                     </h3>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => setFilterType('all')}
-                        className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
-                          filterType === 'all'
-                            ? 'bg-gray-800 text-white'
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                        }`}
-                      >
-                        Todos ({allProducts.length})
-                      </button>
-                      <button
-                        onClick={() => {
-                          setFilterType('direct');
-                          setProducts(allProducts.filter(p => p.sale_type === 'direct'));
-                        }}
-                        className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
-                          filterType === 'direct'
-                            ? 'bg-blue-500 text-white'
-                            : 'bg-blue-100 text-blue-800 hover:bg-blue-200'
-                        }`}
-                      >
-                        Precio Fijo ({allProducts.filter(p => p.sale_type === 'direct').length})
-                      </button>
-                      <button
-                        onClick={() => {
-                          setFilterType('auction');
-                          setProducts(allProducts.filter(p => p.sale_type === 'auction'));
-                        }}
-                        className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
-                          filterType === 'auction'
-                            ? 'bg-yellow-500 text-white'
-                            : 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200'
-                        }`}
-                      >
-                        Subastas ({allProducts.filter(p => p.sale_type === 'auction').length})
-                      </button>
-                    </div>
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
                     {allProducts.slice(0, 6).map((product) => (
@@ -1261,7 +1867,7 @@ export default function Dashboard() {
                         href={`/dashboard/edit-product/${product.id}`}
                         className="group relative"
                       >
-                        <div className="relative aspect-square rounded-lg overflow-hidden bg-gray-100 mb-2 border-2 border-transparent group-hover:border-blue-500 transition-all">
+                        <div className="relative aspect-square rounded-lg overflow-hidden bg-gray-700 mb-2 border-2 border-transparent group-hover:border-blue-500 transition-all">
                           {product.cover_url ? (
                             <Image
                               src={product.cover_url}
@@ -1272,7 +1878,7 @@ export default function Dashboard() {
                             />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center">
-                              <Package className="w-8 h-8 text-gray-400" />
+                              <Package className="w-8 h-8 text-gray-500" />
                             </div>
                           )}
                           {product.sale_type === 'auction' && (
@@ -1281,10 +1887,10 @@ export default function Dashboard() {
                             </div>
                           )}
                         </div>
-                        <p className="text-xs font-medium text-gray-900 line-clamp-2 group-hover:text-blue-600 transition-colors">
+                        <p className="text-xs font-medium text-gray-200 line-clamp-2 group-hover:text-blue-400 transition-colors">
                           {product.title}
                         </p>
-                        <p className="text-xs text-green-600 font-semibold mt-1">
+                        <p className="text-xs text-emerald-400 font-semibold mt-1">
                           {product.price.toLocaleString('es-PY')} Gs.
                         </p>
                       </Link>
@@ -1297,7 +1903,7 @@ export default function Dashboard() {
                           const element = document.getElementById('all-products');
                           element?.scrollIntoView({ behavior: 'smooth' });
                         }}
-                        className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                        className="text-sm text-blue-400 hover:text-blue-300 font-medium"
                       >
                         Ver todos los productos ({allProducts.length}) ↓
                       </button>
@@ -1306,10 +1912,32 @@ export default function Dashboard() {
                 </div>
               )}
 
+              {/* Mensaje informativo para subastas finalizadas */}
+              {filterType === 'finished_auctions' && finishedAuctions.length > 0 && (
+                <div className="bg-blue-900/30 border border-blue-700 rounded-lg p-4 mb-4">
+                  <div className="flex items-start gap-3">
+                    <div className="text-blue-400 text-xl">ℹ️</div>
+                    <div className="flex-1">
+                      <p className="text-sm text-blue-300 font-medium mb-1">
+                        Información importante
+                      </p>
+                      <p className="text-xs text-blue-400">
+                        Las subastas finalizadas se eliminan automáticamente después de 30 días desde su fecha de finalización para optimizar el almacenamiento. 
+                        Si necesitas conservar la información, descárgala antes del plazo.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div id="all-products" className="grid gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-3">
-                {products.map((product) => {
+                {(filterType === 'finished_auctions' ? finishedAuctions : 
+                  filterType === 'paused' ? pausedProducts : 
+                  products).map((product) => {
                 const isAuction = product.sale_type === 'auction';
                 const isDirect = product.sale_type === 'direct';
+                const isFinishedAuction = filterType === 'finished_auctions';
+                const isPaused = filterType === 'paused' || product.status === 'paused';
                 
                 // Validación de filtro
                 if (filterType === 'auction' && !isAuction) {
@@ -1320,7 +1948,7 @@ export default function Dashboard() {
                   });
                 }
                 if (filterType === 'direct' && !isDirect) {
-                  console.warn('⚠️ Producto sin sale_type="direct" en vista de precios fijos:', {
+                  logger.warn('Producto sin sale_type="direct" en vista de precios fijos', undefined, {
                     id: product.id,
                     title: product.title,
                     sale_type: product.sale_type
@@ -1328,8 +1956,22 @@ export default function Dashboard() {
                 }
                 
                 return (
-                <div key={product.id} className="bg-white rounded-lg shadow-sm border overflow-hidden relative">
-                  {isAuction && (
+                <div key={product.id} className={`bg-[#252525] rounded-lg shadow-sm border overflow-hidden relative ${
+                  isFinishedAuction ? 'opacity-75 border-gray-700' :
+                  isPaused ? 'border-orange-700 border-2' :
+                  'border-gray-700'
+                }`}>
+                  {isPaused && (
+                    <div className="absolute top-2 right-2 bg-orange-600 text-white text-xs font-bold px-2 py-1 rounded z-10">
+                      ⏸️ PAUSADO
+                    </div>
+                  )}
+                  {isFinishedAuction && !isPaused && (
+                    <div className="absolute top-2 right-2 bg-gray-600 text-white text-xs font-bold px-2 py-1 rounded z-10">
+                      ✓ FINALIZADA
+                    </div>
+                  )}
+                  {isAuction && !isFinishedAuction && !isPaused && (
                     <div className="absolute top-2 right-2 bg-yellow-500 text-white text-xs font-bold px-2 py-1 rounded z-10">
                       🔨 SUBASTA
                     </div>
@@ -1338,38 +1980,89 @@ export default function Dashboard() {
                     <img
                       src={product.cover_url}
                       alt={product.title}
-                      className="w-full h-40 sm:h-48 object-cover"
+                      className={`w-full h-40 sm:h-48 object-cover ${
+                        isFinishedAuction || isPaused ? 'grayscale opacity-60' : ''
+                      }`}
                     />
                   )}
+                  {!product.cover_url && (isFinishedAuction || isPaused) && (
+                    <div className="w-full h-40 sm:h-48 bg-gray-700 flex items-center justify-center">
+                      <Package className="w-12 h-12 text-gray-500" />
+                    </div>
+                  )}
                   <div className="p-3 sm:p-4">
-                    <h3 className="font-medium text-base sm:text-lg mb-2 line-clamp-2">{product.title}</h3>
-                    <p className="text-lg sm:text-2xl font-bold text-green-600 mb-3">
+                    <h3 className={`font-medium text-base sm:text-lg mb-2 line-clamp-2 ${isFinishedAuction ? 'text-gray-400' : 'text-gray-200'}`}>{product.title}</h3>
+                    <p className={`text-lg sm:text-2xl font-bold mb-3 ${isFinishedAuction ? 'text-gray-500' : 'text-emerald-400'}`}>
                       {product.price.toLocaleString()} Gs.
-                      {isAuction && (
-                        <span className="block text-xs text-yellow-600 font-normal mt-1">Precio base</span>
+                      {isFinishedAuction && (
+                        <span className="block text-xs text-gray-500 font-normal mt-1">Precio base final</span>
+                      )}
+                      {isAuction && !isFinishedAuction && (
+                        <span className="block text-xs text-yellow-400 font-normal mt-1">Precio base</span>
                       )}
                     </p>
                     <div className="flex flex-col sm:flex-row gap-2">
-                      <Link
-                        href={`/dashboard/edit-product/${product.id}`}
-                        className="flex-1 px-3 py-2 bg-blue-500 text-white rounded text-center hover:bg-blue-600 transition-colors text-sm"
-                      >
-                        ✏️ Editar
-                      </Link>
-                      <Link
-                        href={`/products/${product.id}`}
-                        className="flex-1 px-3 py-2 bg-gray-500 text-white rounded text-center hover:bg-gray-600 transition-colors text-sm"
-                      >
-                        👁️ Ver
-                      </Link>
-                      <button
-                        onClick={() => deleteProduct(product.id)}
-                        disabled={deletingId === product.id}
-                        className="px-3 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-                      >
-                        {deletingId === product.id ? '⏳' : '🗑️'}
-                      </button>
+                      {isPaused ? (
+                        <>
+                          <button
+                            onClick={() => reactivateProduct(product.id)}
+                            disabled={reactivatingId === product.id}
+                            className="flex-1 px-3 py-2 rounded text-center transition-colors text-sm bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {reactivatingId === product.id ? '⏳ Reactivando...' : '🔄 Reactivar'}
+                          </button>
+                          <Link
+                            href={`/dashboard/edit-product/${product.id}`}
+                            className="flex-1 px-3 py-2 rounded text-center transition-colors text-sm bg-gray-600 text-white hover:bg-gray-700"
+                          >
+                            ✏️ Ver detalles
+                          </Link>
+                          <Link
+                            href="/memberships"
+                            className="px-3 py-2 rounded text-center transition-colors text-sm bg-blue-600 text-white hover:bg-blue-700"
+                          >
+                            💎 Upgrade
+                          </Link>
+                        </>
+                      ) : (
+                        <>
+                          <Link
+                            href={`/dashboard/edit-product/${product.id}`}
+                            className={`flex-1 px-3 py-2 rounded text-center transition-colors text-sm ${
+                              isFinishedAuction 
+                                ? 'bg-gray-400 text-white hover:bg-gray-500' 
+                                : 'bg-blue-500 text-white hover:bg-blue-600'
+                            }`}
+                          >
+                            {isFinishedAuction ? '✏️ Ver detalles' : '✏️ Editar'}
+                          </Link>
+                          <Link
+                            href={`/products/${product.id}`}
+                            className={`flex-1 px-3 py-2 rounded text-center transition-colors text-sm ${
+                              isFinishedAuction 
+                                ? 'bg-gray-500 text-white hover:bg-gray-600' 
+                                : 'bg-gray-500 text-white hover:bg-gray-600'
+                            }`}
+                          >
+                            👁️ Ver
+                          </Link>
+                          {!isFinishedAuction && (
+                            <button
+                              onClick={() => deleteProduct(product.id)}
+                              disabled={deletingId === product.id}
+                              className="px-3 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                            >
+                              {deletingId === product.id ? '⏳' : '🗑️'}
+                            </button>
+                          )}
+                        </>
+                      )}
                     </div>
+                    {isFinishedAuction && product.auction_end_at && (
+                      <p className="text-xs text-gray-500 mt-2">
+                        Finalizada: {new Date(product.auction_end_at).toLocaleDateString('es-PY')}
+                      </p>
+                    )}
                   </div>
                 </div>
                 );
@@ -1377,6 +2070,7 @@ export default function Dashboard() {
               </div>
             </>
           )}
+
         </div>
       )}
 
@@ -1384,6 +2078,6 @@ export default function Dashboard() {
       {/* <div className="mt-8">
         <AdminRoleAssigner />
       </div> */}
-    </main>
+    </div>
   );
 }

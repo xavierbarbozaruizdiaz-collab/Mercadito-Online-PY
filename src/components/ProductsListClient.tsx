@@ -13,7 +13,7 @@ type Product = {
   title: string; 
   description: string | null; 
   price: number; 
-  cover_url: string | null;
+  image_url: string | null;
   condition: string;
   sale_type: string;
   category_id: string;
@@ -69,6 +69,14 @@ export default function ProductsListClient() {
     sortBy: 'date_desc'
   });
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [vehicleFields, setVehicleFields] = useState({
+    marca: '',
+    modelo: '',
+    año: '',
+    kilometraje: '',
+    color: '',
+    documentacion: ''
+  });
   
   // Actualizar búsqueda cuando cambia la URL
   useEffect(() => {
@@ -163,7 +171,7 @@ export default function ProductsListClient() {
           title, 
           description, 
           price, 
-          cover_url,
+          image_url:cover_url,
           condition,
           sale_type,
           category_id,
@@ -174,7 +182,8 @@ export default function ProductsListClient() {
           auction_start_at,
           auction_end_at,
           current_bid,
-          total_bids
+          total_bids,
+          attributes
         `)
         .or('status.is.null,status.eq.active'); // Incluir productos sin status o activos
 
@@ -312,11 +321,94 @@ export default function ProductsListClient() {
         throw queryError;
       }
 
+      // Filtrar productos por atributos de vehículos/motos (filtrado del lado del cliente)
+      let filteredProductsData = productsData || [];
+      
+      // Filtrar productos anómalos o inválidos (métricas del dashboard, Firebase, etc.)
+      filteredProductsData = filteredProductsData.filter((p: any) => {
+        // Excluir productos que no tengan estructura válida
+        if (!p.id || !p.title) return false;
+        
+        // Excluir cualquier producto cuyo título o descripción contenga métricas del dashboard
+        const title = (p.title || '').toLowerCase();
+        const description = (p.description || '').toLowerCase();
+        
+        // Palabras clave que indican productos anómalos
+        const anomalousKeywords = [
+          'resumen',
+          'solicitudes',
+          'firebase studio',
+          'firebase',
+          'errores',
+          'solicitud',
+          'application has',
+          'requests',
+          'errors',
+          'últimos 7 días',
+          'últimos 7 dias',
+          'dashboard',
+          'métricas',
+          'metrics'
+        ];
+        
+        const containsAnomalousContent = anomalousKeywords.some(keyword => 
+          title.includes(keyword) || description.includes(keyword)
+        );
+        
+        if (containsAnomalousContent) return false;
+        
+        return true;
+      });
+      
+      if (vehicleFields.marca || vehicleFields.modelo || vehicleFields.año || vehicleFields.kilometraje || vehicleFields.color || vehicleFields.documentacion) {
+        filteredProductsData = filteredProductsData.filter((p: any) => {
+          const attrs = p.attributes || {};
+          
+          // Filtro por marca
+          if (vehicleFields.marca && (!attrs.marca || !attrs.marca.toLowerCase().includes(vehicleFields.marca.toLowerCase()))) {
+            return false;
+          }
+          
+          // Filtro por modelo
+          if (vehicleFields.modelo && (!attrs.modelo || !attrs.modelo.toLowerCase().includes(vehicleFields.modelo.toLowerCase()))) {
+            return false;
+          }
+          
+          // Filtro por año
+          if (vehicleFields.año && attrs.año && attrs.año.toString() !== vehicleFields.año) {
+            return false;
+          }
+          
+          // Filtro por kilometraje (rango ±10%)
+          if (vehicleFields.kilometraje) {
+            const km = parseFloat(vehicleFields.kilometraje);
+            if (!isNaN(km)) {
+              const productKm = parseFloat(attrs.kilometraje || '0');
+              if (productKm < km * 0.9 || productKm > km * 1.1) {
+                return false;
+              }
+            }
+          }
+          
+          // Filtro por color
+          if (vehicleFields.color && (!attrs.color || !attrs.color.toLowerCase().includes(vehicleFields.color.toLowerCase()))) {
+            return false;
+          }
+          
+          // Filtro por documentación
+          if (vehicleFields.documentacion && attrs.documentacion !== vehicleFields.documentacion) {
+            return false;
+          }
+          
+          return true;
+        });
+      }
+
       // Si hay productos, obtener información de sellers y stores (optimizado con límites)
-      if (productsData && productsData.length > 0) {
+      if (filteredProductsData && filteredProductsData.length > 0) {
         // Limitar productos a enriquecer para mejor rendimiento
         const maxProductsToEnrich = 50;
-        const productsToEnrich = productsData.slice(0, maxProductsToEnrich);
+        const productsToEnrich = filteredProductsData.slice(0, maxProductsToEnrich);
         
         const sellerIds = [...new Set(productsToEnrich.map((p: any) => p.seller_id).filter(Boolean))].slice(0, 100) as string[];
         const storeIds = [...new Set(productsToEnrich.map((p: any) => p.store_id).filter(Boolean))].slice(0, 100) as string[];
@@ -393,7 +485,7 @@ export default function ProductsListClient() {
         }
 
         // Enriquecer productos (todos, no solo los primeros 50)
-        let enrichedProducts = (productsData as any[]).map((product: any) => ({
+        let enrichedProducts = (filteredProductsData as any[]).map((product: any) => ({
           ...product,
           seller: sellersMap[product.seller_id] || null,
           store: storesMap[product.store_id] || null,
@@ -444,7 +536,13 @@ export default function ProductsListClient() {
           });
         }
 
-        setProducts(enrichedProducts);
+        // Aplicar los productos filtrados (no solo los enriquecidos)
+        const allFilteredProducts = filteredProductsData.map((p: any) => {
+          const enriched = enrichedProducts.find((ep: any) => ep.id === p.id);
+          return enriched || p;
+        });
+        
+        setProducts(allFilteredProducts);
       } else {
         setProducts([]);
       }
@@ -476,6 +574,14 @@ export default function ProductsListClient() {
       saleType: '',
       auctionFilter: '',
       sortBy: 'date_desc'
+    });
+    setVehicleFields({
+      marca: '',
+      modelo: '',
+      año: '',
+      kilometraje: '',
+      color: '',
+      documentacion: ''
     });
   }
 
@@ -643,6 +749,93 @@ export default function ProductsListClient() {
               </div>
             )}
           </div>
+          
+          {/* Campos específicos para vehículos/motos */}
+          {(() => {
+            const selectedCategory = categories.find(cat => cat.id === filters.category);
+            const selectedCategoryName = selectedCategory?.name?.toLowerCase() || '';
+            const isVehicleCategory = selectedCategoryName === 'vehiculos' || selectedCategoryName === 'motos';
+            
+            if (!isVehicleCategory) return null;
+            
+            return (
+              <div className="px-3 pb-3 border-t border-gray-200 mt-3 pt-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg">
+                <h3 className="font-semibold text-blue-900 dark:text-blue-300 mb-3 text-sm">
+                  {selectedCategoryName === 'vehiculos' ? '🚗 Información del Vehículo' : '🏍️ Información de la Moto'}
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Marca</label>
+                    <input
+                      type="text"
+                      placeholder={selectedCategoryName === 'vehiculos' ? 'Ej: Ford, Toyota...' : 'Ej: Honda, Yamaha...'}
+                      value={vehicleFields.marca}
+                      onChange={(e) => setVehicleFields(prev => ({ ...prev, marca: e.target.value }))}
+                      className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm text-gray-900 dark:text-gray-200"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Modelo</label>
+                    <input
+                      type="text"
+                      placeholder={selectedCategoryName === 'vehiculos' ? 'Ej: Fiesta, Corolla...' : 'Ej: CG 150, XTZ 250...'}
+                      value={vehicleFields.modelo}
+                      onChange={(e) => setVehicleFields(prev => ({ ...prev, modelo: e.target.value }))}
+                      className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm text-gray-900 dark:text-gray-200"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Año</label>
+                    <input
+                      type="number"
+                      placeholder="Ej: 2020"
+                      min="1900"
+                      max={new Date().getFullYear() + 1}
+                      value={vehicleFields.año}
+                      onChange={(e) => setVehicleFields(prev => ({ ...prev, año: e.target.value }))}
+                      className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm text-gray-900 dark:text-gray-200"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Kilometraje</label>
+                    <input
+                      type="number"
+                      placeholder="Ej: 50000"
+                      min="0"
+                      value={vehicleFields.kilometraje}
+                      onChange={(e) => setVehicleFields(prev => ({ ...prev, kilometraje: e.target.value }))}
+                      className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm text-gray-900 dark:text-gray-200"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Color</label>
+                    <input
+                      type="text"
+                      placeholder="Ej: Blanco, Negro..."
+                      value={vehicleFields.color}
+                      onChange={(e) => setVehicleFields(prev => ({ ...prev, color: e.target.value }))}
+                      className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm text-gray-900 dark:text-gray-200"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Documentación</label>
+                    <select
+                      value={vehicleFields.documentacion}
+                      onChange={(e) => setVehicleFields(prev => ({ ...prev, documentacion: e.target.value }))}
+                      className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm text-gray-900 dark:text-gray-200"
+                    >
+                      <option value="">— Selecciona —</option>
+                      <option value="al_dia">Al día</option>
+                      <option value="solo_titulo">Solo título</option>
+                      <option value="solo_cedula_verde">Solo cédula verde</option>
+                      <option value="titulo_y_cedula_verde">Título y cédula verde</option>
+                      <option value="ninguna">Ninguna de las anteriores</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
           </div>
         </div>
       </div>
@@ -697,11 +890,12 @@ export default function ProductsListClient() {
               }`}>
                 <div className="relative">
                   <img
-                    src={product.cover_url ?? 'https://placehold.co/400x300?text=Producto'}
+                    src={product.image_url ?? 'https://placehold.co/400x300?text=Producto'}
                     alt={product.title}
                     className="w-full h-48 object-cover"
                   />
-                  <div className="absolute top-2 left-2 flex flex-col gap-1">
+                  {/* Badges de condición y tipo de venta - OCULTOS */}
+                  {/* <div className="absolute top-2 left-2 flex flex-col gap-1">
                     <span className={`px-2 py-1 text-xs rounded-full ${
                       product.condition === 'nuevo' 
                         ? 'bg-green-100 text-green-800' 
@@ -718,16 +912,17 @@ export default function ProductsListClient() {
                         Finaliza pronto
                       </span>
                     )}
-                  </div>
+                  </div> */}
                   <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
-                    <span className={`px-2 py-1 text-xs rounded-full flex items-center gap-1 ${
+                    {/* Badge de tipo de venta - OCULTO */}
+                    {/* <span className={`px-2 py-1 text-xs rounded-full flex items-center gap-1 ${
                       isAuction 
                         ? 'bg-purple-100 text-purple-800' 
                         : 'bg-blue-100 text-blue-800'
                     }`}>
                       {isAuction && <Gavel className="h-3 w-3" />}
                       {isAuction ? 'Subasta' : 'Directa'}
-                    </span>
+                    </span> */}
                     {isActiveAuction && product.total_bids !== undefined && product.total_bids > 0 && (
                       <span className="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800 flex items-center gap-1">
                         <Users className="h-3 w-3" />

@@ -11,6 +11,7 @@ import { useAuth, useStore, useRole } from '@/lib/hooks/useAuth';
 import { supabase } from '@/lib/supabase/client';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import SellerAnalytics from '@/components/SellerAnalytics';
+import { getSellerAuctions, type AuctionProduct } from '@/lib/services/auctionService';
 import { 
   Package, 
   Plus, 
@@ -23,7 +24,11 @@ import {
   Store,
   Settings,
   BarChart3,
-  Bell
+  Bell,
+  Gavel,
+  Clock,
+  Trophy,
+  AlertCircle
 } from 'lucide-react';
 
 // ============================================
@@ -77,6 +82,15 @@ export default function SellerDashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [recentProducts, setRecentProducts] = useState<Product[]>([]);
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
+  const [recentAuctions, setRecentAuctions] = useState<AuctionProduct[]>([]);
+  const [auctionStats, setAuctionStats] = useState<{
+    total: number;
+    active: number;
+    scheduled: number;
+    ended: number;
+    with_winner: number;
+    total_revenue: number;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -195,6 +209,35 @@ export default function SellerDashboard() {
 
         if (recentOrdersResult.data) {
           setRecentOrders(recentOrdersResult.data);
+        }
+
+        // Cargar subastas del vendedor
+        try {
+          const auctionsData = await getSellerAuctions(user.id);
+          setRecentAuctions(auctionsData.slice(0, 5)); // Solo las 5 más recientes
+          
+          // Calcular estadísticas de subastas
+          const auctions = auctionsData as AuctionProduct[];
+          const activeAuctions = auctions.filter((a: AuctionProduct) => a.auction_status === 'active');
+          const scheduledAuctions = auctions.filter((a: AuctionProduct) => a.auction_status === 'scheduled');
+          const endedAuctions = auctions.filter((a: AuctionProduct) => a.auction_status === 'ended');
+          const withWinner = endedAuctions.filter((a: AuctionProduct) => a.winner_id);
+          
+          // Calcular ingresos de subastas finalizadas con ganador
+          const revenue = withWinner.reduce((sum: number, auction: AuctionProduct) => {
+            return sum + (auction.current_bid || auction.price);
+          }, 0);
+          
+          setAuctionStats({
+            total: auctions.length,
+            active: activeAuctions.length,
+            scheduled: scheduledAuctions.length,
+            ended: endedAuctions.length,
+            with_winner: withWinner.length,
+            total_revenue: revenue,
+          });
+        } catch (auctionErr) {
+          console.error('Error loading auctions:', auctionErr);
         }
 
       } catch (err) {
@@ -327,6 +370,54 @@ export default function SellerDashboard() {
           </div>
         )}
 
+        {/* Estadísticas de Subastas */}
+        {auctionStats && auctionStats.total > 0 && (
+          <>
+            <div className="mb-4 mt-8">
+              <h2 className="text-xl font-semibold text-gray-900">Subastas</h2>
+              <p className="text-gray-600">Estadísticas de tus subastas</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+              <StatCard
+                title="Total Subastas"
+                value={auctionStats.total}
+                icon={Gavel}
+                color="purple"
+              />
+              <StatCard
+                title="Subastas Activas"
+                value={auctionStats.active}
+                icon={Clock}
+                color="blue"
+              />
+              <StatCard
+                title="Subastas Finalizadas"
+                value={auctionStats.ended}
+                icon={Trophy}
+                color="green"
+              />
+              <StatCard
+                title="Con Ganador"
+                value={auctionStats.with_winner}
+                icon={Trophy}
+                color="yellow"
+              />
+              <StatCard
+                title="Ingresos de Subastas"
+                value={formatCurrency(auctionStats.total_revenue)}
+                icon={DollarSign}
+                color="emerald"
+              />
+              <StatCard
+                title="Tasa de Éxito"
+                value={`${auctionStats.total > 0 ? ((auctionStats.with_winner / auctionStats.ended) * 100).toFixed(1) : 0}%`}
+                icon={TrendingUp}
+                color="indigo"
+              />
+            </div>
+          </>
+        )}
+
         {/* Dashboard Analítico Avanzado */}
         <div className="mt-8">
           <div className="mb-4">
@@ -396,6 +487,28 @@ export default function SellerDashboard() {
           </div>
         </div>
 
+        {/* Subastas Recientes */}
+        {recentAuctions.length > 0 && (
+          <div className="mt-8 bg-white rounded-lg shadow-sm border">
+            <div className="px-6 py-4 border-b">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-gray-900">Subastas Recientes</h2>
+                <Link
+                  href="/dashboard/my-bids"
+                  className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+                >
+                  Ver todas
+                </Link>
+              </div>
+            </div>
+            <div className="divide-y divide-gray-200">
+              {recentAuctions.map((auction) => (
+                <AuctionRow key={auction.id} auction={auction} />
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Acciones Rápidas */}
         <div className="mt-8 bg-white rounded-lg shadow-sm border">
           <div className="px-6 py-4 border-b">
@@ -453,6 +566,7 @@ function StatCard({ title, value, icon: Icon, color }: StatCardProps) {
     pink: 'bg-pink-100 text-pink-600',
     orange: 'bg-orange-100 text-orange-600',
     teal: 'bg-teal-100 text-teal-600',
+    emerald: 'bg-emerald-100 text-emerald-600',
   };
 
   return (
@@ -550,6 +664,83 @@ function OrderRow({ order }: OrderRowProps) {
         <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusColors[order.status as keyof typeof statusColors]}`}>
           {order.status}
         </span>
+      </div>
+    </div>
+  );
+}
+
+interface AuctionRowProps {
+  auction: AuctionProduct;
+}
+
+function AuctionRow({ auction }: AuctionRowProps) {
+  const statusColors = {
+    scheduled: 'bg-blue-100 text-blue-800',
+    active: 'bg-green-100 text-green-800',
+    ended: 'bg-gray-100 text-gray-800',
+    cancelled: 'bg-red-100 text-red-800',
+  };
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'scheduled':
+        return 'Programada';
+      case 'active':
+        return 'Activa';
+      case 'ended':
+        return 'Finalizada';
+      case 'cancelled':
+        return 'Cancelada';
+      default:
+        return status;
+    }
+  };
+
+  return (
+    <div className="px-6 py-4 flex items-center justify-between">
+      <div className="flex items-center">
+        <img
+          src={auction.image_url || 'https://placehold.co/60x60?text=Subasta'}
+          alt={auction.title}
+          className="w-12 h-12 object-cover rounded-md mr-4"
+        />
+        <div>
+          <Link
+            href={`/auctions/${auction.id}`}
+            className="text-sm font-medium text-gray-900 hover:text-blue-600"
+          >
+            {auction.title}
+          </Link>
+          <div className="flex items-center gap-3 mt-1">
+            <p className="text-sm text-gray-600">
+              Puja: {formatCurrency(auction.current_bid || auction.price)}
+            </p>
+            <span className="text-xs text-gray-500">
+              {auction.total_bids} puja{auction.total_bids !== 1 ? 's' : ''}
+            </span>
+          </div>
+        </div>
+      </div>
+      <div className="flex items-center space-x-2">
+        <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusColors[auction.auction_status as keyof typeof statusColors]}`}>
+          {getStatusLabel(auction.auction_status)}
+        </span>
+        {auction.auction_status === 'ended' && auction.winner_id && (
+          <Link
+            href={`/chat?user=${auction.winner_id}`}
+            className="p-1 text-gray-400 hover:text-green-600"
+            title="Contactar ganador"
+          >
+            <Trophy className="w-4 h-4" />
+          </Link>
+        )}
+        <Link
+          href={`/auctions/${auction.id}`}
+          className="p-1 text-gray-400 hover:text-blue-600"
+          title="Ver subasta"
+        >
+          <Eye className="w-4 h-4" />
+        </Link>
       </div>
     </div>
   );

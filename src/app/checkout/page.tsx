@@ -1,11 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import CouponInput from '@/components/CouponInput';
 import { CouponValidationResult } from '@/lib/services/couponService';
+import { getAuctionById, type AuctionProduct } from '@/lib/services/auctionService';
+import { logger } from '@/lib/utils/logger';
+import toast from 'react-hot-toast';
 
 type CartItem = {
   id: string;
@@ -15,7 +18,7 @@ type CartItem = {
     id: string;
     title: string;
     price: number;
-    cover_url: string | null;
+    image_url: string | null;
   };
 };
 
@@ -28,9 +31,26 @@ type ShippingAddress = {
   zipCode: string;
 };
 
-export default function CheckoutPage() {
+function CheckoutContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const auctionProductId = searchParams.get('auction');
+  const checkoutType = searchParams.get('type'); // 'membership' o null
+  const planId = searchParams.get('plan_id');
+  const subscriptionType = searchParams.get('subscription_type') as 'monthly' | 'yearly' | 'one_time' | null;
+  const membershipAmount = searchParams.get('amount');
+  
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [auctionProduct, setAuctionProduct] = useState<AuctionProduct | null>(null);
+  const [membershipPlan, setMembershipPlan] = useState<any>(null);
+  const [auctionCommissions, setAuctionCommissions] = useState<{
+    buyer_commission_percent: number;
+    buyer_commission_amount: number;
+    buyer_total_paid: number;
+    seller_commission_percent: number;
+    seller_commission_amount: number;
+    seller_earnings: number;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [address, setAddress] = useState<ShippingAddress>({
@@ -41,13 +61,177 @@ export default function CheckoutPage() {
     department: '',
     zipCode: ''
   });
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'transfer' | 'card'>('cash');
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'transfer' | 'card' | 'pagopar'>('cash');
   const [notes, setNotes] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<CouponValidationResult | null>(null);
+  const [pagoparLoading, setPagoparLoading] = useState(false);
 
   useEffect(() => {
-    loadCartItems();
-  }, []);
+    if (checkoutType === 'membership' && planId) {
+      loadMembershipPlan();
+    } else if (auctionProductId) {
+      loadAuctionProduct();
+    } else {
+      loadCartItems();
+    }
+  }, [checkoutType, planId, auctionProductId]);
+
+  async function loadMembershipPlan() {
+    if (!planId) return;
+    
+    try {
+      setLoading(true);
+      const { data: plan, error } = await (supabase as any)
+        .from('membership_plans')
+        .select('*')
+        .eq('id', planId)
+        .single();
+      
+      if (error || !plan) {
+        logger.error('Error cargando plan de membresía', error);
+        toast.error('Plan de membresía no encontrado');
+        router.push('/memberships');
+        return;
+      }
+      
+      setMembershipPlan(plan);
+      setLoading(false);
+    } catch (error) {
+      logger.error('Error en loadMembershipPlan', error);
+      toast.error('Error cargando plan de membresía');
+      router.push('/memberships');
+    }
+  }
+
+  async function loadAuctionProduct() {
+    if (!auctionProductId) return;
+    
+    try {
+      setLoading(true);
+      const auction = await getAuctionById(auctionProductId);
+      
+      if (!auction) {
+        logger.warn('Subasta no encontrada en checkout', { auctionProductId });
+        toast.error('Subasta no encontrada');
+        router.push('/');
+        return;
+      }
+
+      // Verificar que la subasta terminó y el usuario es el ganador
+      const { data: session } = await supabase.auth.getSession();
+      if (!session?.session?.user?.id) {
+        toast.error('Debes iniciar sesión para continuar');
+        router.push('/auth/sign-in');
+        return;
+      }
+
+      if (auction.auction_status !== 'ended') {
+        logger.warn('Intento de checkout de subasta no finalizada', { 
+          auctionProductId, 
+          status: auction.auction_status 
+        });
+        toast.error('Esta subasta aún no ha finalizado');
+        router.push(`/auctions/${auctionProductId}`);
+        return;
+      }
+
+      if (auction.winner_id !== session.session.user.id) {
+        logger.warn('Intento de checkout de subasta no ganada', { 
+          auctionProductId, 
+          winnerId: auction.winner_id,
+          userId: session.session.user.id 
+        });
+        toast.error('No eres el ganador de esta subasta');
+        router.push(`/auctions/${auctionProductId}`);
+        return;
+      }
+
+      // Calcular comisiones de la subasta
+      if (auction.current_bid && auction.seller_id) {
+        try {
+          const { calculateAuctionCommissions } = await import('@/lib/services/commissionService');
+          
+          // Obtener store_id
+          const { data: storeData } = await (supabase as any)
+            .from('stores')
+            .select('id')
+            .eq('seller_id', auction.seller_id)
+            .maybeSingle();
+          
+          const storeId = storeData?.id || null;
+          const calculated = await calculateAuctionCommissions(
+            auction.current_bid || 0,
+            auction.seller_id || '',
+            storeId || undefined
+          );
+          
+          const currentBid = auction.current_bid || 0;
+          setAuctionCommissions({
+            buyer_commission_percent: currentBid > 0 ? calculated.buyer_commission_amount / currentBid * 100 : 0,
+            buyer_commission_amount: calculated.buyer_commission_amount,
+            buyer_total_paid: calculated.buyer_total_paid,
+            seller_commission_percent: currentBid > 0 ? calculated.seller_commission_amount / currentBid * 100 : 0,
+            seller_commission_amount: calculated.seller_commission_amount,
+            seller_earnings: calculated.seller_earnings,
+          });
+          
+          // Convertir la subasta ganada en un "cart item" temporal para el checkout
+          // Precio mostrado = precio subasta + comisión comprador
+          const auctionAsCartItem = [{
+            id: `auction-${auction.id}`,
+            product_id: auction.id,
+            quantity: 1,
+            product: {
+              id: auction.id,
+              title: auction.title,
+              price: calculated.buyer_total_paid, // Precio con comisión incluida
+              image_url: auction.image_url || null,
+            }
+          }];
+
+          setAuctionProduct(auction);
+          setCartItems(auctionAsCartItem as CartItem[]);
+        } catch (commError: any) {
+          logger.error('Error calculating auction commissions', commError, { auctionId: auction.id });
+          // Fallback: usar precio sin comisión
+          const auctionAsCartItem = [{
+            id: `auction-${auction.id}`,
+            product_id: auction.id,
+            quantity: 1,
+            product: {
+              id: auction.id,
+              title: auction.title,
+              price: auction.current_bid || auction.price,
+              image_url: auction.image_url || null,
+            }
+          }];
+          setAuctionProduct(auction);
+          setCartItems(auctionAsCartItem as CartItem[]);
+        }
+      } else {
+        // Sin precio, usar precio base
+        const auctionAsCartItem = [{
+          id: `auction-${auction.id}`,
+          product_id: auction.id,
+          quantity: 1,
+          product: {
+            id: auction.id,
+            title: auction.title,
+            price: auction.price,
+            image_url: auction.image_url || null,
+          }
+        }];
+        setAuctionProduct(auction);
+        setCartItems(auctionAsCartItem as CartItem[]);
+      }
+    } catch (err) {
+      logger.error('Error loading auction product', err, { auctionProductId });
+      toast.error('Error al cargar la subasta. Por favor, intenta de nuevo.');
+      router.push('/');
+    } finally {
+      setLoading(false);
+    }
+  }
 
   async function loadCartItems() {
     try {
@@ -75,7 +259,7 @@ export default function CheckoutPage() {
         .filter(Boolean) as string[];
       const { data: productsData } = await (supabase as any)
         .from('products')
-        .select('id, title, price, cover_url')
+        .select('id, title, price, image_url:cover_url')
         .in('id', productIds);
 
       // Combinar cart items con productos
@@ -86,12 +270,13 @@ export default function CheckoutPage() {
 
       const enrichedCartItems = (cartData as any[]).map((item: any) => ({
         ...item,
-        product: productsMap.get(item.product_id) || { id: item.product_id, title: 'Producto no encontrado', price: 0, cover_url: null },
+        product: productsMap.get(item.product_id) || { id: item.product_id, title: 'Producto no encontrado', price: 0, image_url: null },
       }));
 
       setCartItems(enrichedCartItems as CartItem[]);
     } catch (err) {
-      console.error('Error loading cart:', err);
+      logger.error('Error loading cart', err);
+      toast.error('Error al cargar el carrito');
     } finally {
       setLoading(false);
     }
@@ -104,7 +289,7 @@ export default function CheckoutPage() {
     try {
       // Validar dirección
       if (!address.fullName.trim() || !address.phone.trim() || !address.address.trim()) {
-        alert('Por favor completa todos los campos obligatorios');
+        toast.error('Por favor completa todos los campos obligatorios');
         return;
       }
 
@@ -113,16 +298,79 @@ export default function CheckoutPage() {
         router.push('/auth/sign-in');
         return;
       }
+      
+      const buyerId = session.session.user.id;
 
-      console.log('🛒 Creando pedido...', {
-        buyer_id: session.session.user.id,
+      // Procesar membresía si es checkout de membresía
+      if (checkoutType === 'membership' && planId && subscriptionType) {
+        try {
+          const { activateMembershipSubscription } = await import('@/lib/services/membershipService');
+          const paymentAmount = membershipAmount ? parseFloat(membershipAmount) : 0;
+          
+          // Activar membresía directamente
+          const subscriptionId = await activateMembershipSubscription(
+            buyerId,
+            planId,
+            subscriptionType,
+            paymentAmount,
+            paymentMethod,
+            `checkout-${Date.now()}`
+          );
+
+          logger.info('Membresía activada exitosamente', {
+            subscriptionId,
+            userId: buyerId,
+            planId,
+            subscriptionType,
+            amount: paymentAmount,
+          });
+
+          toast.success('¡Membresía activada exitosamente!');
+          router.push(`/checkout/success?membership=${subscriptionId}`);
+          return;
+        } catch (membershipErr: any) {
+          logger.error('Error activando membresía', membershipErr);
+          toast.error('Error al activar membresía: ' + (membershipErr.message || 'Error desconocido'));
+          throw membershipErr;
+        }
+      }
+
+      // Validar stock final antes de crear orden (solo para productos fixed, no subastas)
+      if (!auctionProductId && !checkoutType) {
+        for (const item of cartItems) {
+          if (item.product) {
+            try {
+              const { data: productData } = await (supabase as any)
+                .from('products')
+                .select('sale_type, stock_management_enabled, stock_quantity, title')
+                .eq('id', item.product.id)
+                .single();
+              
+              if (productData && (productData.sale_type === 'fixed') && productData.stock_management_enabled !== false) {
+                const { checkStockAvailability } = await import('@/lib/services/inventoryService');
+                const check = await checkStockAvailability(item.product.id, item.quantity);
+                
+                if (!check.available) {
+                  toast.error(`Stock insuficiente para "${productData.title || 'producto'}". ${check.message}`);
+                  return;
+                }
+              }
+            } catch (stockErr: any) {
+              logger.warn('Error checking stock in checkout', stockErr, { productId: item.product.id });
+              // Continuar si falla la validación de stock (no bloquear checkout)
+            }
+          }
+        }
+      }
+
+      logger.debug('Creando pedido', {
+        buyer_id: buyerId,
         cartItems: cartItems.length,
         total: totalPrice
       });
 
-      // Crear orden usando la función de la base de datos
-      const buyerId = session.session.user.id;
-      console.log('📝 Datos del pedido a crear:', {
+      // Crear orden
+      logger.debug('Datos del pedido a crear', {
         buyer_id: buyerId,
         buyer_email: session.session.user.email,
         cartItems_count: cartItems.length,
@@ -131,30 +379,177 @@ export default function CheckoutPage() {
         payment_method: paymentMethod
       });
 
-      const { data: orderId, error } = await (supabase as any).rpc('create_order_from_cart', {
-        p_buyer_id: buyerId,
-        p_shipping_address: address,
-        p_payment_method: paymentMethod,
-        p_notes: notes.trim() || null
-      });
+      // Obtener código de afiliado de localStorage si existe
+      let affiliateCode: string | null = null;
+      let affiliateId: string | null = null;
+      if (typeof window !== 'undefined') {
+        const storedCode = localStorage.getItem('affiliate_code');
+        if (storedCode) {
+          affiliateCode = storedCode;
+          // Obtener affiliate_id desde el código
+          try {
+            const { getAffiliateByCode } = await import('@/lib/services/affiliateService');
+            const affiliate = await getAffiliateByCode(storedCode);
+            if (affiliate && affiliate.status === 'active') {
+              affiliateId = affiliate.id;
+            }
+          } catch (err) {
+            logger.warn('Error obteniendo afiliado por código', err);
+          }
+        }
+      }
 
-      if (error) {
-        console.error('❌ Error creando pedido:', {
-          error,
+      let orderId: string | undefined;
+      let error: any = null;
+
+      // Si es orden de subasta, usar función especial
+      if (auctionProductId && auctionProduct) {
+        const { data: auctionOrderId, error: auctionOrderError } = await (supabase as any).rpc('create_auction_order', {
+          p_buyer_id: buyerId,
+          p_auction_id: auctionProductId,
+          p_shipping_address: address,
+          p_payment_method: paymentMethod,
+          p_notes: notes.trim() || null,
+          p_total_amount: totalPrice,
+        });
+
+        if (auctionOrderError) {
+          error = auctionOrderError;
+        } else {
+          orderId = auctionOrderId;
+        }
+      } else {
+        // Orden normal desde carrito
+        const { data: cartOrderId, error: cartOrderError } = await (supabase as any).rpc('create_order_from_cart', {
+          p_buyer_id: buyerId,
+          p_shipping_address: address,
+          p_payment_method: paymentMethod,
+          p_notes: notes.trim() || null
+        });
+
+        if (cartOrderError) {
+          error = cartOrderError;
+        } else {
+          orderId = cartOrderId;
+        }
+      }
+
+      if (error || !orderId) {
+        logger.error('Error creando pedido', error || 'No se obtuvo orderId', {
           code: error.code,
           message: error.message,
           details: error.details,
           hint: error.hint,
           buyer_id: buyerId
         });
-        throw error;
+        
+        // Mensajes de error más específicos para el usuario
+        let userMessage = 'Error al procesar el pedido. Por favor, intenta de nuevo.';
+        if (error.code === 'PGRST301' || error.message?.includes('cart is empty')) {
+          userMessage = 'Tu carrito está vacío. Agrega productos antes de realizar el pedido.';
+        } else if (error.code === '23505' || error.message?.includes('duplicate')) {
+          userMessage = 'Ya existe un pedido con estos datos. Verifica tu historial de pedidos.';
+        } else if (error.message?.includes('stock') || error.message?.includes('inventory')) {
+          userMessage = 'Algunos productos no tienen suficiente stock. Por favor, revisa tu carrito.';
+        } else if (error.message?.includes('price') || error.message?.includes('amount')) {
+          userMessage = 'Error al calcular el precio. Por favor, recarga la página e intenta de nuevo.';
+        }
+        
+        toast.error(userMessage);
+        throw new Error(userMessage);
       }
 
-      console.log('✅ Pedido creado exitosamente:', {
+      logger.info('Pedido creado exitosamente', {
         orderId,
         buyer_id: buyerId,
         timestamp: new Date().toISOString()
       });
+
+      // Obtener código de influencer de localStorage si existe
+      let influencerCode: string | null = null;
+      let utmSource: string | null = null;
+      let utmMedium: string | null = null;
+      let utmCampaign: string | null = null;
+      
+      if (typeof window !== 'undefined') {
+        influencerCode = localStorage.getItem('influencer_code');
+        utmSource = localStorage.getItem('utm_source');
+        utmMedium = localStorage.getItem('utm_medium');
+        utmCampaign = localStorage.getItem('utm_campaign');
+      }
+
+      // Actualizar orden con código de afiliado si existe
+      if (orderId && affiliateCode && affiliateId) {
+        try {
+          await (supabase as any)
+            .from('orders')
+            .update({
+              affiliate_code: affiliateCode,
+              referred_by: affiliateId,
+            })
+            .eq('id', orderId);
+          
+          logger.info('Orden actualizada con código de afiliado', {
+            orderId,
+            affiliateCode,
+            affiliateId,
+          });
+
+          // Limpiar código de afiliado del localStorage después de usarlo
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('affiliate_code');
+            localStorage.removeItem('affiliate_store_id');
+          }
+        } catch (affiliateError) {
+          logger.warn('Error actualizando orden con código de afiliado', affiliateError);
+          // No fallar el checkout si hay error con el afiliado
+        }
+      }
+
+      // Actualizar orden con código de influencer si existe
+      if (orderId && influencerCode) {
+        try {
+          const updateData: any = {
+            influencer_code: influencerCode,
+          };
+          
+          if (utmSource) updateData.utm_source = utmSource;
+          if (utmMedium) updateData.utm_medium = utmMedium;
+          if (utmCampaign) updateData.utm_campaign = utmCampaign;
+
+          await (supabase as any)
+            .from('orders')
+            .update(updateData)
+            .eq('id', orderId);
+          
+          logger.info('Orden actualizada con código de influencer', {
+            orderId,
+            influencerCode,
+            utmSource,
+            utmMedium,
+            utmCampaign,
+          });
+
+          // Limpiar datos de influencer del localStorage después de usarlo
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('influencer_code');
+            localStorage.removeItem('utm_source');
+            localStorage.removeItem('utm_medium');
+            localStorage.removeItem('utm_campaign');
+          }
+
+          // Trackear visita/evento del influencer (opcional, no bloquea el checkout)
+          try {
+            const { trackInfluencerVisit } = await import('@/lib/services/influencerService');
+            await trackInfluencerVisit(influencerCode, 'visit');
+          } catch (trackError) {
+            logger.warn('Error tracking influencer visit', trackError);
+          }
+        } catch (influencerError) {
+          logger.warn('Error actualizando orden con código de influencer', influencerError);
+          // No fallar el checkout si hay error con el influencer
+        }
+      }
 
       // Verificar que el pedido se creó correctamente con el buyer_id correcto
       const { data: verifyOrder, error: verifyError } = await supabase
@@ -164,12 +559,12 @@ export default function CheckoutPage() {
         .single();
 
       if (verifyError) {
-        console.error('⚠️ No se pudo verificar el pedido creado:', verifyError);
+        logger.warn('No se pudo verificar el pedido creado', verifyError, { orderId, buyerId });
       } else {
         type OrderVerify = { id: string; buyer_id: string; total_amount: number; status: string; created_at: string };
         const orderTyped = verifyOrder as OrderVerify | null;
         
-        console.log('✅ Verificación del pedido:', {
+        logger.debug('Verificación del pedido', {
           orderId: orderTyped?.id,
           buyer_id_in_db: orderTyped?.buyer_id,
           buyer_id_expected: buyerId,
@@ -179,8 +574,12 @@ export default function CheckoutPage() {
         });
 
         if (orderTyped?.buyer_id !== buyerId) {
-          console.error('❌ PROBLEMA CRÍTICO: El buyer_id en la BD no coincide con el usuario actual!');
-          alert('Se creó el pedido pero hay un problema con la asociación. Contacta al administrador.');
+          logger.error('PROBLEMA CRÍTICO: El buyer_id en la BD no coincide con el usuario actual', undefined, {
+            orderId,
+            buyer_id_in_db: orderTyped?.buyer_id,
+            buyer_id_expected: buyerId
+          });
+          toast.error('Se creó el pedido pero hay un problema con la asociación. Contacta al administrador.');
         }
       }
 
@@ -201,15 +600,16 @@ export default function CheckoutPage() {
         .eq('id', orderId)
         .single();
 
-      console.log('📋 Datos del pedido creado:', orderData);
+      logger.debug('Datos del pedido creado', { orderId, orderData });
 
       // Enviar email de confirmación (en segundo plano, no bloquea)
-      if (session.session.user.email) {
+      const buyerEmail = session.session.user.email;
+      if (buyerEmail) {
         fetch('/api/email/order-confirmation', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            email: session.session.user.email,
+            email: buyerEmail,
             orderNumber: orderId,
             orderDetails: {
               items: cartItems.map(item => ({
@@ -221,7 +621,7 @@ export default function CheckoutPage() {
               shippingAddress: address,
             },
           }),
-        }).catch(err => console.error('Error enviando email:', err));
+        }).catch(err => logger.error('Error enviando email', err, { orderId, email: buyerEmail }));
       }
 
       // Enviar notificaciones de WhatsApp a los vendedores (en segundo plano, no bloquea)
@@ -236,7 +636,7 @@ export default function CheckoutPage() {
             .filter(Boolean)
         )];
 
-        console.log('📱 Enviando notificaciones WhatsApp a vendedores:', sellerIds);
+        logger.debug('Enviando notificaciones WhatsApp a vendedores', { sellerIds, orderId });
 
         // Enviar notificación a cada vendedor
         for (const sellerId of sellerIds) {
@@ -254,13 +654,88 @@ export default function CheckoutPage() {
           .then(res => res.json())
           .then(data => {
             if (data.success) {
-              console.log(`✅ Notificación WhatsApp preparada para vendedor ${sellerId}:`, data.whatsapp_url);
+              logger.debug('Notificación WhatsApp preparada para vendedor', { sellerId, whatsapp_url: data.whatsapp_url });
               // Opcional: En producción, puedes configurar una API de WhatsApp para envío automático
             } else {
-              console.warn(`⚠️ No se pudo enviar WhatsApp a vendedor ${sellerId}:`, data.error);
+              logger.warn('No se pudo enviar WhatsApp a vendedor', data.error, { sellerId, orderId });
             }
           })
-          .catch(err => console.error(`❌ Error enviando WhatsApp a vendedor ${sellerId}:`, err));
+          .catch(err => logger.error('Error enviando WhatsApp a vendedor', err, { sellerId, orderId }));
+        }
+      }
+
+      // Si el método de pago es Pagopar, crear factura y redirigir
+      if (paymentMethod === 'pagopar') {
+        setPagoparLoading(true);
+        try {
+          // Obtener datos del comprador
+          const buyerEmail = session.session.user.email || '';
+          const buyerProfile = await (supabase as any)
+            .from('profiles')
+            .select('first_name, last_name, phone')
+            .eq('id', buyerId)
+            .single();
+
+          const buyerFullName = buyerProfile?.data?.first_name && buyerProfile?.data?.last_name
+            ? `${buyerProfile.data.first_name} ${buyerProfile.data.last_name}`
+            : address.fullName;
+
+          // Preparar items para Pagopar
+          const pagoparItems = checkoutType === 'membership' && membershipPlan
+            ? [{
+                title: membershipPlan.name,
+                quantity: 1,
+                price: totalPrice,
+              }]
+            : auctionProductId && auctionProduct
+            ? [{
+                title: auctionProduct.title || 'Producto de subasta',
+                quantity: 1,
+                price: totalPrice,
+              }]
+            : cartItems.map(item => ({
+                title: item.product.title,
+                quantity: item.quantity,
+                price: item.product.price * item.quantity,
+              }));
+
+          // Crear factura en Pagopar
+          const pagoparResponse = await fetch('/api/payments/pagopar/create-invoice', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              orderId,
+              buyerData: {
+                fullName: buyerFullName,
+                email: buyerEmail,
+                phone: address.phone,
+                ruc: address.zipCode || undefined,
+              },
+              items: pagoparItems,
+              totalAmount: totalPrice,
+              paymentMethod: 'card', // Pagopar permite tarjeta
+            }),
+          });
+
+          const pagoparData = await pagoparResponse.json();
+
+          if (pagoparData.success && pagoparData.invoice?.link_pago) {
+            // Guardar orderId en localStorage para cuando Pagopar redirija de vuelta
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('pagopar_order_id', orderId);
+            }
+            
+            // Redirigir al link de pago de Pagopar
+            window.location.href = pagoparData.invoice.link_pago;
+            return;
+          } else {
+            throw new Error(pagoparData.error || 'Error al crear factura en Pagopar');
+          }
+        } catch (pagoparError: any) {
+          logger.error('Error procesando pago con Pagopar', pagoparError);
+          toast.error('Error al procesar pago con Pagopar: ' + (pagoparError.message || 'Error desconocido'));
+          setPagoparLoading(false);
+          return;
         }
       }
 
@@ -268,14 +743,26 @@ export default function CheckoutPage() {
       router.push(`/checkout/success?orderId=${orderId}`);
 
     } catch (err: any) {
-      alert('Error al procesar el pedido: ' + (err.message || 'Error desconocido'));
+      logger.error('Error al procesar el pedido', err, {
+        cartItems_count: cartItems.length,
+        error_message: err.message
+      });
+      
+      // El mensaje de error ya fue mostrado arriba en la validación de error
+      // Solo mostrar aquí si no se mostró antes
+      if (!err.message?.includes('carrito') && !err.message?.includes('stock') && !err.message?.includes('precio')) {
+        toast.error('Error al procesar el pedido: ' + (err.message || 'Error desconocido. Por favor, contacta al soporte.'));
+      }
     } finally {
       setProcessing(false);
     }
   }
 
-  const totalItems = cartItems.reduce((sum, item) => sum + item.quantity, 0);
-  const subtotal = cartItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
+  // Calcular totales
+  const totalItems = checkoutType === 'membership' ? 1 : cartItems.reduce((sum, item) => sum + item.quantity, 0);
+  const subtotal = checkoutType === 'membership' 
+    ? (membershipAmount ? parseFloat(membershipAmount) : 0)
+    : cartItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
   const discountAmount = appliedCoupon?.valid ? appliedCoupon.discount_amount : 0;
   const totalPrice = Math.max(0, subtotal - discountAmount);
 
@@ -434,7 +921,31 @@ export default function CheckoutPage() {
                   />
                   <span>Tarjeta de crédito/débito</span>
                 </label>
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    value="pagopar"
+                    checked={paymentMethod === 'pagopar'}
+                    onChange={(e) => setPaymentMethod(e.target.value as any)}
+                    className="mr-3"
+                  />
+                  <span className="flex items-center gap-2">
+                    <span>Pago con Pagopar</span>
+                    <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded">Seguro</span>
+                  </span>
+                </label>
               </div>
+              {paymentMethod === 'pagopar' && (
+                <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
+                  <p className="font-medium mb-1">💳 Pagopar - Métodos de pago disponibles:</p>
+                  <ul className="list-disc list-inside space-y-1 text-xs">
+                    <li>Tarjetas de crédito/débito</li>
+                    <li>Transferencia bancaria</li>
+                    <li>Billetera digital</li>
+                  </ul>
+                  <p className="mt-2 text-xs">Serás redirigido a la plataforma segura de Pagopar para completar el pago.</p>
+                </div>
+              )}
             </div>
 
             {/* Notas adicionales */}
@@ -453,17 +964,67 @@ export default function CheckoutPage() {
           {/* Resumen del pedido */}
           <div className="lg:col-span-1">
             <div className="bg-white rounded-lg shadow-sm border p-6 sticky top-4">
-              <h2 className="text-xl font-semibold mb-4">Resumen del pedido</h2>
+              <h2 className="text-xl font-semibold mb-4">
+                {checkoutType === 'membership' ? 'Resumen de Membresía' : 'Resumen del pedido'}
+              </h2>
               <div className="space-y-3 mb-4">
+                {/* Mostrar membresía si es checkout de membresía */}
+                {checkoutType === 'membership' && membershipPlan && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                    <h3 className="font-semibold text-blue-900 mb-2">{membershipPlan.name}</h3>
+                    <p className="text-sm text-blue-700 mb-2">{membershipPlan.description}</p>
+                    <div className="text-sm text-blue-800">
+                      <p><strong>Tipo:</strong> {
+                        subscriptionType === 'monthly' ? 'Mensual' :
+                        subscriptionType === 'yearly' ? 'Anual' :
+                        subscriptionType === 'one_time' ? 'Pago Único' : subscriptionType
+                      }</p>
+                      <p><strong>Límite de puja:</strong> {membershipPlan.bid_limit_formatted || 'Ilimitado'}</p>
+                    </div>
+                    <ul className="mt-3 space-y-1 text-xs text-blue-700">
+                      {membershipPlan.features.map((feature, idx) => (
+                        <li key={idx} className="flex items-start">
+                          <span className="mr-2">✓</span>
+                          <span>{feature}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                
                 {cartItems.map((item) => (
                   <div key={item.id} className="flex justify-between text-sm">
                     <span>{item.product.title} x{item.quantity}</span>
                     <span>{(item.product.price * item.quantity).toLocaleString('es-PY')} Gs.</span>
                   </div>
                 ))}
+                
+                {/* Mostrar desglose de comisiones para subastas */}
+                {auctionProductId && auctionCommissions && auctionProduct && (
+                  <div className="mt-3 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg">
+                    <h3 className="font-semibold text-yellow-900 dark:text-yellow-300 mb-2 text-sm">
+                      🔨 Desglose de Subasta
+                    </h3>
+                    <div className="space-y-1 text-xs">
+                      <div className="flex justify-between text-yellow-800 dark:text-yellow-400">
+                        <span>Precio de subasta:</span>
+                        <span className="font-medium">{(auctionProduct.current_bid || auctionProduct.price || 0).toLocaleString('es-PY')} Gs.</span>
+                      </div>
+                      <div className="flex justify-between text-yellow-800 dark:text-yellow-400">
+                        <span>Comisión comprador ({auctionCommissions.buyer_commission_percent.toFixed(2)}%):</span>
+                        <span className="font-medium">+{auctionCommissions.buyer_commission_amount.toLocaleString('es-PY')} Gs.</span>
+                      </div>
+                      <div className="border-t border-yellow-300 dark:border-yellow-700 pt-1 mt-1 flex justify-between text-yellow-900 dark:text-yellow-300 font-semibold">
+                        <span>Total a pagar:</span>
+                        <span>{auctionCommissions.buyer_total_paid.toLocaleString('es-PY')} Gs.</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
                 <hr />
                 <div className="flex justify-between">
-                  <span>Subtotal ({totalItems} productos)</span>
+                  <span>Subtotal ({totalItems} {totalItems === 1 ? 'producto' : 'productos'})</span>
                   <span>{subtotal.toLocaleString('es-PY')} Gs.</span>
                 </div>
                 
@@ -496,15 +1057,38 @@ export default function CheckoutPage() {
               </div>
               <button
                 type="submit"
-                disabled={processing}
+                disabled={processing || pagoparLoading}
                 className="w-full mt-6 bg-black text-white py-3 rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {processing ? 'Procesando...' : 'Confirmar pedido'}
+                {pagoparLoading 
+                  ? 'Redirigiendo a Pagopar...' 
+                  : processing 
+                  ? 'Procesando...' 
+                  : paymentMethod === 'pagopar'
+                  ? 'Pagar con Pagopar'
+                  : 'Confirmar pedido'}
               </button>
             </div>
           </div>
         </form>
       </div>
     </main>
+  );
+}
+
+export default function CheckoutPage() {
+  return (
+    <Suspense fallback={
+      <main className="min-h-screen bg-gray-50 p-8">
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-white rounded-lg shadow-sm border p-8 text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Cargando checkout...</p>
+          </div>
+        </div>
+      </main>
+    }>
+      <CheckoutContent />
+    </Suspense>
   );
 }

@@ -29,7 +29,7 @@ export default function AuctionDetailPage() {
   const [sellerInfo, setSellerInfo] = useState<any>(null);
   const [newBidNotification, setNewBidNotification] = useState<string | null>(null);
   const [productImages, setProductImages] = useState<string[]>([]);
-  const [relatedAuctions, setRelatedAuctions] = useState<Array<{id: string; title: string; cover_url: string | null}>>([]);
+  const [relatedAuctions, setRelatedAuctions] = useState<Array<{id: string; title: string; image_url: string | null}>>([]);
   const [serverTime, setServerTime] = useState<number>(Date.now());
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
   const [maxVersion, setMaxVersion] = useState<number>(0); // Para descartar mensajes viejos
@@ -38,6 +38,7 @@ export default function AuctionDetailPage() {
   const [myBidPosition, setMyBidPosition] = useState<number | null>(null); // Posición del usuario (1ro, 2do, etc.)
   const [winnerInfo, setWinnerInfo] = useState<any>(null);
   const [recentEvents, setRecentEvents] = useState<Array<{type: string; message: string; time: string}>>([]);
+  const [previousEndAt, setPreviousEndAt] = useState<string | null>(null); // Para detectar extensiones anti-sniping
   
   // Función para reproducir sonido (mover fuera de useEffect)
   const playBidSound = useCallback(() => {
@@ -164,7 +165,37 @@ export default function AuctionDetailPage() {
                 setMaxVersion(messageVersion);
               }
               
+              // DETECTAR ANTI-SNIPING: Si cambió auction_end_at, es una extensión de tiempo
+              if (newAuction.auction_end_at && previousEndAt && newAuction.auction_end_at !== previousEndAt) {
+                const oldEndAt = new Date(previousEndAt);
+                const newEndAt = new Date(newAuction.auction_end_at);
+                const extensionMs = newEndAt.getTime() - oldEndAt.getTime();
+                
+                if (extensionMs > 0) {
+                  console.log('⏰ ⚠️ ANTI-SNIPING ACTIVADO: +' + (extensionMs / 1000) + 's');
+                  setNewBidNotification(`⏰ +${Math.floor(extensionMs / 1000)}s bonus tiempo!`);
+                  setTimeout(() => setNewBidNotification(null), 5000);
+                  
+                  // Sonido especial para extensión
+                  try {
+                    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+                    const oscillator = audioContext.createOscillator();
+                    const gainNode = audioContext.createGain();
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioContext.destination);
+                    oscillator.frequency.setValueAtTime(1000, audioContext.currentTime);
+                    oscillator.frequency.exponentialRampToValueAtTime(1500, audioContext.currentTime + 0.2);
+                    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.4);
+                    oscillator.start(audioContext.currentTime);
+                    oscillator.stop(audioContext.currentTime + 0.4);
+                  } catch (e) {}
+                }
+              }
+              
+              // Guardar nuevo end_at
               if (newAuction.auction_end_at) {
+                setPreviousEndAt(newAuction.auction_end_at);
                 setLastBidTime(serverTime);
               }
               
@@ -328,6 +359,11 @@ export default function AuctionDetailPage() {
         setMaxVersion((auctionData as any).auction_version);
       }
       
+      // Inicializar previousEndAt
+      if (auctionData.auction_end_at) {
+        setPreviousEndAt(auctionData.auction_end_at);
+      }
+      
       // Calcular posición del usuario actual si está pujando
       if (currentUserId && auctionData) {
         try {
@@ -452,17 +488,17 @@ export default function AuctionDetailPage() {
         setProductImages(imageUrls);
         console.log('📸 Imágenes cargadas:', imageUrls.length);
       } else {
-        // Fallback a cover_url si no hay imágenes en product_images
-        const fallbackImages = auctionData.cover_url ? [auctionData.cover_url] : [];
+        // Fallback a image_url si no hay imágenes en product_images
+        const fallbackImages = auctionData.image_url ? [auctionData.image_url] : [];
         setProductImages(fallbackImages);
-        console.log('⚠️ Usando cover_url como fallback');
+        console.log('⚠️ Usando image_url como fallback');
       }
       
       // Cargar subastas relacionadas (siguientes/anteriores) para navegación
       try {
         const { data: relatedData, error: relatedError } = await supabase
           .from('products')
-          .select('id, title, cover_url')
+          .select('id, title, image_url:cover_url')
           .eq('sale_type', 'auction')
           .not('seller_id', 'is', null)
           .or('status.is.null,status.eq.active,status.eq.paused')
@@ -474,7 +510,7 @@ export default function AuctionDetailPage() {
           setRelatedAuctions(relatedData.map((a: any) => ({
             id: a.id,
             title: a.title,
-            cover_url: a.cover_url
+            image_url: a.image_url
           })));
           console.log('🔗 Subastas relacionadas cargadas:', relatedData.length);
         }
@@ -1052,9 +1088,9 @@ export default function AuctionDetailPage() {
                 >
                   <div className="flex items-center gap-4 p-4">
                     <div className="relative w-24 h-24 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100">
-                      {prevAuction.cover_url ? (
+                      {prevAuction.image_url ? (
                         <Image
-                          src={prevAuction.cover_url}
+                          src={prevAuction.image_url}
                           alt={prevAuction.title}
                           width={96}
                           height={96}
@@ -1100,9 +1136,9 @@ export default function AuctionDetailPage() {
                       </h3>
                     </div>
                     <div className="relative w-24 h-24 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100">
-                      {nextAuction.cover_url ? (
+                      {nextAuction.image_url ? (
                         <Image
-                          src={nextAuction.cover_url}
+                          src={nextAuction.image_url}
                           alt={nextAuction.title}
                           width={96}
                           height={96}
@@ -1136,9 +1172,9 @@ export default function AuctionDetailPage() {
                   className="group bg-white rounded-lg shadow-md hover:shadow-xl border-2 border-gray-200 hover:border-blue-500 transition-all overflow-hidden"
                 >
                   <div className="aspect-square relative overflow-hidden bg-gray-100">
-                    {related.cover_url ? (
+                    {related.image_url ? (
                       <Image
-                        src={related.cover_url}
+                        src={related.image_url}
                         alt={related.title}
                         width={300}
                         height={300}

@@ -5,6 +5,8 @@
 
 import { supabase } from '@/lib/supabase/client';
 import { Database } from '@/types/database';
+import { validatePageLimit, validatePageNumber, calculateOffset } from '@/lib/utils/pagination';
+import { cache, getStoreCacheKey, getStoreProductsCacheKey, invalidateStoreCache } from '@/lib/utils/cache';
 
 // ============================================
 // TIPOS
@@ -60,19 +62,29 @@ export async function getStoreBySlug(storeSlug: string, includeInactive: boolean
       query = query.eq('is_active', true);
     }
     
+    // Intentar obtener del cache primero
+    const cacheKey = getStoreCacheKey(storeSlug);
+    const cached = cache.get<Store>(cacheKey);
+    if (cached) return cached;
+
     const { data, error } = await query.single();
 
     if (error) {
       // Si no se encuentra y no era por RLS, loguear el error
       if (error.code !== 'PGRST116') {
-        console.error('Error fetching store by slug:', error);
+        const { logger } = await import('@/lib/utils/logger');
+        logger.error('Error fetching store by slug', error, { storeSlug });
       }
       return null;
     }
 
-    return data as Store;
+    const result = data as Store;
+    // Cache por 10 minutos para tiendas (cambian poco)
+    cache.set(cacheKey, result, 10 * 60 * 1000);
+    return result;
   } catch (err: any) {
-    console.error('Error fetching store by slug:', err);
+    const { logger } = await import('@/lib/utils/logger');
+    logger.error('Error fetching store by slug', err, { storeSlug });
     return null;
   }
 }
@@ -93,13 +105,19 @@ export async function getStoreProducts(
     sellerId?: string; // Agregar sellerId como opción
   } = {}
 ): Promise<{ products: Product[]; total: number; total_pages: number }> {
-  const page = options.page || 1;
-  const limit = options.limit || 12;
-  const offset = (page - 1) * limit;
+  // Validar paginación con límite máximo (mantener default de 12)
+  const page = validatePageNumber(options.page);
+  const limit = validatePageLimit(options.limit || 12, 60); // Default 12, max 60
+  const offset = calculateOffset(page, limit);
+
+  // Intentar obtener del cache
+  const cacheKey = getStoreProductsCacheKey(storeId, { ...options, page, limit });
+  const cached = cache.get<{ products: Product[]; total: number; total_pages: number }>(cacheKey);
+  if (cached) return cached;
 
   let query = supabase
     .from('products')
-    .select('*, category:categories(name)', { count: 'exact' });
+    .select('*, image_url:cover_url, category:categories(name), attributes', { count: 'exact' });
 
   // Buscar por store_id o seller_id (muchos productos solo tienen seller_id)
   // Intentar ambos si están disponibles
@@ -112,19 +130,12 @@ export async function getStoreProducts(
   } else if (storeId) {
     // Solo store_id si no hay sellerId
     query = query.eq('store_id', storeId);
-  } else {
-    // Si no hay storeId ni sellerId, retornar vacío
-    console.warn('⚠️ getStoreProducts: No storeId or sellerId provided');
-    return { products: [], total: 0, total_pages: 0 };
-  }
-  
-  console.log('📊 getStoreProducts query:', {
-    storeId,
-    sellerId: options.sellerId,
-    usingSellerId: !!options.sellerId,
-    usingStoreId: !!storeId,
-    usingBoth: !!(options.sellerId && storeId)
-  });
+    } else {
+      // Si no hay storeId ni sellerId, retornar vacío
+      const { logger } = await import('@/lib/utils/logger');
+      logger.warn('getStoreProducts called without storeId or sellerId', undefined, { storeId, sellerId: options.sellerId });
+      return { products: [], total: 0, total_pages: 0 };
+    }
 
   if (options.status) {
     query = query.eq('status', options.status);
@@ -144,31 +155,28 @@ export async function getStoreProducts(
   // Si hay error relacionado con stock_quantity y usamos select('*'), 
   // Supabase debería manejarlo, pero si hay un problema, ignorarlo
   if (error && error.message?.includes('stock_quantity')) {
-    console.warn('⚠️ stock_quantity no existe en productos. Continuando sin esa columna.');
-    // Con select('*'), esto no debería pasar normalmente
+    const { logger } = await import('@/lib/utils/logger');
+    logger.warn('stock_quantity no existe en productos. Continuando sin esa columna.', undefined, { storeId, options });
   }
 
   if (error && !error.message?.includes('stock_quantity')) {
-    console.error('❌ Error fetching store products:', error);
+    const { logger } = await import('@/lib/utils/logger');
+    logger.error('Error fetching store products', error, { storeId, options });
     return { products: [], total: 0, total_pages: 0 };
   }
 
   const total = count || 0;
   const total_pages = Math.ceil(total / limit);
   
-  console.log('✅ getStoreProducts result:', {
-    productsFound: data?.length || 0,
-    total,
-    total_pages,
-    page,
-    limit
-  });
-
-  return {
+  const result = {
     products: data || [],
     total,
     total_pages,
   };
+
+  // Cache por 3 minutos para productos de tienda
+  cache.set(cacheKey, result, 3 * 60 * 1000);
+  return result;
 }
 
 /**

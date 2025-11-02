@@ -1,965 +1,902 @@
 // ============================================
 // MERCADITO ONLINE PY - STORE PROFILE PAGE
-// Página de perfil público de tienda
+// Página de perfil público de tienda estilo Facebook Marketplace
 // ============================================
 
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import Image from 'next/image';
+import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabaseClient';
-import { 
-  Card, 
-  CardContent, 
-  CardHeader, 
-  CardTitle,
-  Button,
-  Badge,
-  Avatar,
-  LoadingSpinner,
-  EmptyState,
-  Pagination
-} from '@/components/ui';
-import { useSellerProfile } from '@/lib/hooks/useSellerProfile';
 import { getStoreBySlug, getStoreProducts } from '@/lib/services/storeService';
-import { useSearchParams } from 'next/navigation';
 import { 
   Star,
   MapPin,
-  Phone,
-  Globe,
-  Facebook,
-  Instagram,
-  Twitter,
-  Linkedin,
-  Package,
-  TrendingUp,
-  Users,
+  Search,
+  Filter,
   MessageCircle,
-  Heart,
-  Share2,
-  Calendar,
-  Award,
-  Clock,
   CheckCircle,
-  XCircle,
-  Store,
-  ShoppingBag,
-  Truck,
-  Shield,
-  CreditCard
+  Package,
+  Award,
+  ArrowLeft,
+  Home,
+  Phone,
+  Mail,
+  Share2,
+  Heart,
+  Gavel,
+  Users
 } from 'lucide-react';
 
-// ============================================
-// COMPONENTE PRINCIPAL
-// ============================================
+interface Store {
+  id: string;
+  seller_id: string;
+  name: string;
+  slug: string;
+  description?: string | null;
+  cover_image_url?: string | null;
+  logo_url?: string | null;
+  contact_phone?: string | null;
+  contact_email?: string | null;
+  department?: string | null;
+  city?: string | null;
+  neighborhood?: string | null;
+  address_note?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  is_active: boolean;
+  is_verified?: boolean;
+  rating?: number;
+  total_reviews?: number;
+  created_at: string;
+  updated_at: string;
+}
+
+interface Product {
+  id: string;
+  title: string;
+  description: string | null;
+  price: number;
+  image_url: string | null;
+  condition: string;
+  sale_type: string;
+  created_at: string;
+}
+
+interface Category {
+  id: string;
+  name: string;
+}
 
 export default function StoreProfilePage() {
   const params = useParams();
-  const router = useRouter();
   const searchParams = useSearchParams();
   const storeSlug = params.slug as string;
   const isAdminView = searchParams.get('admin') === 'true';
+  const affiliateCode = searchParams.get('ref') || null;
   
-  const [activeTab, setActiveTab] = useState<'products' | 'reviews' | 'about' | 'policies'>('products');
+  const [store, setStore] = useState<Store | null>(null);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  // Estado para búsqueda y filtros
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filters, setFilters] = useState({
+    category: '',
+    minPrice: '',
+    maxPrice: '',
+    condition: '',
+    saleType: '',
+    availability: '',
+  });
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [sortBy, setSortBy] = useState('date_desc');
+  const [totalProducts, setTotalProducts] = useState(0);
+  const [hasAuctions, setHasAuctions] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
   const [isFavorited, setIsFavorited] = useState(false);
-  const [sellerId, setSellerId] = useState<string | null>(null);
-  const [storeId, setStoreId] = useState<string | null>(null);
-  const [store, setStore] = useState<any>(null);
-  const [storeProducts, setStoreProducts] = useState<any[]>([]);
-  const [storeLoading, setStoreLoading] = useState(true);
-  const [storeError, setStoreError] = useState<string | null>(null);
-  const [productsPagination, setProductsPagination] = useState({
-    page: 1,
-    total_pages: 1,
-    total: 0,
-    per_page: 12,
+  const [vehicleFields, setVehicleFields] = useState({
+    marca: '',
+    modelo: '',
+    año: '',
+    kilometraje: '',
+    color: '',
+    documentacion: ''
   });
-  
-  // Estados para filtros y categorías
-  const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([]);
-  const [selectedCategory, setSelectedCategory] = useState<string>('');
-  const [searchQuery, setSearchQuery] = useState<string>('');
-  const [priceSort, setPriceSort] = useState<string>('');
-  const [conditionFilter, setConditionFilter] = useState<string>('');
 
-  // Función para cargar categorías
-  const loadCategories = async () => {
+  // Guardar código de afiliado si existe en la URL
+  useEffect(() => {
+    if (affiliateCode && typeof window !== 'undefined') {
+      localStorage.setItem('affiliate_code', affiliateCode);
+      // Guardar también el store_id para validación posterior
+      if (store) {
+        localStorage.setItem('affiliate_store_id', store.id);
+      }
+    }
+  }, [affiliateCode, store]);
+
+  // Cargar tienda y productos
+  useEffect(() => {
+    loadStore();
+  }, [storeSlug, isAdminView]);
+
+  // Cargar productos cuando cambian los filtros o campos de vehículos
+  useEffect(() => {
+    if (store) {
+      loadProducts();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [store, filters, searchQuery, sortBy, vehicleFields]);
+
+  // Cargar categorías
+  useEffect(() => {
+    loadCategories();
+  }, []);
+
+  async function loadStore() {
+    setLoading(true);
+    setError(null);
+
     try {
-      const { data, error } = await supabase
+      const storeData = await getStoreBySlug(storeSlug, isAdminView);
+      
+      if (!storeData) {
+        throw new Error('Tienda no encontrada');
+      }
+
+      setStore(storeData as Store);
+
+      // Contar productos
+      const { count } = await supabase
+        .from('products')
+        .select('*', { count: 'exact', head: true })
+        .eq('seller_id', storeData.seller_id)
+        .or('status.is.null,status.eq.active');
+      
+      setTotalProducts(count || 0);
+    } catch (err: any) {
+      setError(err.message || 'Error al cargar la tienda');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function loadCategories() {
+    try {
+      const { data } = await supabase
         .from('categories')
         .select('id, name')
         .eq('is_active', true)
-        .order('name', { ascending: true });
+        .order('name');
       
-      if (error) {
-        console.error('❌ Error cargando categorías:', error);
-        setCategories([]);
-      } else {
-        setCategories(data || []);
+      if (data) {
+        setCategories(data);
       }
     } catch (err) {
-      console.error('❌ Error cargando categorías:', err);
-      setCategories([]);
+      // Error loading categories
     }
-  };
+  }
 
-  // Función para cargar productos de la tienda
-  const loadStoreProducts = async (currentStoreId: string, page: number = 1, currentSellerId?: string) => {
+  async function loadProducts() {
+    if (!store) return;
+    
     try {
-      console.log('🛒 Loading products for store:', currentStoreId, 'seller:', currentSellerId);
-      
-      // Priorizar sellerId si está disponible
-      if (!currentSellerId && !currentStoreId) {
-        console.error('❌ No storeId or sellerId provided');
-        setStoreProducts([]);
-        return;
-      }
-      
-      // Construir opciones de filtrado
       const options: any = {
-        page,
-        limit: 12,
-        sellerId: currentSellerId,
+        page: 1,
+        limit: 100,
+        sellerId: store.seller_id,
       };
       
-      // Agregar filtro de categoría si está seleccionada
-      if (selectedCategory) {
-        options.category_id = selectedCategory;
+      if (filters.category) {
+        options.category_id = filters.category;
       }
-      
-      // No filtrar por status para incluir productos sin ese campo
-      const result = await getStoreProducts(currentStoreId || '', options);
-      
-      // Aplicar filtros adicionales en el cliente
-      let filteredProducts = result.products || [];
-      
-      // Filtro de búsqueda
-      if (searchQuery) {
+
+      const result = await getStoreProducts(store.id, options);
+      const allProducts = result.products || [];
+      let filteredProducts = [...allProducts];
+
+      // Verificar si hay productos en subasta ACTIVOS (ANTES de aplicar filtros)
+      const hasAuctionProducts = allProducts.some((p: any) => 
+        p.sale_type === 'auction' && 
+        (p.auction_status === 'active' || p.auction_status === 'scheduled') &&
+        (p.status === 'active' || !p.status)
+      );
+      setHasAuctions(hasAuctionProducts);
+
+      // Filtrar productos anómalos o inválidos
+      filteredProducts = filteredProducts.filter((p: any) => {
+        // Excluir productos que no tengan estructura válida
+        if (!p.id || !p.title) return false;
+        // Excluir cualquier producto cuyo título o descripción contenga "Resumen" o métricas del dashboard
+        const title = (p.title || '').toLowerCase();
+        const description = (p.description || '').toLowerCase();
+        if (title.includes('resumen') || 
+            title.includes('solicitudes') || 
+            title.includes('firebase studio') ||
+            description.includes('resumen') ||
+            description.includes('solicitudes') ||
+            description.includes('firebase studio')) {
+          return false;
+        }
+        return true;
+      });
+
+      // Aplicar búsqueda
+      if (searchQuery.trim()) {
         filteredProducts = filteredProducts.filter((p: any) => 
           p.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
           p.description?.toLowerCase().includes(searchQuery.toLowerCase())
         );
       }
-      
-      // Filtro de condición
-      if (conditionFilter) {
-        filteredProducts = filteredProducts.filter((p: any) => p.condition === conditionFilter);
-      }
-      
-      // Ordenamiento por precio
-      if (priceSort === 'asc') {
-        filteredProducts.sort((a: any, b: any) => a.price - b.price);
-      } else if (priceSort === 'desc') {
-        filteredProducts.sort((a: any, b: any) => b.price - a.price);
-      }
-      
-      console.log('✅ Loaded products:', filteredProducts.length, 'total:', result.total);
-      console.log('📦 Products data:', filteredProducts);
-      
-      setStoreProducts(filteredProducts);
-      setProductsPagination({
-        page,
-        total_pages: result.total_pages,
-        total: result.total,
-        per_page: 12,
-      });
-    } catch (err) {
-      console.error('❌ Error loading store products:', err);
-      setStoreProducts([]);
-    }
-  };
 
-  // Obtener el storeId y sellerId desde el storeSlug
-  useEffect(() => {
-    async function loadStoreAndGetIds() {
-      setStoreLoading(true);
-      setStoreError(null);
-      try {
-        const storeData = await getStoreBySlug(storeSlug, isAdminView);
-        console.log('🏪 Store data loaded:', storeData);
-        if (storeData) {
-          setStore(storeData);
-          
-          // Asegurar que tenemos un storeId válido (usar id si existe, sino seller_id)
-          const validStoreId = storeData.id || storeData.seller_id || null;
-          const validSellerId = storeData.seller_id || null;
-          
-          if (validStoreId) {
-            setStoreId(validStoreId);
-          }
-          if (validSellerId) {
-            setSellerId(validSellerId);
-          }
-          
-          // Si tenemos seller_id, usarlo para cargar productos (más confiable)
-          if (validSellerId) {
-            console.log('🔄 Loading products with seller_id:', validSellerId, 'storeId:', validStoreId);
-            // Si storeId está vacío, usar seller_id también como storeId
-            await loadStoreProducts(validStoreId || validSellerId, 1, validSellerId);
-          } else if (validStoreId) {
-            // Si no hay seller_id, intentar solo con store_id
-            console.warn('⚠️ Store has no seller_id, trying with store_id only:', validStoreId);
-            await loadStoreProducts(validStoreId, 1);
-          } else {
-            console.error('❌ Store has no id or seller_id');
-            setStoreError('Tienda sin datos válidos');
-          }
-        } else {
-          setStoreError('Tienda no encontrada');
+      // Aplicar filtros
+      if (filters.minPrice) {
+        filteredProducts = filteredProducts.filter((p: any) => 
+          p.price >= parseFloat(filters.minPrice)
+        );
+      }
+
+      if (filters.maxPrice) {
+        filteredProducts = filteredProducts.filter((p: any) => 
+          p.price <= parseFloat(filters.maxPrice)
+        );
+      }
+
+      if (filters.condition) {
+        filteredProducts = filteredProducts.filter((p: any) => 
+          p.condition === filters.condition
+        );
+      }
+
+      if (filters.saleType) {
+        filteredProducts = filteredProducts.filter((p: any) => 
+          p.sale_type === filters.saleType
+        );
+      }
+
+      // Filtros específicos para vehículos/motos
+      if (vehicleFields.marca) {
+        filteredProducts = filteredProducts.filter((p: any) => {
+          const attrs = p.attributes || {};
+          return attrs.marca && attrs.marca.toLowerCase().includes(vehicleFields.marca.toLowerCase());
+        });
+      }
+      if (vehicleFields.modelo) {
+        filteredProducts = filteredProducts.filter((p: any) => {
+          const attrs = p.attributes || {};
+          return attrs.modelo && attrs.modelo.toLowerCase().includes(vehicleFields.modelo.toLowerCase());
+        });
+      }
+      if (vehicleFields.año) {
+        filteredProducts = filteredProducts.filter((p: any) => {
+          const attrs = p.attributes || {};
+          return attrs.año && attrs.año.toString() === vehicleFields.año;
+        });
+      }
+      if (vehicleFields.kilometraje) {
+        const km = parseFloat(vehicleFields.kilometraje);
+        if (!isNaN(km)) {
+          filteredProducts = filteredProducts.filter((p: any) => {
+            const attrs = p.attributes || {};
+            const productKm = parseFloat(attrs.kilometraje || '0');
+            // Permitir un rango de ±10% para el kilometraje
+            return productKm >= km * 0.9 && productKm <= km * 1.1;
+          });
         }
-      } catch (err) {
-        console.error('Error loading store:', err);
-        setStoreError('No se pudo cargar la información de la tienda.');
-      } finally {
-        setStoreLoading(false);
       }
+      if (vehicleFields.color) {
+        filteredProducts = filteredProducts.filter((p: any) => {
+          const attrs = p.attributes || {};
+          return attrs.color && attrs.color.toLowerCase().includes(vehicleFields.color.toLowerCase());
+        });
+      }
+      if (vehicleFields.documentacion) {
+        filteredProducts = filteredProducts.filter((p: any) => {
+          const attrs = p.attributes || {};
+          return attrs.documentacion === vehicleFields.documentacion;
+        });
+      }
+
+      // Aplicar ordenamiento
+      switch (sortBy) {
+        case 'price_asc':
+          filteredProducts.sort((a: any, b: any) => a.price - b.price);
+          break;
+        case 'price_desc':
+          filteredProducts.sort((a: any, b: any) => b.price - a.price);
+          break;
+        case 'date_asc':
+          filteredProducts.sort((a: any, b: any) => 
+            new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+          );
+          break;
+        case 'date_desc':
+        default:
+          filteredProducts.sort((a: any, b: any) => 
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          );
+          break;
+      }
+
+      // Mapear productos para asegurar que tienen image_url
+      const mappedProducts: Product[] = filteredProducts.map((p: any) => ({
+        ...p,
+        image_url: p.image_url ?? null,
+      }));
+      setProducts(mappedProducts);
+    } catch (err: any) {
+      // Error loading products
     }
+  }
 
-    if (storeSlug) {
-      loadStoreAndGetIds();
-    }
-  }, [storeSlug, isAdminView]);
+  function updateFilter(key: string, value: string) {
+    setFilters(prev => ({ ...prev, [key]: value }));
+  }
 
-  // Cargar categorías al montar el componente
-  useEffect(() => {
-    loadCategories();
-  }, []);
-
-  // Recargar productos cuando cambian los filtros
-  useEffect(() => {
-    if (storeId && sellerId) {
-      loadStoreProducts(storeId, 1, sellerId);
-    }
-  }, [selectedCategory, searchQuery, priceSort, conditionFilter]);
-
-  const { 
-    profile, 
-    reviews,
-    stats,
-    loading: profileLoading, 
-    error: profileError,
-    reviewsPagination,
-    loadReviews,
-  } = useSellerProfile({
-    sellerId: sellerId || undefined,
-    autoLoad: !!sellerId,
-  });
-
-  // Usar productos de la tienda en lugar de productos del seller
-  const products = storeProducts;
-  
-  // Debug: log productos actuales
-  useEffect(() => {
-    console.log('🔍 Current products state:', {
-      storeProductsLength: storeProducts.length,
-      productsLength: products.length,
-      productsPaginationTotal: productsPagination.total,
-      storeId,
-      sellerId
+  function clearFilters() {
+    setFilters({
+      category: '',
+      minPrice: '',
+      maxPrice: '',
+      condition: '',
+      saleType: '',
+      availability: '',
     });
-  }, [storeProducts, products, productsPagination.total, storeId, sellerId]);
-  
-  const loading = storeLoading || profileLoading;
-  const error = storeError || profileError;
+    setSearchQuery('');
+    setSortBy('date_desc');
+  }
 
-  // Manejar cambio de página de productos
-  const handleProductsPageChange = (page: number) => {
-    // Usar storeId si existe, sino sellerId como fallback
-    const validId = storeId || sellerId;
-    if (validId) {
-      loadStoreProducts(validId, page, sellerId || undefined);
+  function getWhatsAppLink() {
+    if (!store?.contact_phone) return '#';
+    const phone = store.contact_phone.replace(/\D/g, '');
+    return `https://wa.me/${phone}`;
+  }
+
+  function getLocationDisplay() {
+    if (!store) return '';
+    
+    if (store.city && store.department) {
+      return `${store.city}, ${store.department}`;
+    } else if (store.department) {
+      return store.department;
+    } else if (store.city) {
+      return store.city;
     }
-  };
+    return '';
+  }
 
-  // Manejar cambio de página de reseñas
-  const handleReviewsPageChange = (page: number) => {
-    loadReviews({ page });
-  };
-
-  // Manejar clic en producto
-  const handleProductClick = (productId: string) => {
-    router.push(`/products/${productId}`);
-  };
-
-  // Manejar seguir tienda
   const handleFollow = () => {
     setIsFollowing(!isFollowing);
-    // En una implementación real, esto haría una llamada a la API
   };
 
-  // Manejar agregar a favoritos
   const handleFavorite = () => {
     setIsFavorited(!isFavorited);
-    // En una implementación real, esto haría una llamada a la API
   };
 
-  // Manejar compartir perfil
-  const handleShare = () => {
-    if (navigator.share) {
-      navigator.share({
-        title: `Tienda ${store?.name}`,
-        text: `Mira la tienda ${store?.name} en Mercadito Online PY`,
-        url: window.location.href,
-      });
-    } else {
-      navigator.clipboard.writeText(window.location.href);
-      // Mostrar notificación de copiado
+  const handleShare = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      alert('Enlace copiado al portapapeles');
+    } catch (err) {
+      // Error copying link
     }
   };
+
+  const hasActiveFilters = Object.values(filters).some(v => v !== '') || searchQuery.trim() !== '';
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <LoadingSpinner size="lg" text="Cargando perfil de la tienda..." />
+      <div className="min-h-screen bg-gray-50 dark:bg-[#1A1A1A] flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">Cargando perfil de la tienda...</p>
+        </div>
       </div>
     );
   }
 
   if (error || !store) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="text-center max-w-md">
-          <EmptyState
-            icon={Store}
-            title="Tienda no encontrada"
-            description={error || "Esta tienda no existe o no está disponible."}
-          />
-          <Link href="/" className="mt-4 inline-block text-blue-600 hover:underline">
-            ← Volver al inicio
+      <div className="min-h-screen bg-gray-50 dark:bg-[#1A1A1A] flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-6xl mb-4">😕</div>
+          <h2 className="text-xl font-medium text-gray-900 dark:text-gray-300 mb-2">Tienda no encontrada</h2>
+          <p className="text-gray-600 dark:text-gray-400 mb-4">{error || 'La tienda que buscas no existe'}</p>
+          <Link
+            href="/"
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Volver al inicio
           </Link>
         </div>
       </div>
     );
   }
 
-  // Verificar si la tienda está pendiente o incompleta
-  const isPending = !store.is_active || (store.settings as any)?.verification_status === 'pending';
-  const isRejected = (store.settings as any)?.verification_status === 'rejected';
-  const isIncomplete = !store.description || !store.contact_phone;
-
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Banner de estado para admin o tiendas pendientes */}
-      {(isAdminView || isPending || isRejected || isIncomplete) && (
-        <div className="bg-yellow-50 border-b border-yellow-200 px-4 sm:px-6 lg:px-8 py-3">
-          <div className="max-w-7xl mx-auto">
-            {isPending && (
-              <div className="flex items-center gap-2 text-yellow-800">
-                <span className="text-lg">⏳</span>
-                <p className="text-sm">
-                  <strong>Tienda pendiente de verificación.</strong> El vendedor aún no ha completado toda la información.
-                </p>
-              </div>
-            )}
-            {isRejected && (
-              <div className="flex items-center gap-2 text-red-800">
-                <span className="text-lg">❌</span>
-                <p className="text-sm">
-                  <strong>Verificación rechazada.</strong> Esta tienda necesita corregir su información antes de ser aprobada.
-                </p>
-              </div>
-            )}
-            {isIncomplete && !isPending && !isRejected && (
-              <div className="flex items-center gap-2 text-blue-800">
-                <span className="text-lg">ℹ️</span>
-                <p className="text-sm">
-                  <strong>Información incompleta.</strong> Esta tienda no tiene todos los datos requeridos.
-                </p>
-              </div>
-            )}
-            {isAdminView && (
-              <div className="mt-2 text-xs text-gray-600">
-                Vista de administrador - Puedes ver tiendas incluso si están inactivas o incompletas.
+    <div className="min-h-screen bg-gray-50 dark:bg-[#1A1A1A]">
+      {/* Header mínimo - solo botón de volver */}
+      <div className="bg-white dark:bg-[#252525] border-b border-gray-200 dark:border-gray-700 px-4 py-2 flex items-center gap-4">
+        <Link
+          href="/"
+          className="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 transition-colors"
+        >
+          <ArrowLeft className="w-5 h-5" />
+          <Home className="w-5 h-5" />
+        </Link>
+        <div className="flex-1"></div>
+      </div>
+
+      {/* Foto de Portada - Estilo Facebook */}
+      <div className="relative h-64 sm:h-80 bg-gradient-to-br from-purple-400 to-blue-500">
+        {store.cover_image_url ? (
+          <img
+            src={store.cover_image_url}
+            alt={store.name}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-purple-400 to-blue-500">
+            <div className="text-white text-center opacity-50">
+              <Package className="w-16 h-16 mx-auto mb-2" />
+              <p className="text-lg">Foto de Portada</p>
+            </div>
+          </div>
+        )}
+        
+        {/* Logo superpuesto - Estilo Facebook */}
+        <div className="absolute -bottom-12 sm:-bottom-16 left-4 sm:left-8">
+          <div className="relative">
+            <img
+              src={store.logo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(store.name)}&background=6366f1&color=fff`}
+              alt={store.name}
+              className="w-24 h-24 sm:w-32 sm:h-32 rounded-full border-4 border-white shadow-lg object-cover bg-white"
+            />
+            {store.is_verified && (
+              <div className="absolute -bottom-1 -right-1 bg-blue-600 text-white rounded-full p-1.5 shadow-lg">
+                <CheckCircle className="w-6 h-6" />
               </div>
             )}
           </div>
         </div>
-      )}
+      </div>
 
-      {/* Header del perfil */}
-      <div className="relative bg-gray-100 shadow-sm border-b overflow-hidden">
-        {/* Imagen de portada */}
-        {store.cover_image_url ? (
-          <div className="absolute inset-0">
-            <Image
-              src={store.cover_image_url}
-              alt={`Portada de ${store.name}`}
-              fill
-              className="object-cover"
-              priority
-            />
-            {/* Overlay para mejor contraste */}
-            <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/10 to-white/90" />
-          </div>
-        ) : (
-          <div className="absolute inset-0 bg-gradient-to-br from-gray-200 to-gray-300" />
-        )}
-        
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
-          <div className="flex flex-col md:flex-row items-start md:items-center space-y-4 md:space-y-0 md:space-x-6">
-            {/* Logo */}
-            <div className="relative z-10">
-              <Avatar
-                src={store.logo_url || undefined}
-                fallback={store.name.charAt(0).toUpperCase()}
-                size="xl"
-                className="border-4 border-white shadow-xl w-32 h-32 md:w-40 md:h-40"
-              />
-              {((store as any).is_verified) && (
-                <div className="absolute -bottom-2 -right-2 bg-blue-600 text-white rounded-full p-1.5 shadow-lg">
-                  <CheckCircle className="w-6 h-6 md:w-7 md:h-7" />
+      {/* Información de la tienda - Estilo Facebook */}
+      <div className="bg-white dark:bg-[#252525] border-b border-gray-200 dark:border-gray-700 pt-16 sm:pt-20 pb-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-200 flex items-center gap-2">
+                {store.name}
+                {store.is_verified && (
+                  <span className="text-xs bg-blue-600 text-white px-2 py-1 rounded-full flex items-center gap-1">
+                    <Award className="w-3 h-3" />
+                    Verificada
+                  </span>
+                )}
+              </h1>
+              
+              {/* Información adicional */}
+              <div className="flex flex-wrap items-center gap-4 mt-2 text-sm text-gray-600 dark:text-gray-400">
+                {getLocationDisplay() && (
+                  <div className="flex items-center">
+                    <MapPin className="w-4 h-4 mr-1" />
+                    <span>{getLocationDisplay()}</span>
+                  </div>
+                )}
+                <div className="flex items-center">
+                  <Package className="w-4 h-4 mr-1" />
+                  <span>{totalProducts}+ publicaciones activas</span>
+                </div>
+              </div>
+              
+              {/* Calificación y reseñas */}
+              {store.rating && store.rating > 0 && (
+                <div className="flex items-center gap-2 mt-2">
+                  <div className="flex items-center">
+                    <Star className="w-5 h-5 text-yellow-400 fill-yellow-400" />
+                    <span className="font-semibold ml-1">{store.rating.toFixed(1)}</span>
+                  </div>
+                  {store.total_reviews && store.total_reviews > 0 && (
+                    <span className="text-sm text-gray-600 dark:text-gray-400">({store.total_reviews} reseñas)</span>
+                  )}
                 </div>
               )}
             </div>
 
-            {/* Información principal */}
-            <div className="flex-1 relative z-10">
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between">
-                <div>
-                  <h1 className="text-3xl md:text-4xl font-bold text-gray-900 flex items-center drop-shadow-sm">
-                    {store.name}
-                    {((store as any).is_verified) && (
-                      <Badge variant="success" size="sm" className="ml-2">
-                        <Award className="w-3 h-3 mr-1" />
-                        Verificada
-                      </Badge>
-                    )}
-                  </h1>
-                  
-                  <div className="flex items-center space-x-4 mt-2 text-gray-600">
-                    {((store as any).rating !== undefined) && (
-                      <div className="flex items-center">
-                        <Star className="w-4 h-4 text-yellow-500 mr-1" />
-                        <span className="font-medium">{((store as any).rating || 0).toFixed(1)}</span>
-                        <span className="text-sm ml-1">({((store as any).total_reviews || 0)} reseñas)</span>
-                      </div>
-                    )}
+            {/* Botones de acción - Siempre los mismos (solo iconos) para sincronizar vistas */}
+            <div className="flex items-center gap-2 flex-wrap">
+              {store.contact_phone && (
+                <a
+                  href={getWhatsAppLink()}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center w-10 h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                  title="Enviar mensaje"
+                >
+                  <MessageCircle className="w-5 h-5" />
+                </a>
+              )}
+              
+              {store.contact_phone && (
+                <a
+                  href={`tel:${store.contact_phone}`}
+                  className="flex items-center justify-center w-10 h-10 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+                  title="Llamar"
+                >
+                  <Phone className="w-5 h-5" />
+                </a>
+              )}
+              
+              {store.contact_email && (
+                <a
+                  href={`mailto:${store.contact_email}`}
+                  className="flex items-center justify-center w-10 h-10 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors"
+                  title="Email"
+                >
+                  <Mail className="w-5 h-5" />
+                </a>
+              )}
+              
+              {(getLocationDisplay() || (store.latitude && store.longitude)) && (
+                <button
+                  onClick={() => {
+                    let mapsUrl = '';
                     
-                    <div className="flex items-center">
-                      <Calendar className="w-4 h-4 mr-1" />
-                      <span className="text-sm">Tienda desde {new Date(store.created_at).getFullYear()}</span>
-                    </div>
+                    if (store.latitude && store.longitude) {
+                      mapsUrl = `https://www.google.com/maps/search/?api=1&query=${store.latitude},${store.longitude}`;
+                    } else if (getLocationDisplay()) {
+                      mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(getLocationDisplay() + ', Paraguay')}`;
+                    }
                     
-                    <div className="flex items-center">
-                      <Clock className="w-4 h-4 mr-1" />
-                      <span className="text-sm">Activa {new Date(store.updated_at).toLocaleDateString()}</span>
-                    </div>
-                  </div>
-
-                  {store.location && (
-                    <div className="flex items-center mt-2 text-gray-600">
-                      <MapPin className="w-4 h-4 mr-1" />
-                      <span>{store.location}</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Acciones */}
-                <div className="flex items-center space-x-2 mt-4 md:mt-0">
-                  <Button
-                    variant="outline"
-                    onClick={handleFollow}
-                    className={isFollowing ? 'bg-blue-600 text-white' : ''}
-                  >
-                    {isFollowing ? 'Siguiendo' : 'Seguir'}
-                  </Button>
-                  
-                  <Button
-                    variant="outline"
-                    onClick={handleFavorite}
-                    className={isFavorited ? 'text-red-500' : ''}
-                  >
-                    <Heart className={`w-4 h-4 ${isFavorited ? 'fill-current' : ''}`} />
-                  </Button>
-                  
-                  <Button variant="outline" onClick={handleShare}>
-                    <Share2 className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
+                    if (mapsUrl) {
+                      window.open(mapsUrl, '_blank');
+                    }
+                  }}
+                  className="flex items-center justify-center w-10 h-10 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors"
+                  title="Ubicación"
+                >
+                  <MapPin className="w-5 h-5" />
+                </button>
+              )}
+              
+              {/* Icono de subastas - Solo visible si hay productos en subasta activos */}
+              {hasAuctions && (
+                <Link
+                  href={`/auctions?seller_id=${store.seller_id}`}
+                  className="flex items-center justify-center w-10 h-10 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors"
+                  title="Ver subastas de esta tienda"
+                >
+                  <Gavel className="w-5 h-5" />
+                </Link>
+              )}
+              
+              <button
+                onClick={handleFollow}
+                className={`flex items-center justify-center w-10 h-10 rounded-lg transition-colors ${
+                  isFollowing 
+                    ? 'bg-blue-600 text-white' 
+                    : 'bg-gray-700 dark:bg-gray-600 text-gray-300 hover:bg-gray-600 dark:hover:bg-gray-500'
+                }`}
+                title={isFollowing ? 'Siguiendo' : 'Seguir'}
+              >
+                {isFollowing ? (
+                  <CheckCircle className="w-5 h-5" />
+                ) : (
+                  <Users className="w-5 h-5" />
+                )}
+              </button>
+              
+              <button
+                onClick={handleFavorite}
+                className={`flex items-center justify-center w-10 h-10 rounded-lg transition-colors ${
+                  isFavorited 
+                    ? 'bg-red-900/30 text-red-400 hover:bg-red-900/40 border border-red-600' 
+                    : 'bg-gray-700 dark:bg-gray-600 text-gray-300 hover:bg-gray-600 dark:hover:bg-gray-500'
+                }`}
+                title={isFavorited ? 'Quitar de favoritos' : 'Agregar a favoritos'}
+              >
+                <Heart className={`w-5 h-5 ${isFavorited ? 'fill-current' : ''}`} />
+              </button>
+              
+              <button
+                onClick={handleShare}
+                className="flex items-center justify-center w-10 h-10 bg-gray-700 dark:bg-gray-600 hover:bg-gray-600 dark:hover:bg-gray-500 text-gray-300 rounded-lg transition-colors"
+                title="Compartir"
+              >
+                <Share2 className="w-5 h-5" />
+              </button>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          {/* Sidebar */}
-          <div className="lg:col-span-1 space-y-6">
-            {/* Estadísticas */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <TrendingUp className="w-5 h-5 mr-2" />
-                  Estadísticas
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {stats && (
-                  <>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Productos</span>
-                      <span className="font-medium">{stats.total_products}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Ventas</span>
-                      <span className="font-medium">{stats.total_sales}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Calificación</span>
-                      <span className="font-medium">{stats.average_rating.toFixed(1)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Respuesta</span>
-                      <span className="font-medium">{stats.response_rate}%</span>
-                    </div>
-                  </>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Información de contacto */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Información de Contacto</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {store.phone && (
-                  <div className="flex items-center text-gray-600">
-                    <Phone className="w-4 h-4 mr-2" />
-                    <span>{store.phone}</span>
-                  </div>
-                )}
-                
-                {store.email && (
-                  <div className="flex items-center text-gray-600">
-                    <Globe className="w-4 h-4 mr-2" />
-                    <a href={`mailto:${store.email}`} className="hover:text-blue-600">
-                      {store.email}
-                    </a>
-                  </div>
-                )}
-
-                {store.website && (
-                  <div className="flex items-center text-gray-600">
-                    <Globe className="w-4 h-4 mr-2" />
-                    <a href={store.website} target="_blank" rel="noopener noreferrer" className="hover:text-blue-600">
-                      Sitio web
-                    </a>
-                  </div>
-                )}
-
-                {store.social_links && (
-                  <div className="flex items-center space-x-2">
-                    {store.social_links.facebook && (
-                      <a href={store.social_links.facebook} target="_blank" rel="noopener noreferrer">
-                        <Facebook className="w-5 h-5 text-blue-600 hover:text-blue-700" />
-                      </a>
-                    )}
-                    {store.social_links.instagram && (
-                      <a href={store.social_links.instagram} target="_blank" rel="noopener noreferrer">
-                        <Instagram className="w-5 h-5 text-pink-600 hover:text-pink-700" />
-                      </a>
-                    )}
-                    {store.social_links.twitter && (
-                      <a href={store.social_links.twitter} target="_blank" rel="noopener noreferrer">
-                        <Twitter className="w-5 h-5 text-blue-400 hover:text-blue-500" />
-                      </a>
-                    )}
-                    {store.social_links.linkedin && (
-                      <a href={store.social_links.linkedin} target="_blank" rel="noopener noreferrer">
-                        <Linkedin className="w-5 h-5 text-blue-700 hover:text-blue-800" />
-                      </a>
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Botón de contacto */}
-            <Button className="w-full" size="lg">
-              <MessageCircle className="w-4 h-4 mr-2" />
-              Contactar Tienda
-            </Button>
-          </div>
-
-          {/* Contenido principal */}
-          <div className="lg:col-span-3">
-            {/* Tabs */}
-            <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg mb-6">
-              <button
-                onClick={() => setActiveTab('products')}
-                className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-                  activeTab === 'products'
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                <Package className="w-4 h-4 inline mr-2" />
-                Productos ({productsPagination.total})
-              </button>
-              <button
-                onClick={() => setActiveTab('reviews')}
-                className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-                  activeTab === 'reviews'
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                <Star className="w-4 h-4 inline mr-2" />
-                Reseñas ({reviewsPagination.total})
-              </button>
-              <button
-                onClick={() => setActiveTab('about')}
-                className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-                  activeTab === 'about'
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                <Store className="w-4 h-4 inline mr-2" />
-                Acerca de
-              </button>
-              <button
-                onClick={() => setActiveTab('policies')}
-                className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-                  activeTab === 'policies'
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                <Shield className="w-4 h-4 inline mr-2" />
-                Políticas
-              </button>
+      {/* Buscador y Filtros - Estilo Facebook */}
+      <div className="bg-white dark:bg-[#252525] border-b border-gray-200 dark:border-gray-700 py-3">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+            {/* Buscador */}
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <input
+                type="text"
+                placeholder="Busca publicaciones"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 bg-gray-100 dark:bg-gray-800 border-0 rounded-lg focus:bg-white dark:focus:bg-gray-700 focus:ring-2 focus:ring-blue-500 text-sm text-gray-900 dark:text-gray-200 placeholder-gray-500"
+              />
             </div>
 
-            {/* Contenido de las tabs */}
-            {activeTab === 'products' && (
-              <div className="space-y-6">
-                {/* Buscador y Filtros estilo Facebook Marketplace */}
-                <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-4">
-                  {/* Buscador */}
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="Buscar en esta tienda..."
-                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                    <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                  </div>
-                  
-                  {/* Filtros rápidos */}
-                  <div className="flex flex-wrap gap-2">
-                    <select 
-                      value={selectedCategory}
-                      onChange={(e) => setSelectedCategory(e.target.value)}
-                      className="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    >
-                      <option value="">Todas las categorías</option>
-                      {categories.map((cat) => (
-                        <option key={cat.id} value={cat.id}>
-                          {cat.name}
-                        </option>
-                      ))}
-                    </select>
-                    <select 
-                      value={priceSort}
-                      onChange={(e) => setPriceSort(e.target.value)}
-                      className="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    >
-                      <option value="">Precio</option>
-                      <option value="asc">Menor a mayor</option>
-                      <option value="desc">Mayor a menor</option>
-                    </select>
-                    <select 
-                      value={conditionFilter}
-                      onChange={(e) => setConditionFilter(e.target.value)}
-                      className="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    >
-                      <option value="">Condición</option>
-                      <option value="nuevo">Nuevo</option>
-                      <option value="usado">Usado</option>
-                      <option value="usado_como_nuevo">Usado como nuevo</option>
-                    </select>
-                  </div>
+            {/* Filtros rápidos */}
+            <div className="flex gap-2 flex-wrap">
+              <select
+                value={filters.availability}
+                onChange={(e) => updateFilter('availability', e.target.value)}
+                className="px-3 py-2 bg-gray-100 dark:bg-gray-800 border-0 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm text-gray-900 dark:text-gray-200"
+              >
+                <option value="">Disponible</option>
+                <option value="active">Activos</option>
+                <option value="sold">Vendidos</option>
+              </select>
+
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="px-3 py-2 bg-gray-100 dark:bg-gray-800 border-0 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm text-gray-900 dark:text-gray-200"
+              >
+                <option value="date_desc">Ordenar por</option>
+                <option value="date_desc">Más recientes</option>
+                <option value="date_asc">Más antiguos</option>
+                <option value="price_asc">Precio: menor a mayor</option>
+                <option value="price_desc">Precio: mayor a menor</option>
+              </select>
+
+              <button
+                onClick={() => setFiltersOpen(!filtersOpen)}
+                className="flex items-center gap-2 px-3 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors text-sm text-gray-900 dark:text-gray-200"
+              >
+                <Filter className="w-4 h-4" />
+                <span>Filtros</span>
+                {hasActiveFilters && (
+                  <span className="ml-1 px-1.5 py-0.5 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full">
+                    {Object.values(filters).filter(v => v !== '').length}
+                  </span>
+                )}
+              </button>
+
+              {hasActiveFilters && (
+                <button
+                  onClick={clearFilters}
+                  className="px-3 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+                >
+                  Limpiar
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Filtros expandidos */}
+          {filtersOpen && (
+            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Categoría
+                  </label>
+                  <select
+                    value={filters.category}
+                    onChange={(e) => updateFilter('category', e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-100 dark:bg-gray-800 border-0 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm text-gray-900 dark:text-gray-200"
+                  >
+                    <option value="">Todas</option>
+                    {categories.map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
-                {products.length > 0 ? (
-                  <>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {products.map((product: any) => (
-                        <Card
-                          key={product.id}
-                          className="cursor-pointer hover:shadow-md transition-shadow"
-                          onClick={() => handleProductClick(product.id)}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Precio Mín.
+                </label>
+                <input
+                  type="number"
+                  placeholder="0"
+                  value={filters.minPrice}
+                  onChange={(e) => updateFilter('minPrice', e.target.value)}
+                  className="w-full px-3 py-2 bg-gray-100 dark:bg-gray-800 border-0 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm text-gray-900 dark:text-gray-200"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Precio Máx.
+                </label>
+                <input
+                  type="number"
+                  placeholder="Sin límite"
+                  value={filters.maxPrice}
+                  onChange={(e) => updateFilter('maxPrice', e.target.value)}
+                  className="w-full px-3 py-2 bg-gray-100 dark:bg-gray-800 border-0 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm text-gray-900 dark:text-gray-200"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Condición
+                </label>
+                <select
+                  value={filters.condition}
+                  onChange={(e) => updateFilter('condition', e.target.value)}
+                  className="w-full px-3 py-2 bg-gray-100 dark:bg-gray-800 border-0 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm text-gray-900 dark:text-gray-200"
+                >
+                  <option value="">Todas</option>
+                  <option value="nuevo">Nuevo</option>
+                  <option value="usado_como_nuevo">Usado como nuevo</option>
+                  <option value="usado">Usado</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Tipo
+                </label>
+                <select
+                  value={filters.saleType}
+                  onChange={(e) => updateFilter('saleType', e.target.value)}
+                  className="w-full px-3 py-2 bg-gray-100 dark:bg-gray-800 border-0 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm text-gray-900 dark:text-gray-200"
+                >
+                  <option value="">Todos</option>
+                  <option value="direct">Directa</option>
+                  <option value="auction">Subasta</option>
+                </select>
+              </div>
+              </div>
+              
+              {/* Campos específicos para vehículos/motos */}
+              {(() => {
+                const selectedCategory = categories.find(cat => cat.id === filters.category);
+                const selectedCategoryName = selectedCategory?.name?.toLowerCase() || '';
+                const isVehicleCategory = selectedCategoryName === 'vehiculos' || selectedCategoryName === 'motos';
+                
+                if (!isVehicleCategory) return null;
+                
+                return (
+                  <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-4 space-y-4">
+                    <h3 className="font-semibold text-blue-900 dark:text-blue-300 mb-3 text-sm">
+                      {selectedCategoryName === 'vehiculos' ? '🚗 Información del Vehículo' : '🏍️ Información de la Moto'}
+                    </h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Marca</label>
+                        <input
+                          type="text"
+                          placeholder={selectedCategoryName === 'vehiculos' ? 'Ej: Ford, Toyota...' : 'Ej: Honda, Yamaha...'}
+                          value={vehicleFields.marca}
+                          onChange={(e) => setVehicleFields(prev => ({ ...prev, marca: e.target.value }))}
+                          className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm text-gray-900 dark:text-gray-200"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Modelo</label>
+                        <input
+                          type="text"
+                          placeholder={selectedCategoryName === 'vehiculos' ? 'Ej: Fiesta, Corolla...' : 'Ej: CG 150, XTZ 250...'}
+                          value={vehicleFields.modelo}
+                          onChange={(e) => setVehicleFields(prev => ({ ...prev, modelo: e.target.value }))}
+                          className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm text-gray-900 dark:text-gray-200"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Año</label>
+                        <input
+                          type="number"
+                          placeholder="Ej: 2020"
+                          min="1900"
+                          max={new Date().getFullYear() + 1}
+                          value={vehicleFields.año}
+                          onChange={(e) => setVehicleFields(prev => ({ ...prev, año: e.target.value }))}
+                          className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm text-gray-900 dark:text-gray-200"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Kilometraje</label>
+                        <input
+                          type="number"
+                          placeholder="Ej: 50000"
+                          min="0"
+                          value={vehicleFields.kilometraje}
+                          onChange={(e) => setVehicleFields(prev => ({ ...prev, kilometraje: e.target.value }))}
+                          className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm text-gray-900 dark:text-gray-200"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Color</label>
+                        <input
+                          type="text"
+                          placeholder="Ej: Blanco, Negro..."
+                          value={vehicleFields.color}
+                          onChange={(e) => setVehicleFields(prev => ({ ...prev, color: e.target.value }))}
+                          className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm text-gray-900 dark:text-gray-200"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Documentación</label>
+                        <select
+                          value={vehicleFields.documentacion}
+                          onChange={(e) => setVehicleFields(prev => ({ ...prev, documentacion: e.target.value }))}
+                          className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm text-gray-900 dark:text-gray-200"
                         >
-                          <div className="relative w-full h-48">
-                            <Image
-                              src={product.cover_url || '/placeholder-product.png'}
-                              alt={product.title}
-                              fill
-                              className="object-cover rounded-t-lg"
-                            />
-                            <div className="absolute top-2 left-2">
-                              <Badge variant="info" size="sm">
-                                {product.condition}
-                              </Badge>
-                            </div>
-                          </div>
-                          <CardContent className="p-4">
-                            <h3 className="font-semibold text-gray-900 line-clamp-2 mb-2">
-                              {product.title}
-                            </h3>
-                            <div className="flex items-center justify-between">
-                              <span className="text-lg font-bold text-gray-900">
-                                Gs. {product.price.toLocaleString('es-PY')}
-                              </span>
-                              <Badge variant="default" size="sm">
-                                {product.sale_type}
-                              </Badge>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-
-                    {/* Paginación de productos */}
-                    {productsPagination.total_pages > 1 && (
-                      <div className="flex justify-center">
-                        <Pagination
-                          currentPage={productsPagination.page}
-                          totalPages={productsPagination.total_pages}
-                          onPageChange={handleProductsPageChange}
-                        />
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <EmptyState
-                    title="No hay productos"
-                    description="Esta tienda aún no ha publicado productos."
-                    icon={<Package className="w-16 h-16" />}
-                  />
-                )}
-              </div>
-            )}
-
-            {activeTab === 'reviews' && (
-              <div className="space-y-6">
-                {reviews.length > 0 ? (
-                  <>
-                    <div className="space-y-4">
-                      {reviews.map((review: any) => (
-                        <Card key={review.id}>
-                          <CardContent className="p-4">
-                            <div className="flex items-start space-x-3">
-                              <Avatar
-                                src={review.buyer.avatar_url}
-                                fallback={
-                                  (
-                                    (review.buyer.first_name || review.buyer.last_name)
-                                      ? `${review.buyer.first_name || ''} ${review.buyer.last_name || ''}`.trim()
-                                      : (review.buyer.email?.split('@')[0] || 'U')
-                                  ).charAt(0).toUpperCase()
-                                }
-                                size="md"
-                              />
-                              <div className="flex-1">
-                                <div className="flex items-center justify-between mb-2">
-                                  <h4 className="font-medium text-gray-900">
-                                    {(review.buyer.first_name || review.buyer.last_name 
-                                      ? `${review.buyer.first_name || ''} ${review.buyer.last_name || ''}`.trim()
-                                      : review.buyer.email?.split('@')[0] || 'Usuario')}
-                                  </h4>
-                                  <div className="flex items-center">
-                                    {[...Array(5)].map((_, i) => (
-                                      <Star
-                                        key={i}
-                                        className={`w-4 h-4 ${
-                                          i < review.rating
-                                            ? 'text-yellow-500 fill-current'
-                                            : 'text-gray-300'
-                                        }`}
-                                      />
-                                    ))}
-                                  </div>
-                                </div>
-                                {review.comment && (
-                                  <p className="text-gray-600 mb-2">{review.comment}</p>
-                                )}
-                                <p className="text-sm text-gray-500">
-                                  {new Date(review.created_at).toLocaleDateString('es-PY')}
-                                </p>
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-
-                    {/* Paginación de reseñas */}
-                    {reviewsPagination.total_pages > 1 && (
-                      <div className="flex justify-center">
-                        <Pagination
-                          currentPage={reviewsPagination.page}
-                          totalPages={reviewsPagination.total_pages}
-                          onPageChange={handleReviewsPageChange}
-                        />
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <EmptyState
-                    title="No hay reseñas"
-                    description="Esta tienda aún no tiene reseñas de compradores."
-                    icon={<Star className="w-16 h-16" />}
-                  />
-                )}
-              </div>
-            )}
-
-            {activeTab === 'about' && (
-              <div className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Acerca de {store.name}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {store.description ? (
-                      <p className="text-gray-600 leading-relaxed">{store.description}</p>
-                    ) : (
-                      <p className="text-gray-500 italic">
-                        Esta tienda aún no ha agregado una descripción.
-                      </p>
-                    )}
-                  </CardContent>
-                </Card>
-
-                {/* Información adicional */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Información de la Tienda</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Creada</span>
-                      <span className="font-medium">
-                        {new Date(store.created_at).toLocaleDateString('es-PY')}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Última actualización</span>
-                      <span className="font-medium">
-                        {new Date(store.updated_at).toLocaleDateString('es-PY')}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Estado</span>
-                      <Badge variant="success" size="sm">
-                        <CheckCircle className="w-3 h-3 mr-1" />
-                        Activa
-                      </Badge>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            )}
-
-            {activeTab === 'policies' && (
-              <div className="space-y-6">
-                {/* Política de envío */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center">
-                      <Truck className="w-5 h-5 mr-2" />
-                      Política de Envío
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Costo de envío</span>
-                        <span className="font-medium">Gs. 15,000 - 25,000</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Tiempo de entrega</span>
-                        <span className="font-medium">2-5 días hábiles</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Envío gratuito</span>
-                        <span className="font-medium">Compras mayores a Gs. 100,000</span>
+                          <option value="">— Selecciona —</option>
+                          <option value="al_dia">Al día</option>
+                          <option value="solo_titulo">Solo título</option>
+                          <option value="solo_cedula_verde">Solo cédula verde</option>
+                          <option value="titulo_y_cedula_verde">Título y cédula verde</option>
+                          <option value="ninguna">Ninguna de las anteriores</option>
+                        </select>
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
-
-                {/* Política de devoluciones */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center">
-                      <ShoppingBag className="w-5 h-5 mr-2" />
-                      Política de Devoluciones
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Período de devolución</span>
-                        <span className="font-medium">30 días</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Condición</span>
-                        <span className="font-medium">Producto sin usar</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Costo de devolución</span>
-                        <span className="font-medium">A cargo del comprador</span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Política de pagos */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center">
-                      <CreditCard className="w-5 h-5 mr-2" />
-                      Métodos de Pago
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="flex items-center space-x-2">
-                        <CheckCircle className="w-4 h-4 text-green-500" />
-                        <span className="text-sm">Transferencia bancaria</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <CheckCircle className="w-4 h-4 text-green-500" />
-                        <span className="text-sm">Efectivo contra entrega</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <CheckCircle className="w-4 h-4 text-green-500" />
-                        <span className="text-sm">Tarjeta de crédito</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <CheckCircle className="w-4 h-4 text-green-500" />
-                        <span className="text-sm">Billetera digital</span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            )}
-          </div>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
         </div>
+      </div>
+
+      {/* Productos - Grid estilo Facebook */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {products.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {products.map((product) => (
+              <Link
+                key={product.id}
+                href={`/products/${product.id}`}
+                className="bg-white dark:bg-[#252525] rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-lg transition-shadow"
+              >
+                <div className="relative h-48 bg-gray-100 dark:bg-gray-800">
+                  {product.image_url ? (
+                    <img
+                      src={product.image_url}
+                      alt={product.title}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-gray-400 text-4xl">
+                      📦
+                    </div>
+                  )}
+                </div>
+
+                <div className="p-3">
+                  <p className="text-lg font-semibold text-gray-900 dark:text-gray-200 mb-1">
+                    {product.price.toLocaleString('es-PY')} G
+                  </p>
+                  {getLocationDisplay() && (
+                    <p className="text-sm text-gray-600 dark:text-gray-400">{getLocationDisplay()}</p>
+                  )}
+                </div>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-12 bg-white dark:bg-[#252525] rounded-lg border border-gray-200 dark:border-gray-700">
+            <div className="text-6xl mb-4">📦</div>
+            <h2 className="text-xl font-medium text-gray-900 dark:text-gray-300 mb-2">
+              No se encontraron productos
+            </h2>
+            <p className="text-gray-600 dark:text-gray-400">
+              {hasActiveFilters
+                ? 'Intenta ajustar los filtros de búsqueda'
+                : 'Esta tienda aún no ha publicado productos'}
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -4,6 +4,7 @@
 // ============================================
 
 import { supabase } from '@/lib/supabase/client';
+import { validatePageLimit, validatePageNumber, calculateOffset } from '@/lib/utils/pagination';
 
 // ============================================
 // TIPOS
@@ -96,7 +97,7 @@ export class SearchService {
           compare_price,
           condition,
           sale_type,
-          cover_url,
+          image_url:cover_url,
           created_at,
           store:stores!inner(
             id,
@@ -149,11 +150,12 @@ export class SearchService {
       const sortOrder = filters.sort_order || 'desc';
       query = query.order(sortBy, { ascending: sortOrder === 'asc' });
 
-      // Aplicar paginación
-      const page = filters.page || 1;
-      const limit = filters.limit || 12;
-      const from = (page - 1) * limit;
-      const to = from + limit - 1;
+      // Aplicar paginación con validación de límites (mantener default de 12)
+      const page = validatePageNumber(filters.page);
+      const limit = validatePageLimit(filters.limit || 12, 60); // Default 12, max 60
+      const offset = calculateOffset(page, limit);
+      const from = offset;
+      const to = offset + limit - 1;
 
       query = query.range(from, to);
 
