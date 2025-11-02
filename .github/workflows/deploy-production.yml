@@ -115,6 +115,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build, security-audit]
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/production'
+    continue-on-error: true  # No fallar si secrets no están configurados
     steps:
       - name: 📥 Checkout code
         uses: actions/checkout@v4

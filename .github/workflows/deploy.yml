@@ -49,6 +49,7 @@ jobs:
   build:
     needs: test
     runs-on: ubuntu-latest
+    continue-on-error: false  # Build debe ser exitoso
     steps:
       - uses: actions/checkout@v4
       
