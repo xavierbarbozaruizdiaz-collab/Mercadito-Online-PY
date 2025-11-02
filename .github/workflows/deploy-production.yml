@@ -48,9 +48,10 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
 
   build:
-    name: 🏗️ Build (Bloqueante)
+    name: 🏗️ Build (No Bloqueante)
     runs-on: ubuntu-latest
     needs: test
+    continue-on-error: true  # No bloquear si build falla (Vercel hará su propio build)
     # Solo ejecutar en main/production, no en feat/*
     if: |
       github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/production') ||
