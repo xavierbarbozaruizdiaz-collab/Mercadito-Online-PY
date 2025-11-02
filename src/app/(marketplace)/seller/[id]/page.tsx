@@ -140,7 +140,7 @@ export default function SellerProfilePage() {
         .eq('seller_id', sellerId);
 
       if (reviewsData && reviewsData.length > 0) {
-        const ratings = reviewsData.map((r: any) => r.rating || 0).filter((r: number) => r > 0);
+        const ratings = reviewsData.map((r: { rating?: number }) => r.rating || 0).filter((r: number) => r > 0);
         if (ratings.length > 0) {
           const avgRating = ratings.reduce((sum: number, r: number) => sum + r, 0) / ratings.length;
           setRating(avgRating);
@@ -156,9 +156,9 @@ export default function SellerProfilePage() {
         .or('status.is.null,status.eq.active');
       
       setTotalProducts(count || 0);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error loading profile:', err);
-      setError(err.message || 'Error al cargar el perfil del vendedor');
+      setError(err instanceof Error ? err.message : 'Error al cargar el perfil del vendedor');
     } finally {
       setLoading(false);
     }
@@ -258,7 +258,7 @@ export default function SellerProfilePage() {
       console.log('✅ Products loaded:', productsData?.length || 0, 'products');
       console.log('📦 Products data:', productsData);
       setProducts(productsData || []);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('❌ Error loading products:', err);
     }
   }
