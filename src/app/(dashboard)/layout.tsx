@@ -158,11 +158,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     );
   }
 
-         // Renderizar dashboard con sidebar
-         return (
-           <div className="min-h-screen bg-gray-50">
-             {/* Sidebar */}
-             <DashboardSidebar />
+  // Renderizar dashboard con sidebar
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Sidebar */}
+      <DashboardSidebar />
 
       {/* Contenido principal con margen para sidebar */}
       <div className="md:ml-64">
