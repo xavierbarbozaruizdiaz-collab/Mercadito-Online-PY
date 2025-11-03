@@ -24,7 +24,9 @@ export type HeroSlide = {
   position: number;
 };
 
-export default function HeroSlider({ slides, ...props }: { slides: HeroSlide[]; [key: string]: any }) {
+type Props = React.HTMLAttributes<HTMLElement> & { slides: any[] };
+
+export default function HeroSlider({ slides, ...rest }: Props) {
   // Crear el plugin de autoplay solo si hay múltiples slides
   const autoplayPlugin = useMemo(() => {
     if (slides.length <= 1) return undefined;
@@ -81,7 +83,7 @@ export default function HeroSlider({ slides, ...props }: { slides: HeroSlide[]; 
   const hasMultipleSlides = slides.length > 1;
 
   return (
-    <section className="relative w-screen left-1/2 right-1/2 -mx-[50vw] group" aria-label="Promociones destacadas" {...props}>
+    <section className="relative w-screen left-1/2 right-1/2 -mx-[50vw] group" aria-label="Promociones destacadas" {...rest}>
       <div className="overflow-hidden" ref={emblaRef}>
         <div className="flex touch-pan-y">
           {slides.map((s, i) => (
