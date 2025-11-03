@@ -79,6 +79,9 @@ export const dynamicClasses = `
   overflow-hidden left-3 right-3 top-1/2 -translate-y-1/2 z-50 items-center
   justify-center hover:bg-white/90 hover:bg-gray-800 border-white/70
   hover:bg-white/10 text-cyan-700
+  bg-neutral-300 bg-purple-500 bg-purple-900 border-b-0 text-2xl
+  px-2.5 py-1.5 hover:bg-blue-700 hover:bg-gray-700 hover:bg-red-700
+  hover:bg-gray-50 focus:ring-blue-500 focus:ring-gray-500 focus:ring-red-500
 `;
 
 // Este archivo se escanea pero nunca se ejecuta
