@@ -112,6 +112,8 @@ const nextConfig = {
     // Temporalmente deshabilitado para evitar que elimine clases dinámicas
     // optimizeCss: true, // Deshabilitado temporalmente para debug
     optimizePackageImports: ['lucide-react', '@radix-ui/react-icons'],
+    // dynamicIO puede no ser una opción válida en Next.js 16
+    // dynamicIO: true, // Comentado - puede estar causando errores de build
   },
 
   // Configuración de webpack
@@ -137,10 +139,8 @@ const nextConfig = {
   // NO usar 'standalone' para evitar generación estática
   // output: 'standalone', // Comentado para forzar render dinámico
   
-  // Forzar que todas las páginas sean dinámicas por defecto
-  experimental: {
-    dynamicIO: true,
-  },
+  // NOTA: dynamicIO puede no estar disponible en Next.js 16
+  // Se ha removido para evitar errores de build
 
   // Configuración de poweredByHeader
   poweredByHeader: false,

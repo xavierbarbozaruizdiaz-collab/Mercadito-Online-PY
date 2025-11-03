@@ -172,8 +172,9 @@ export default async function Home() {
   console.log('[HERO/DIAG]', Array.isArray(slides), slides?.length);
   console.log(`[Hero] Render in ${process.env.NODE_ENV}:`, slides?.length);
 
-  // FORZAR PLACEHOLDER VISIBLE SIEMPRE PARA DEBUG
-  const showPlaceholder = !Array.isArray(slides) || slides.length === 0;
+  // Timestamp dinámico para forzar que cada render sea único
+  const renderTimestamp = Date.now();
+  const renderRandom = Math.random().toString(36).substring(7);
 
   return (
     <main className="min-h-screen bg-gray-50">
@@ -185,6 +186,9 @@ export default async function Home() {
           <p className="text-lg mb-1">Slides: {slides?.length || 0}</p>
           <p className="text-sm mb-1">NEXT_PUBLIC_FEATURE_HERO: {process.env.NEXT_PUBLIC_FEATURE_HERO || 'undefined'}</p>
           <p className="text-sm mb-1">NODE_ENV: {process.env.NODE_ENV || 'undefined'}</p>
+          <p className="text-xs mb-1">Render Time: {new Date().toISOString()}</p>
+          <p className="text-xs mb-1">Timestamp: {renderTimestamp}</p>
+          <p className="text-xs mb-1">Random: {renderRandom}</p>
           <p className="text-xs mt-4 opacity-75">Si ves esto, el componente funciona</p>
         </div>
       </div>
