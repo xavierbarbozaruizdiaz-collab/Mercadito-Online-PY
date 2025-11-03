@@ -34,10 +34,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
     (async () => {
       try {
-        // TEMPORALMENTE PERMITIR ACCESO PARA DEBUG - REMOVER DESPUÉS
-        let session = null;
-        let profile = null;
-        let role = 'buyer';
+               // TEMPORALMENTE PERMITIR ACCESO PARA DEBUG - REMOVER DESPUÉS
+               let session: any = null;
+               let profile: any = null;
+               let role = 'buyer';
         
         try {
           // Verificar sesión
