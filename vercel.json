@@ -42,7 +42,7 @@
     },
     {
       "path": "/api/cron/close-auctions",
-      "schedule": "*/10 * * * * *"
+      "schedule": "* * * * *"
     }
   ]
 }
