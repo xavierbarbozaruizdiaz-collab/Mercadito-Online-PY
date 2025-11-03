@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
+import { useRole } from '@/lib/hooks/useAuth';
 import { 
   Home, 
   Plus, 
@@ -13,30 +14,48 @@ import {
   Users, 
   User, 
   Store, 
-  Settings 
+  Settings,
+  Shield,
+  Gavel
 } from 'lucide-react';
 
 interface SidebarItem {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   href: string;
+  roles?: ('admin' | 'seller' | 'buyer' | 'affiliate')[]; // Roles que pueden ver este item
 }
 
-const sidebarItems: SidebarItem[] = [
+// Items base (visibles para todos los usuarios autenticados)
+const baseSidebarItems: SidebarItem[] = [
   { icon: Home, label: 'Home', href: '/dashboard' },
-  { icon: Plus, label: 'Nuevo Producto', href: '/dashboard/new-product' },
-  { icon: ShoppingCart, label: 'Pedidos', href: '/dashboard/orders' },
-  { icon: DollarSign, label: 'Retiros', href: '/dashboard/payouts' },
-  { icon: ArrowLeftRight, label: 'Transacciones', href: '/dashboard/transactions' },
-  { icon: Users, label: 'Afiliado', href: '/dashboard/affiliate' },
   { icon: User, label: 'Perfil', href: '/dashboard/profile' },
-  { icon: Store, label: 'Tienda', href: '/dashboard/store' },
-  { icon: Settings, label: 'Configuración', href: '/dashboard/settings' },
+];
+
+// Items para vendedores
+const sellerSidebarItems: SidebarItem[] = [
+  { icon: Plus, label: 'Nuevo Producto', href: '/dashboard/new-product', roles: ['seller', 'admin'] },
+  { icon: ShoppingCart, label: 'Pedidos', href: '/dashboard/orders', roles: ['seller', 'admin'] },
+  { icon: DollarSign, label: 'Retiros', href: '/dashboard/payouts', roles: ['seller', 'admin'] },
+  { icon: ArrowLeftRight, label: 'Transacciones', href: '/dashboard/transactions', roles: ['seller', 'admin'] },
+  { icon: Store, label: 'Tienda', href: '/dashboard/store', roles: ['seller', 'admin'] },
+  { icon: Gavel, label: 'Dashboard Vendedor', href: '/dashboard/seller', roles: ['seller', 'admin'] },
+];
+
+// Items para afiliados
+const affiliateSidebarItems: SidebarItem[] = [
+  { icon: Users, label: 'Dashboard Afiliado', href: '/dashboard/affiliate', roles: ['affiliate', 'admin'] },
+];
+
+// Items para administradores
+const adminSidebarItems: SidebarItem[] = [
+  { icon: Shield, label: 'Dashboard Admin', href: '/dashboard/admin', roles: ['admin'] },
 ];
 
 export default function DashboardSidebar() {
   const pathname = usePathname();
   const [userEmail, setUserEmail] = useState<string>('');
+  const { isAdmin, isSeller, isBuyer, role, loading: roleLoading } = useRole();
 
   useEffect(() => {
     const getUserEmail = async () => {
@@ -47,6 +66,33 @@ export default function DashboardSidebar() {
     };
     getUserEmail();
   }, []);
+
+  // Filtrar items según el rol del usuario
+  const getVisibleItems = (): SidebarItem[] => {
+    const items: SidebarItem[] = [...baseSidebarItems];
+
+    // Agregar items de vendedor si es seller o admin
+    if (isSeller || isAdmin) {
+      items.push(...sellerSidebarItems);
+    }
+
+    // Agregar items de afiliado si es affiliate o admin
+    if (role === 'affiliate' || isAdmin) {
+      items.push(...affiliateSidebarItems);
+    }
+
+    // Agregar items de admin solo si es admin
+    if (isAdmin) {
+      items.push(...adminSidebarItems);
+    }
+
+    // Filtrar items duplicados (puede haber solapamiento)
+    const uniqueItems = items.filter((item, index, self) =>
+      index === self.findIndex((t) => t.href === item.href)
+    );
+
+    return uniqueItems;
+  };
 
   return (
     <aside className="w-64 bg-[#1F1F1F] border-r border-gray-800 min-h-screen fixed left-0 top-0 z-40">
@@ -60,7 +106,7 @@ export default function DashboardSidebar() {
       </div>
       
       <nav className="p-4 space-y-1">
-        {sidebarItems.map((item) => {
+        {!roleLoading && getVisibleItems().map((item) => {
           const Icon = item.icon;
           const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname?.startsWith(item.href));
           
@@ -79,6 +125,11 @@ export default function DashboardSidebar() {
             </Link>
           );
         })}
+        {roleLoading && (
+          <div className="p-4 text-center">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-400 mx-auto"></div>
+          </div>
+        )}
       </nav>
       
       {/* Sección de usuario en la parte inferior */}
