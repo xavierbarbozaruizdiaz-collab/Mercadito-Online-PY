@@ -4,7 +4,7 @@ import HeroSlider from '@/components/hero/HeroSlider';
 import { supabase } from '@/lib/supabase/client';
 
 // Forzar revalidación para evitar caché en producción
-export const revalidate = 30; // Revalidar cada 30 segundos temporalmente
+export const revalidate = 0;
 export const dynamic = 'force-dynamic'; // Desactivar caché estático
 
 const FEATURE_HERO = process.env.NEXT_PUBLIC_FEATURE_HERO === 'true';
@@ -133,10 +133,12 @@ export default async function Home() {
     console.log('[Hero] Will render:', FEATURE_HERO && slides.length > 0 ? 'HeroSlider' : 'Placeholder');
   }
 
+  console.log('Hero render in PROD', slides?.length);
+
   return (
     <main className="min-h-screen bg-gray-50">
       {/* Hero Section */}
-      {FEATURE_HERO && slides.length > 0 ? (
+      {slides.length > 0 ? (
         <HeroSlider slides={slides} />
       ) : FEATURE_HERO && slides.length === 0 ? (
         // Placeholder cuando feature está habilitado pero no hay slides
