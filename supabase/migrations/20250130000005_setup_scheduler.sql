@@ -14,13 +14,14 @@
 -- SELECT * FROM pg_extension WHERE extname = 'pg_cron';
 
 -- Si pg_cron está disponible, crear job:
-/*
-SELECT cron.schedule(
-  'close-expired-auctions',
-  '*/5 * * * * *',  -- Cada 5 segundos
-  $$SELECT auto_close_expired_auctions();$$
-);
-*/
+-- NOTA: Descomenta estas líneas si pg_cron está habilitado
+-- Formato cron para cada 5 segundos: '*/5 * * * * *'
+--
+-- SELECT cron.schedule(
+--   'close-expired-auctions',
+--   '*/5 * * * * *',
+--   $$SELECT auto_close_expired_auctions();$$
+-- );
 
 -- ============================================
 -- OPCIÓN 2: Edge Function (RECOMENDADO)

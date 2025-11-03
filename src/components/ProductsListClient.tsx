@@ -329,6 +329,10 @@ export default function ProductsListClient() {
         // Excluir productos que no tengan estructura válida
         if (!p.id || !p.title) return false;
         
+        // Excluir productos cuyo título sea exactamente "Resumen" (común en productos de Firebase/Vercel)
+        const titleTrimmed = (p.title || '').trim().toLowerCase();
+        if (titleTrimmed === 'resumen') return false;
+        
         // Excluir cualquier producto cuyo título o descripción contenga métricas del dashboard
         const title = (p.title || '').toLowerCase();
         const description = (p.description || '').toLowerCase();
@@ -339,6 +343,7 @@ export default function ProductsListClient() {
           'solicitudes',
           'firebase studio',
           'firebase',
+          'vercel',
           'errores',
           'solicitud',
           'application has',
@@ -348,7 +353,10 @@ export default function ProductsListClient() {
           'últimos 7 dias',
           'dashboard',
           'métricas',
-          'metrics'
+          'metrics',
+          'implementado desde',
+          'publicación en vivo',
+          'ver detalles'
         ];
         
         const containsAnomalousContent = anomalousKeywords.some(keyword => 
@@ -356,6 +364,12 @@ export default function ProductsListClient() {
         );
         
         if (containsAnomalousContent) return false;
+        
+        // Excluir productos con descripciones que contengan URLs de Firebase/Vercel
+        const fullText = `${title} ${description}`;
+        if (fullText.includes('firebase') || fullText.includes('vercel.app') || fullText.includes('studio')) {
+          return false;
+        }
         
         return true;
       });

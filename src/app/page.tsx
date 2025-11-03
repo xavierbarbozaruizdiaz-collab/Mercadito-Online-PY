@@ -1,13 +1,8 @@
 import ProductsListClient from '@/components/ProductsListClient';
 import { Suspense } from 'react';
-import dynamic from 'next/dynamic';
 import { supabase } from '@/lib/supabaseServer';
 import HeroMountProbe from '@/components/hero/HeroMountProbe';
-
-// Import dinámico sin SSR para evitar bloqueos en prod
-const HeroSlider = dynamic(() => import('@/components/hero/HeroSlider'), {
-  ssr: false,
-});
+import HeroSliderClient from '@/components/hero/HeroSliderClient';
 
 // Forzar revalidación para evitar caché en producción
 export const revalidate = 0;
@@ -140,7 +135,7 @@ export default async function Home() {
   }
 
   console.log('[HERO/DIAG]', Array.isArray(slides), slides?.length);
-  console.log('Hero render in PROD', slides?.length);
+  console.log(`[Hero] Render in ${process.env.NODE_ENV}:`, slides?.length);
 
   return (
     <main className="min-h-screen bg-gray-50">
@@ -151,7 +146,7 @@ export default async function Home() {
       
       {/* HERO - componente real sin SSR */}
       {Array.isArray(slides) && slides.length > 0 ? (
-        <HeroSlider slides={slides} data-testid="hero-slider" />
+        <HeroSliderClient slides={slides} />
       ) : null}
 
       {/* Products Section */}

@@ -19,7 +19,10 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",
-    "test:unit": "vitest run"
+    "test:unit": "vitest run",
+    "verify:env": "node scripts/verificar-env-vars.js",
+    "verify:migrations": "node scripts/comparar-migraciones.js",
+    "compare:migrations": "node scripts/comparar-migraciones-produccion.js"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx}": [
