@@ -77,7 +77,7 @@ export default function DashboardSidebar() {
     }
 
     // Agregar items de afiliado si es affiliate o admin
-    if (role === 'affiliate' || isAdmin) {
+    if ((role === 'affiliate' as any) || isAdmin) {
       items.push(...affiliateSidebarItems);
     }
 

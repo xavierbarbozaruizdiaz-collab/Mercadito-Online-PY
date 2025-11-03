@@ -71,7 +71,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           return;
         }
 
-        const role = profile.role || 'buyer';
+        const role = (profile as { role?: string }).role || 'buyer';
         if (mounted) {
           setUserRole(role);
         }

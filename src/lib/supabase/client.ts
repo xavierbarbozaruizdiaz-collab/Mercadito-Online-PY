@@ -102,7 +102,7 @@ export async function getSessionWithTimeout(options?: { timeoutMs?: number; retr
 export interface AuthUser {
   id: string;
   email: string;
-  role: 'buyer' | 'seller' | 'admin';
+  role: 'buyer' | 'seller' | 'admin' | 'affiliate';
   first_name?: string;
   last_name?: string;
   phone?: string;
