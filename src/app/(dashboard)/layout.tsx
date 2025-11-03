@@ -101,7 +101,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             // Redirigir según el rol del usuario
             if (role === 'seller') {
               window.location.href = '/dashboard/seller';
-            } else             if (role === 'affiliate') {
+            } else if (role === 'affiliate') {
               window.location.href = '/dashboard/affiliate';
             } else if (role === 'buyer') {
               window.location.href = '/dashboard/buyer';
