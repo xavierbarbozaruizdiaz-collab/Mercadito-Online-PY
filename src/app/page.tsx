@@ -116,7 +116,17 @@ export default async function Home() {
         slides = sortedData.map((s: any) => {
           const bgType = (s.bg_type || 'gradient') as 'gradient' | 'image';
           
-          return {
+          // DEBUG: Log cada slide antes de mapear
+          console.log('[Hero/Page] Mapeando slide:', {
+            id: s.id,
+            bg_type: bgType,
+            title: s.title,
+            gradient_from: s.gradient_from,
+            gradient_to: s.gradient_to,
+            image_url: s.image_url,
+          });
+          
+          const mapped = {
             id: s.id as string,
             title: (s.title ?? null) as string | null,
             subtitle: (s.subtitle ?? null) as string | null,
@@ -137,7 +147,14 @@ export default async function Home() {
             public_url: null, // Se calcula si hay storage_path
             sort_order: (s.sort_order as number) ?? 0,
             created_at: s.created_at ?? null,
+            // Añadir position para compatibilidad con HeroSlider
+            position: (s.sort_order as number) ?? 0,
           };
+          
+          // DEBUG: Log slide mapeado
+          console.log('[Hero/Page] Slide mapeado:', mapped);
+          
+          return mapped;
         });
         
         // Log en producción

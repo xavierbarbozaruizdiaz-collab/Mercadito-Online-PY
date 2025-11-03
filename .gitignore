@@ -59,3 +59,4 @@ supabase/.branches/
 supabase/docker/
 supabase/.env
 
+.vercel
