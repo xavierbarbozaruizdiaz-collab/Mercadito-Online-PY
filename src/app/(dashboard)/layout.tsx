@@ -165,7 +165,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
              <DashboardSidebar />
 
       {/* Contenido principal con margen para sidebar */}
-      <div className="ml-64">
+      <div className="md:ml-64">
         {/* Profile Ensurer y Admin Role Assigner */}
         <ProfileEnsurer />
         {userRole === 'admin' && <AdminRoleAssigner />}

@@ -16,7 +16,9 @@ import {
   Store, 
   Settings,
   Shield,
-  Gavel
+  Gavel,
+  Menu,
+  X
 } from 'lucide-react';
 
 interface SidebarItem {
@@ -52,10 +54,25 @@ const adminSidebarItems: SidebarItem[] = [
   { icon: Shield, label: 'Dashboard Admin', href: '/dashboard/admin', roles: ['admin'] },
 ];
 
-export default function DashboardSidebar() {
+interface DashboardSidebarProps {
+  isOpen?: boolean;
+  onClose?: () => void;
+}
+
+export default function DashboardSidebar({ isOpen: controlledIsOpen, onClose }: DashboardSidebarProps = {}) {
   const pathname = usePathname();
   const [userEmail, setUserEmail] = useState<string>('');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { isAdmin, isSeller, isBuyer, role, loading: roleLoading } = useRole();
+
+  // Usar estado controlado si se proporciona, sino usar estado interno
+  const isOpen = controlledIsOpen !== undefined ? controlledIsOpen : isMobileMenuOpen;
+  const setIsOpen = controlledIsOpen !== undefined ? onClose || (() => {}) : setIsMobileMenuOpen;
+
+  // Cerrar menú al cambiar de ruta en móvil
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
     const getUserEmail = async () => {
@@ -95,15 +112,50 @@ export default function DashboardSidebar() {
   };
 
   return (
-    <aside className="w-64 bg-[#1F1F1F] border-r border-gray-800 min-h-screen fixed left-0 top-0 z-40">
-      <div className="p-4 border-b border-gray-800">
-        <Link href="/dashboard" className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-sm">M</span>
-          </div>
-          <span className="text-white font-semibold text-lg">Mercadito Online PY</span>
-        </Link>
-      </div>
+    <>
+      {/* Overlay para móvil */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={() => setIsOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* Botón hamburguesa para móvil */}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="md:hidden fixed top-4 left-4 z-50 p-2 bg-[#1F1F1F] text-white rounded-lg shadow-lg"
+        aria-label="Toggle menu"
+      >
+        {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+      </button>
+
+      {/* Sidebar */}
+      <aside
+        className={`
+          w-64 bg-[#1F1F1F] border-r border-gray-800 min-h-screen fixed left-0 top-0 z-40
+          transition-transform duration-300 ease-in-out
+          md:translate-x-0
+          ${isOpen ? 'translate-x-0' : '-translate-x-full'}
+        `}
+      >
+        <div className="p-4 border-b border-gray-800 flex items-center justify-between">
+          <Link href="/dashboard" className="flex items-center gap-2" onClick={() => setIsOpen(false)}>
+            <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
+              <span className="text-white font-bold text-sm">M</span>
+            </div>
+            <span className="text-white font-semibold text-lg">Mercadito Online PY</span>
+          </Link>
+          {/* Botón cerrar en móvil */}
+          <button
+            onClick={() => setIsOpen(false)}
+            className="md:hidden text-gray-400 hover:text-white"
+            aria-label="Close menu"
+          >
+            <X className="w-6 h-6" />
+          </button>
+        </div>
       
       <nav className="p-4 space-y-1">
         {!roleLoading && getVisibleItems().map((item) => {
@@ -114,6 +166,7 @@ export default function DashboardSidebar() {
             <Link
               key={item.href}
               href={item.href}
+              onClick={() => setIsOpen(false)}
               className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
                 isActive
                   ? 'bg-blue-600 text-white'
@@ -145,6 +198,7 @@ export default function DashboardSidebar() {
         </div>
       </div>
     </aside>
+    </>
   );
 }
 
