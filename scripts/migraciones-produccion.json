@@ -1,0 +1,391 @@
+[
+  {
+    "version": "20250128000000",
+    "name": "orders_system"
+  },
+  {
+    "version": "20250128000001",
+    "name": "fix_products_structure"
+  },
+  {
+    "version": "20250128000002",
+    "name": "products_table"
+  },
+  {
+    "version": "20250128000004",
+    "name": "complete_references"
+  },
+  {
+    "version": "20250128000008",
+    "name": "complete_setup"
+  },
+  {
+    "version": "20250128000009",
+    "name": "add_categories"
+  },
+  {
+    "version": "20250128000010",
+    "name": "add_sample_categories"
+  },
+  {
+    "version": "20250128000011",
+    "name": "fix_categories_access"
+  },
+  {
+    "version": "20250128000012",
+    "name": "debug_categories"
+  },
+  {
+    "version": "20250128000013",
+    "name": "verify_categories"
+  },
+  {
+    "version": "20250128000014",
+    "name": "enable_categories_rls"
+  },
+  {
+    "version": "20250128000015",
+    "name": "fix_product_images"
+  },
+  {
+    "version": "20250128000016",
+    "name": "final_fix_product_images"
+  },
+  {
+    "version": "20250128000017",
+    "name": "fix_is_cover_column"
+  },
+  {
+    "version": "20250128000018",
+    "name": "debug_categories"
+  },
+  {
+    "version": "20250128000019",
+    "name": "fix_categories_rls"
+  },
+  {
+    "version": "20250128000020",
+    "name": "final_categories_fix"
+  },
+  {
+    "version": "20250128000021",
+    "name": "final_verification"
+  },
+  {
+    "version": "20250128000022",
+    "name": "fix_profiles_recursion"
+  },
+  {
+    "version": "20250128000023",
+    "name": "assign_admin_role"
+  },
+  {
+    "version": "20250128000024",
+    "name": "admin_functions"
+  },
+  {
+    "version": "20250128000025",
+    "name": "fix_profile_creation"
+  },
+  {
+    "version": "20250128000026",
+    "name": "fix_sql_functions"
+  },
+  {
+    "version": "20250128000029",
+    "name": "simple_schema_update"
+  },
+  {
+    "version": "20250128000032",
+    "name": "chat_system_final"
+  },
+  {
+    "version": "20250128000034",
+    "name": "analytics_system_fixed"
+  },
+  {
+    "version": "20250128000035",
+    "name": "backup_system"
+  },
+  {
+    "version": "20250128000036",
+    "name": "wishlist_system"
+  },
+  {
+    "version": "20250128000037",
+    "name": "payment_system"
+  },
+  {
+    "version": "20250128000038",
+    "name": "shipping_system"
+  },
+  {
+    "version": "20250128000039",
+    "name": "push_notifications"
+  },
+  {
+    "version": "20250128000040",
+    "name": "referral_system"
+  },
+  {
+    "version": "20250128000041",
+    "name": "reviews_system"
+  },
+  {
+    "version": "20250128000042",
+    "name": "coupons_system"
+  },
+  {
+    "version": "20250128000043",
+    "name": "seller_analytics"
+  },
+  {
+    "version": "20250128000044",
+    "name": "notifications_system"
+  },
+  {
+    "version": "20250128000045",
+    "name": "marketplace_features"
+  },
+  {
+    "version": "20250128000046",
+    "name": "security_audit_final"
+  },
+  {
+    "version": "20250128000047",
+    "name": "fix_rls_recursion_final"
+  },
+  {
+    "version": "20250128000048",
+    "name": "fix_recursion_urgent"
+  },
+  {
+    "version": "20250128000049",
+    "name": "store_categories"
+  },
+  {
+    "version": "20250128000050",
+    "name": "structured_location"
+  },
+  {
+    "version": "20250128000051",
+    "name": "fix_stores_rls"
+  },
+  {
+    "version": "20250128000052",
+    "name": "user_activity_tracking"
+  },
+  {
+    "version": "20250128000053",
+    "name": "product_approval"
+  },
+  {
+    "version": "20250128000054",
+    "name": "orders_disputes"
+  },
+  {
+    "version": "20250128000055",
+    "name": "orders_admin_rls"
+  },
+  {
+    "version": "20250128000056",
+    "name": "site_settings"
+  },
+  {
+    "version": "20250128000057",
+    "name": "content_management"
+  },
+  {
+    "version": "20250128000058",
+    "name": "banners_and_user_ban"
+  },
+  {
+    "version": "20250128000059",
+    "name": "bulk_notifications_log"
+  },
+  {
+    "version": "20250128000060",
+    "name": "categories_admin_rls"
+  },
+  {
+    "version": "20250128000061",
+    "name": "add_categories_columns"
+  },
+  {
+    "version": "20250128000062",
+    "name": "fix_category_slugs"
+  },
+  {
+    "version": "20250128000063",
+    "name": "create_banners_bucket"
+  },
+  {
+    "version": "20250128000064",
+    "name": "add_banner_fields_to_hero"
+  },
+  {
+    "version": "20250128000065",
+    "name": "fix_hero_slides_rls"
+  },
+  {
+    "version": "20250128000066",
+    "name": "prevent_own_product_cart"
+  },
+  {
+    "version": "20250128000067",
+    "name": "add_product_attributes"
+  },
+  {
+    "version": "20250128000068",
+    "name": "fix_product_images_storage_rls"
+  },
+  {
+    "version": "20250128000070",
+    "name": "sync_store_names_with_profiles"
+  },
+  {
+    "version": "20250128000071",
+    "name": "fix_price_history_rls"
+  },
+  {
+    "version": "20250128000072",
+    "name": "fix_products_update_rls"
+  },
+  {
+    "version": "20250128000073",
+    "name": "add_whatsapp_notification_trigger"
+  },
+  {
+    "version": "20250128000074",
+    "name": "fix_orders_rls_for_buyers"
+  },
+  {
+    "version": "20250130000001",
+    "name": "auction_system"
+  },
+  {
+    "version": "20250130000002",
+    "name": "fix_product_delete"
+  },
+  {
+    "version": "20250130000003",
+    "name": "get_server_time"
+  },
+  {
+    "version": "20250130000006",
+    "name": "auction_max_duration"
+  },
+  {
+    "version": "20250130000007",
+    "name": "scalability_security"
+  },
+  {
+    "version": "20250130000008",
+    "name": "final_optimizations"
+  },
+  {
+    "version": "20250130000009",
+    "name": "audit_and_maintenance"
+  },
+  {
+    "version": "20250130000010",
+    "name": "backup_system"
+  },
+  {
+    "version": "20250201000001",
+    "name": "commission_system"
+  },
+  {
+    "version": "20250201000002",
+    "name": "inventory_system"
+  },
+  {
+    "version": "20250201000003",
+    "name": "update_order_creation"
+  },
+  {
+    "version": "20250201000004",
+    "name": "update_auction_close_with_commissions"
+  },
+  {
+    "version": "20250201000005",
+    "name": "fix_seller_balance_update"
+  },
+  {
+    "version": "20250201000006",
+    "name": "payout_system"
+  },
+  {
+    "version": "20250201000007",
+    "name": "order_cancellation_refund"
+  },
+  {
+    "version": "20250201000008",
+    "name": "fix_stores_rls_for_admins"
+  },
+  {
+    "version": "20250201000009",
+    "name": "affiliate_system"
+  },
+  {
+    "version": "20250202000001",
+    "name": "influencer_system"
+  },
+  {
+    "version": "20250202000002",
+    "name": "membership_bid_validation"
+  },
+  {
+    "version": "20250202000003",
+    "name": "penalty_system"
+  },
+  {
+    "version": "20250202000004",
+    "name": "membership_plans_system"
+  },
+  {
+    "version": "20250202000005",
+    "name": "seller_delivery_protection"
+  },
+  {
+    "version": "20250202000006",
+    "name": "create_auction_order_function"
+  },
+  {
+    "version": "20250202000007",
+    "name": "publication_limits_membership"
+  },
+  {
+    "version": "20250202000008",
+    "name": "product_expiration_handling"
+  },
+  {
+    "version": "20250203000000",
+    "name": "fix_products_structure_syntax"
+  },
+  {
+    "version": "20251027185944",
+    "name": "storage"
+  },
+  {
+    "version": "20251027194329",
+    "name": "profiles_table"
+  },
+  {
+    "version": "20251027204301",
+    "name": "categories_seed"
+  },
+  {
+    "version": "20251027213611",
+    "name": "product_images_limit"
+  },
+  {
+    "version": "20251030",
+    "name": "hero_carousel"
+  },
+  {
+    "version": "202511021649",
+    "name": "prod_align"
+  }
+]
+

@@ -5,7 +5,11 @@ module.exports = {
     './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
     './src/components/**/*.{js,ts,jsx,tsx,mdx}',
     './src/app/**/*.{js,ts,jsx,tsx,mdx}',
+    './src/styles/**/*.{js,ts,jsx,tsx}', // Incluir safelist de clases dinámicas
   ],
+  // NOTA: En Tailwind v4, safelist puede no funcionar completamente
+  // Las clases dinámicas están en src/styles/tailwind-safelist.ts
+  // para que Tailwind las detecte durante el análisis
   safelist: [
     // Clases existentes (mantener compatibilidad)
     'bg-blue-600',

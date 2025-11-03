@@ -109,7 +109,8 @@ const nextConfig = {
 
   // Configuración experimental
   experimental: {
-    optimizeCss: true,
+    // Temporalmente deshabilitado para evitar que elimine clases dinámicas
+    // optimizeCss: true, // Deshabilitado temporalmente para debug
     optimizePackageImports: ['lucide-react', '@radix-ui/react-icons'],
   },
 
