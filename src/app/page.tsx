@@ -4,14 +4,8 @@ import dynamic from 'next/dynamic';
 import { supabase } from '@/lib/supabase/client';
 
 // Import dinámico sin SSR para evitar bloqueos en prod
-const HeroSliderClient = dynamic(() => import('@/components/hero/HeroSlider'), {
+const HeroSlider = dynamic(() => import('@/components/hero/HeroSlider'), {
   ssr: false,
-  // Opcional: placeholder rápido mientras hidrata
-  loading: () => (
-    <div style={{height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999'}}>
-      Cargando hero…
-    </div>
-  ),
 });
 
 // Forzar revalidación para evitar caché en producción
@@ -151,14 +145,17 @@ export default async function Home() {
     <main className="min-h-screen bg-gray-50">
       <div data-testid="hero-probe">HERO PROBE</div>
       
+      {/* Asignar slides a window para acceso en cliente */}
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `if (typeof window !== 'undefined') { window.__HERO_SLIDES__ = ${JSON.stringify(slides || [])}; }`,
+        }}
+      />
+      
       {/* HERO - componente real sin SSR */}
       {Array.isArray(slides) && slides.length > 0 ? (
-        <HeroSliderClient slides={slides} data-testid="hero-slider" />
-      ) : (
-        <div style={{height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999'}}>
-          No hay slides activos.
-        </div>
-      )}
+        <HeroSlider slides={slides} data-testid="hero-slider" />
+      ) : null}
 
       {/* Products Section */}
       <div id="products" className="py-8 sm:py-12 px-4 sm:px-8">

@@ -85,9 +85,9 @@ export default function HeroSlider({ slides, ...rest }: Props) {
 
   return (
     <section 
-      className="relative w-screen left-1/2 right-1/2 -mx-[50vw] group" 
-      aria-label="Promociones destacadas" 
-      data-testid={rest['data-testid'] ?? 'hero-slider'}
+      data-testid="hero-slider"
+      className="relative w-full overflow-hidden"
+      aria-label="Promociones destacadas"
       {...rest}
     >
       <div className="overflow-hidden" ref={emblaRef}>
@@ -129,22 +129,13 @@ export default function HeroSlider({ slides, ...rest }: Props) {
                         <p className="mt-2 text-sm md:text-base opacity-90">{s.subtitle}</p>
                       )}
                       <div className="mt-4 flex gap-3">
-                        {true && s.cta_primary_label && s.cta_primary_href && (
+                        {s.cta_primary_label && s.cta_primary_href && (
                           <a
                             href={s.cta_primary_href}
-                            className="rounded-md bg-white text-cyan-700 px-4 py-2 font-medium shadow hover:bg-white/90"
+                            className="inline-flex items-center justify-center rounded-lg px-5 py-2.5 bg-primary text-white hover:bg-primary/90"
                             data-testid="primary-btn"
                           >
                             {s.cta_primary_label}
-                          </a>
-                        )}
-                        {true && s.cta_secondary_label && s.cta_secondary_href && (
-                          <a
-                            href={s.cta_secondary_href}
-                            className="rounded-md border border-white/70 px-4 py-2 font-medium hover:bg-white/10"
-                            data-testid="primary-btn"
-                          >
-                            {s.cta_secondary_label}
                           </a>
                         )}
                       </div>
@@ -157,30 +148,25 @@ export default function HeroSlider({ slides, ...rest }: Props) {
         </div>
       </div>
 
-      {hasMultipleSlides && (
-        <>
-          <button
-            onClick={prev}
-            aria-label="Anterior"
-            className="absolute left-2 top-1/2 -translate-y-1/2 p-2 sm:p-3 rounded-full bg-black/40 text-white shadow-lg backdrop-blur ring-1 ring-white/30 hover:bg-black/60 focus:outline-none focus:ring-2 focus:ring-white/70 opacity-80 group-hover:opacity-100 transition z-10"
-          >
-            {/* Chevron Left */}
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M15 19L8 12L15 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </button>
-          <button
-            onClick={next}
-            aria-label="Siguiente"
-            className="absolute right-2 top-1/2 -translate-y-1/2 p-2 sm:p-3 rounded-full bg-black/40 text-white shadow-lg backdrop-blur ring-1 ring-white/30 hover:bg-black/60 focus:outline-none focus:ring-2 focus:ring-white/70 opacity-80 group-hover:opacity-100 transition z-10"
-          >
-            {/* Chevron Right */}
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M9 5L16 12L9 19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </button>
-        </>
-      )}
+      {/* Botones prev/next siempre visibles */}
+      <button
+        onClick={prev}
+        aria-label="Anterior"
+        className="absolute left-3 top-1/2 -translate-y-1/2 z-50 inline-flex items-center justify-center rounded-full px-3 py-2 bg-white text-gray-900 shadow hover:bg-gray-100"
+      >
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M15 19L8 12L15 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </button>
+      <button
+        onClick={next}
+        aria-label="Siguiente"
+        className="absolute right-3 top-1/2 -translate-y-1/2 z-50 inline-flex items-center justify-center rounded-full px-3 py-2 bg-white text-gray-900 shadow hover:bg-gray-100"
+      >
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M9 5L16 12L9 19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </button>
 
       {hasMultipleSlides && (
         <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2 z-10">
