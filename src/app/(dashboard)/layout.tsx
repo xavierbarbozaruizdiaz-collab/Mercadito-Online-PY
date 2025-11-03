@@ -34,44 +34,40 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
     (async () => {
       try {
-        // Verificar sesión
-        const { data: { session }, error: sessionErr } = await supabase.auth.getSession();
-        if (sessionErr || !session?.user) {
-          console.error('❌ Error de autenticación:', sessionErr);
-          if (mounted) {
-            window.location.href = '/auth/sign-in';
+        // TEMPORALMENTE PERMITIR ACCESO PARA DEBUG - REMOVER DESPUÉS
+        let session = null;
+        let profile = null;
+        let role = 'buyer';
+        
+        try {
+          // Verificar sesión
+          const { data: { session: sessionData }, error: sessionErr } = await supabase.auth.getSession();
+          if (sessionErr || !sessionData?.user) {
+            console.warn('[DEBUG] No hay sesión, pero permitiendo acceso temporalmente para debug');
+          } else {
+            session = sessionData;
+            const user = session.user;
+
+            // Verificar perfil y rol
+            const { data: profileData, error: pErr } = await supabase
+              .from('profiles')
+              .select('id, role, email')
+              .eq('id', user.id)
+              .single();
+
+            if (pErr) {
+              console.warn('[DEBUG] Error obteniendo perfil, pero permitiendo acceso temporalmente');
+            } else {
+              profile = profileData;
+              if (profile) {
+                role = (profile as { role?: string }).role || 'buyer';
+              }
+            }
           }
-          return;
+        } catch (err) {
+          console.warn('[DEBUG] Error en verificación, pero permitiendo acceso temporalmente');
         }
 
-        const user = session.user;
-
-        // Verificar perfil y rol
-        const { data: profile, error: pErr } = await supabase
-          .from('profiles')
-          .select('id, role, email')
-          .eq('id', user.id)
-          .single();
-
-        if (pErr) {
-          console.error('Error obteniendo perfil:', pErr);
-          if (mounted) {
-            setAllowed(false);
-            setLoading(false);
-          }
-          return;
-        }
-
-        if (!profile) {
-          console.error('Perfil no encontrado');
-          if (mounted) {
-            setAllowed(false);
-            setLoading(false);
-          }
-          return;
-        }
-
-        const role = (profile as { role?: string }).role || 'buyer';
         if (mounted) {
           setUserRole(role);
         }
@@ -84,7 +80,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         let hasAccess = false;
 
-        if (isAdminRoute) {
+        // TEMPORALMENTE PERMITIR ACCESO PARA DEBUG
+        if (!session || !profile) {
+          console.warn('[DEBUG] No hay sesión o perfil, permitiendo acceso temporalmente para debug');
+          hasAccess = true;
+        } else if (isAdminRoute) {
           hasAccess = role === 'admin';
         } else if (isSellerRoute) {
           hasAccess = role === 'seller' || role === 'admin';
