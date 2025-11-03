@@ -6,11 +6,14 @@ import HeroSliderClient from '@/components/hero/HeroSliderClient';
 import { unstable_noStore as noStore } from 'next/cache';
 
 // FORZAR RENDER DINÁMICO - NO GENERAR ESTÁTICAMENTE
+// Usar TODAS las opciones posibles para prevenir generación estática
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 export const dynamicParams = true;
 export const fetchCache = 'force-no-store';
 export const runtime = 'nodejs';
+// Prevenir cualquier optimización estática
+export const preferredRegion = 'auto';
 
 // FORZAR HERO ACTIVO PARA DEBUG - REMOVER DESPUÉS
 // Temporalmente forzado a true - NO DEPENDE DE VARIABLES DE ENTORNO
@@ -40,6 +43,13 @@ type HeroSlide = {
 export default async function Home() {
   // Deshabilitar cache completamente - FORZA render dinámico
   noStore();
+  
+  // Forzar que esta página use timestamp dinámico para prevenir cache
+  const timestamp = Date.now();
+  const random = Math.random();
+  
+  // Log para verificar que se ejecuta en cada request
+  console.log(`[DEBUG] Home page render at ${new Date().toISOString()}, timestamp: ${timestamp}, random: ${random}`);
   
   let slides: HeroSlide[] = [];
 
