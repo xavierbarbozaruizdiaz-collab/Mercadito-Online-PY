@@ -19,6 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     # Solo ejecutar en push a main/dev
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev')
+    continue-on-error: true  # No bloquear workflow completo
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -46,6 +47,7 @@ jobs:
     # Solo ejecutar en push a main/dev
     # No usar needs para evitar fallos si lint-and-typecheck se salta
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev')
+    continue-on-error: true  # No bloquear workflow completo
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

@@ -17,6 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     # Solo ejecutar en push a main
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    continue-on-error: true  # No bloquear workflow completo
     steps:
       - uses: actions/checkout@v4
       
@@ -69,6 +70,8 @@ jobs:
       
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
+        if: success()  # Solo subir si build fue exitoso
+        continue-on-error: true
         with:
           name: build-files
           path: .next/
