@@ -80,22 +80,6 @@ export default function HeroSlider({ slides, ...rest }: Props) {
 
   if (!slides?.length) return null;
 
-  // DEBUG: Log de slides recibidos
-  useEffect(() => {
-    console.log('[HeroSlider] Slides recibidos:', slides.length);
-    slides.forEach((s, i) => {
-      console.log(`[HeroSlider] Slide ${i}:`, {
-        id: s.id,
-        title: s.title,
-        bg_type: s.bg_type,
-        bg_gradient_from: s.bg_gradient_from,
-        bg_gradient_to: s.bg_gradient_to,
-        bg_image_url: s.bg_image_url,
-        image_url: (s as any).image_url,
-      });
-    });
-  }, [slides]);
-
   // Solo mostrar controles si hay más de un slide
   const hasMultipleSlides = slides.length > 1;
 

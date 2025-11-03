@@ -80,15 +80,9 @@ export default async function Home() {
         .eq('is_active', true)
         .order('sort_order', { ascending: true });
       
-      // Log en producción
-      if (process.env.NODE_ENV === 'production') {
-        console.log('[Hero] Query result - slides count:', data?.length || 0);
-        console.log('[Hero] Query error:', error?.message || 'none');
-      }
-      
-      if (error) {
-        console.error('[Hero] Error loading hero slides:', error);
-      } else if (data) {
+             if (error) {
+               console.error('[Hero] Error loading hero slides:', error);
+             } else if (data) {
         // Ordenar por sort_order ASC y luego por created_at DESC (si existe)
         const sortedData = [...data].sort((a: any, b: any) => {
           if (a.sort_order !== b.sort_order) {
@@ -116,17 +110,7 @@ export default async function Home() {
         slides = sortedData.map((s: any) => {
           const bgType = (s.bg_type || 'gradient') as 'gradient' | 'image';
           
-          // DEBUG: Log cada slide antes de mapear
-          console.log('[Hero/Page] Mapeando slide:', {
-            id: s.id,
-            bg_type: bgType,
-            title: s.title,
-            gradient_from: s.gradient_from,
-            gradient_to: s.gradient_to,
-            image_url: s.image_url,
-          });
-          
-          const mapped = {
+          return {
             id: s.id as string,
             title: (s.title ?? null) as string | null,
             subtitle: (s.subtitle ?? null) as string | null,
@@ -150,44 +134,14 @@ export default async function Home() {
             // Añadir position para compatibilidad con HeroSlider
             position: (s.sort_order as number) ?? 0,
           };
-          
-          // DEBUG: Log slide mapeado
-          console.log('[Hero/Page] Slide mapeado:', mapped);
-          
-          return mapped;
         });
         
-        // Log en producción
-        if (process.env.NODE_ENV === 'production') {
-          console.log('[Hero] Processed slides count:', slides.length);
-          if (slides.length === 0) {
-            console.warn('[Hero] ⚠️ No slides found! Will show placeholder.');
-            console.warn('[Hero] ⚠️ Verifica que hay slides con is_active=true en hero_slides');
-          }
-        }
-      }
-    } catch (err: any) {
-      console.error('[Hero] Error in Home component:', err?.message || err);
-      if (process.env.NODE_ENV === 'production') {
-        console.error('[Hero] Full error:', err);
-      }
-      slides = [];
-    }
-  }
-  
-  // Debug final
-  console.log('[DEBUG] Final slides.length:', slides?.length);
-  console.log('[DEBUG] Will render hero?', FEATURE_HERO && slides.length > 0);
-
-  // Log final en producción
-  if (process.env.NODE_ENV === 'production') {
-    console.log('[Hero] Final slides count:', slides.length);
-    console.log('[Hero] Feature enabled:', FEATURE_HERO);
-    console.log('[Hero] Will render:', FEATURE_HERO && slides.length > 0 ? 'HeroSlider' : 'Placeholder');
-  }
-
-  console.log('[HERO/DIAG]', Array.isArray(slides), slides?.length);
-  console.log(`[Hero] Render in ${process.env.NODE_ENV}:`, slides?.length);
+             }
+           } catch (err: any) {
+             console.error('[Hero] Error in Home component:', err?.message || err);
+             slides = [];
+           }
+         }
 
   // Timestamp dinámico para forzar que cada render sea único
   const renderTimestamp = Date.now();
@@ -195,23 +149,6 @@ export default async function Home() {
 
   return (
     <main className="min-h-screen bg-gray-50">
-      {/* PLACEHOLDER SIEMPRE VISIBLE PARA DEBUG */}
-      <div className="w-full h-96 bg-gradient-to-r from-blue-600 to-purple-600 flex items-center justify-center mb-8">
-        <div className="text-center text-white">
-          <h2 className="text-3xl font-bold mb-2">🔍 DEBUG HERO</h2>
-          <p className="text-lg mb-1">FEATURE_HERO: {FEATURE_HERO ? 'true' : 'false'}</p>
-          <p className="text-lg mb-1">Slides: {slides?.length || 0}</p>
-          <p className="text-sm mb-1">NEXT_PUBLIC_FEATURE_HERO: {process.env.NEXT_PUBLIC_FEATURE_HERO || 'undefined'}</p>
-          <p className="text-sm mb-1">NODE_ENV: {process.env.NODE_ENV || 'undefined'}</p>
-          <p className="text-xs mb-1">Render Time: {new Date().toISOString()}</p>
-          <p className="text-xs mb-1">Timestamp: {renderTimestamp}</p>
-          <p className="text-xs mb-1">Random: {renderRandom}</p>
-          <p className="text-xs mt-4 opacity-75">Si ves esto, el componente funciona</p>
-        </div>
-      </div>
-      
-      <div data-testid="hero-probe">HERO PROBE</div>
-      
       {/* Probe para asignar slides a window en cliente */}
       {Array.isArray(slides) && <HeroMountProbe slides={slides} />}
       
