@@ -3,6 +3,7 @@ import { Suspense } from 'react';
 import { supabase } from '@/lib/supabaseServer';
 import HeroMountProbe from '@/components/hero/HeroMountProbe';
 import HeroSliderClient from '@/components/hero/HeroSliderClient';
+import { unstable_noStore as noStore } from 'next/cache';
 
 // FORZAR RENDER DINÁMICO - NO GENERAR ESTÁTICAMENTE
 export const dynamic = 'force-dynamic';
@@ -37,6 +38,9 @@ type HeroSlide = {
 };
 
 export default async function Home() {
+  // Deshabilitar cache completamente - FORZA render dinámico
+  noStore();
+  
   let slides: HeroSlide[] = [];
 
   // Log feature flag en producción

@@ -136,6 +136,11 @@ const nextConfig = {
   // Configuración de output
   // NO usar 'standalone' para evitar generación estática
   // output: 'standalone', // Comentado para forzar render dinámico
+  
+  // Forzar que todas las páginas sean dinámicas por defecto
+  experimental: {
+    dynamicIO: true,
+  },
 
   // Configuración de poweredByHeader
   poweredByHeader: false,

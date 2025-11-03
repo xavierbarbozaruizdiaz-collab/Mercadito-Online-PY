@@ -3,11 +3,16 @@
 // Esta página SIEMPRE debe mostrar el banner
 // ============================================
 
+import { unstable_noStore as noStore } from 'next/cache';
+
 // FORZAR RENDER DINÁMICO
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+export const runtime = 'nodejs';
 
 export default function TestDebugPage() {
+  // Deshabilitar cache completamente
+  noStore();
   return (
     <main className="min-h-screen bg-gray-50">
       <div className="w-full h-96 bg-gradient-to-r from-red-600 to-orange-600 flex items-center justify-center">
