@@ -109,7 +109,7 @@ export default function CartButton() {
     <div className="relative">
       <Link
         href="/cart"
-        className="flex items-center gap-2 p-2 text-gray-600 hover:text-gray-800 transition-colors"
+        className="flex items-center gap-2 p-2 sm:p-2 min-h-[44px] sm:min-h-0 text-gray-600 hover:text-gray-800 transition-colors"
       >
         <span className="text-xl">🛒</span>
         {totalItems > 0 && (

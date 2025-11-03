@@ -20,7 +20,7 @@ export default function MobileMenu() {
       {/* Botón hamburguesa */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="md:hidden p-2 text-gray-600 hover:text-gray-900"
+        className="md:hidden p-3 min-h-[44px] min-w-[44px] text-gray-600 hover:text-gray-900 flex items-center justify-center"
         aria-label="Toggle menu"
       >
         {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -48,7 +48,7 @@ export default function MobileMenu() {
           <span className="text-lg font-bold text-blue-600">Menú</span>
           <button
             onClick={() => setIsOpen(false)}
-            className="p-2 text-gray-600 hover:text-gray-900"
+            className="p-3 min-h-[44px] min-w-[44px] text-gray-600 hover:text-gray-900 flex items-center justify-center"
             aria-label="Close menu"
           >
             <X className="w-6 h-6" />
@@ -65,7 +65,7 @@ export default function MobileMenu() {
                 href={item.href}
                 onClick={() => setIsOpen(false)}
                 className={`
-                  flex items-center gap-3 px-4 py-3 mx-2 rounded-lg transition-colors
+                  flex items-center gap-3 px-4 py-3 mx-2 min-h-[44px] rounded-lg transition-colors
                   ${isActive
                     ? 'bg-blue-50 text-blue-600'
                     : 'text-gray-700 hover:bg-gray-50'

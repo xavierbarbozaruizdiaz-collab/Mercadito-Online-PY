@@ -125,7 +125,7 @@ export default function DashboardSidebar({ isOpen: controlledIsOpen, onClose }: 
       {/* Botón hamburguesa para móvil */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="md:hidden fixed top-4 left-4 z-50 p-2 bg-[#1F1F1F] text-white rounded-lg shadow-lg"
+        className="md:hidden fixed top-4 left-4 z-50 p-3 min-h-[44px] min-w-[44px] bg-[#1F1F1F] text-white rounded-lg shadow-lg flex items-center justify-center"
         aria-label="Toggle menu"
       >
         {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -167,7 +167,7 @@ export default function DashboardSidebar({ isOpen: controlledIsOpen, onClose }: 
               key={item.href}
               href={item.href}
               onClick={() => setIsOpen(false)}
-              className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+              className={`flex items-center gap-3 px-4 py-3 min-h-[44px] rounded-lg transition-colors ${
                 isActive
                   ? 'bg-blue-600 text-white'
                   : 'text-gray-300 hover:bg-gray-800 hover:text-white'
