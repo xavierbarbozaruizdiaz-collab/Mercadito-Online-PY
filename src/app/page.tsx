@@ -9,8 +9,8 @@ export const revalidate = 0;
 export const dynamic = 'force-dynamic'; // Desactivar caché estático
 
 // FORZAR HERO ACTIVO PARA DEBUG - REMOVER DESPUÉS
-const FEATURE_HERO = true; // Temporalmente forzado a true para debug
-// const FEATURE_HERO = process.env.NEXT_PUBLIC_FEATURE_HERO === 'true';
+// Temporalmente forzado a true - NO DEPENDE DE VARIABLES DE ENTORNO
+const FEATURE_HERO = true;
 
 type HeroSlide = {
   id: string;
@@ -155,25 +155,32 @@ export default async function Home() {
   console.log('[HERO/DIAG]', Array.isArray(slides), slides?.length);
   console.log(`[Hero] Render in ${process.env.NODE_ENV}:`, slides?.length);
 
+  // FORZAR PLACEHOLDER VISIBLE SIEMPRE PARA DEBUG
+  const showPlaceholder = !Array.isArray(slides) || slides.length === 0;
+
   return (
     <main className="min-h-screen bg-gray-50">
+      {/* PLACEHOLDER SIEMPRE VISIBLE PARA DEBUG */}
+      <div className="w-full h-96 bg-gradient-to-r from-blue-600 to-purple-600 flex items-center justify-center mb-8">
+        <div className="text-center text-white">
+          <h2 className="text-3xl font-bold mb-2">🔍 DEBUG HERO</h2>
+          <p className="text-lg mb-1">FEATURE_HERO: {FEATURE_HERO ? 'true' : 'false'}</p>
+          <p className="text-lg mb-1">Slides: {slides?.length || 0}</p>
+          <p className="text-sm mb-1">NEXT_PUBLIC_FEATURE_HERO: {process.env.NEXT_PUBLIC_FEATURE_HERO || 'undefined'}</p>
+          <p className="text-sm mb-1">NODE_ENV: {process.env.NODE_ENV || 'undefined'}</p>
+          <p className="text-xs mt-4 opacity-75">Si ves esto, el componente funciona</p>
+        </div>
+      </div>
+      
       <div data-testid="hero-probe">HERO PROBE</div>
       
       {/* Probe para asignar slides a window en cliente */}
       {Array.isArray(slides) && <HeroMountProbe slides={slides} />}
       
       {/* HERO - componente real sin SSR */}
-      {FEATURE_HERO && Array.isArray(slides) && slides.length > 0 ? (
-        <HeroSliderClient slides={slides} />
-      ) : (
-        // PLACEHOLDER TEMPORAL PARA DEBUG
-        <div className="w-full h-96 bg-gradient-to-r from-blue-600 to-purple-600 flex items-center justify-center">
-          <div className="text-center text-white">
-            <h2 className="text-3xl font-bold mb-2">Hero Placeholder</h2>
-            <p className="text-lg">FEATURE_HERO: {FEATURE_HERO ? 'true' : 'false'}</p>
-            <p className="text-lg">Slides: {slides?.length || 0}</p>
-            <p className="text-sm mt-4">NEXT_PUBLIC_FEATURE_HERO: {process.env.NEXT_PUBLIC_FEATURE_HERO || 'undefined'}</p>
-          </div>
+      {FEATURE_HERO && Array.isArray(slides) && slides.length > 0 && (
+        <div className="mb-8">
+          <HeroSliderClient slides={slides} />
         </div>
       )}
 

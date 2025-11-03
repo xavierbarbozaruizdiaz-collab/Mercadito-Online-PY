@@ -185,9 +185,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     );
   }
 
+  // BANNER DE DEBUG SIEMPRE VISIBLE
+  const debugBanner = (
+    <div className="w-full bg-yellow-500 text-black p-4 text-center font-bold">
+      🔍 DEBUG MODE: Dashboard accesible sin verificación
+    </div>
+  );
+
   // Renderizar dashboard con sidebar
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Banner de debug */}
+      {debugBanner}
+      
       {/* Sidebar */}
       <DashboardSidebar />
 
