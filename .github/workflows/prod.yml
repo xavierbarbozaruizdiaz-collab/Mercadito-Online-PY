@@ -64,6 +64,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: 🔔 Trigger Vercel Deploy Hook (production)
+        continue-on-error: true  # No fallar si hook falla
         run: |
           if [ -z "${{ secrets.VERCEL_DEPLOY_HOOK_PROD }}" ]; then
             echo "⚠️ VERCEL_DEPLOY_HOOK_PROD not set - skipping deploy hook"
@@ -71,7 +72,7 @@ jobs:
             exit 0
           fi
           echo "🚀 Triggering Vercel deployment..."
-          curl -X POST "${{ secrets.VERCEL_DEPLOY_HOOK_PROD }}"
+          curl -X POST "${{ secrets.VERCEL_DEPLOY_HOOK_PROD }}" || echo "⚠️ Deploy hook failed (non-blocking)"
           echo "✅ Deploy hook triggered"
 
       - name: ✅ Deployment initiated
