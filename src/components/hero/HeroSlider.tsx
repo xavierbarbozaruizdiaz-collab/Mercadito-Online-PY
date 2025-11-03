@@ -1,5 +1,6 @@
 'use client';
 
+import * as React from 'react';
 import Image from 'next/image';
 import useEmblaCarousel from 'embla-carousel-react';
 import Autoplay from 'embla-carousel-autoplay';
@@ -83,7 +84,12 @@ export default function HeroSlider({ slides, ...rest }: Props) {
   const hasMultipleSlides = slides.length > 1;
 
   return (
-    <section className="relative w-screen left-1/2 right-1/2 -mx-[50vw] group" aria-label="Promociones destacadas" {...rest}>
+    <section 
+      className="relative w-screen left-1/2 right-1/2 -mx-[50vw] group" 
+      aria-label="Promociones destacadas" 
+      data-testid={rest['data-testid'] ?? 'hero-slider'}
+      {...rest}
+    >
       <div className="overflow-hidden" ref={emblaRef}>
         <div className="flex touch-pan-y">
           {slides.map((s, i) => (

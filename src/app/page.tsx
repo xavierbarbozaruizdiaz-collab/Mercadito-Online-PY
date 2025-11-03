@@ -1,7 +1,18 @@
 import ProductsListClient from '@/components/ProductsListClient';
 import { Suspense } from 'react';
-import HeroSlider from '@/components/hero/HeroSlider';
+import dynamic from 'next/dynamic';
 import { supabase } from '@/lib/supabase/client';
+
+// Import dinámico sin SSR para evitar bloqueos en prod
+const HeroSliderClient = dynamic(() => import('@/components/hero/HeroSlider'), {
+  ssr: false,
+  // Opcional: placeholder rápido mientras hidrata
+  loading: () => (
+    <div style={{height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999'}}>
+      Cargando hero…
+    </div>
+  ),
+});
 
 // Forzar revalidación para evitar caché en producción
 export const revalidate = 0;
@@ -133,45 +144,21 @@ export default async function Home() {
     console.log('[Hero] Will render:', FEATURE_HERO && slides.length > 0 ? 'HeroSlider' : 'Placeholder');
   }
 
+  console.log('[HERO/DIAG]', Array.isArray(slides), slides?.length);
   console.log('Hero render in PROD', slides?.length);
 
   return (
     <main className="min-h-screen bg-gray-50">
       <div data-testid="hero-probe">HERO PROBE</div>
       
-      {/* HERO - shim de prueba en cliente */}
-      <section id="hero-test">
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `window.__HERO_SLIDES__ = ${JSON.stringify(slides || [])}`,
-          }}
-        />
-        <div id="hero-client-root" data-testid="hero-client-root"></div>
-      </section>
-
-      <script
-        dangerouslySetInnerHTML={{
-          __html: `
-          (function() {
-            function mountHero() {
-              var root = document.getElementById('hero-client-root');
-              if (!root) return;
-              var slides = window.__HERO_SLIDES__ || [];
-              if (slides.length > 0) {
-                root.innerHTML = '<div style="height:300px;display:flex;align-items:center;justify-content:center;background:#eee;font-size:20px;border-radius:12px">Hero cargado ('+slides.length+' slides)</div>';
-              } else {
-                root.innerHTML = '<div style="height:300px;display:flex;align-items:center;justify-content:center;color:#999">No hay slides</div>';
-              }
-            }
-            if (document.readyState === 'complete' || document.readyState === 'interactive') {
-              mountHero();
-            } else {
-              document.addEventListener('DOMContentLoaded', mountHero);
-            }
-          })();
-        `,
-        }}
-      />
+      {/* HERO - componente real sin SSR */}
+      {Array.isArray(slides) && slides.length > 0 ? (
+        <HeroSliderClient slides={slides} data-testid="hero-slider" />
+      ) : (
+        <div style={{height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999'}}>
+          No hay slides activos.
+        </div>
+      )}
 
       {/* Products Section */}
       <div id="products" className="py-8 sm:py-12 px-4 sm:px-8">
