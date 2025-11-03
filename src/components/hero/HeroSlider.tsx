@@ -80,9 +80,9 @@ export default function HeroSlider({ slides }: { slides: HeroSlide[] }) {
           {slides.map((s, i) => (
             <div className="relative flex-[0_0_100%]" key={s.id}>
               <div className="relative w-full min-h-[220px] md:min-h-[340px] lg:min-h-[420px] xl:min-h-[520px]">
-                {s.bg_type === 'image' && (s.public_url || s.bg_image_url) ? (
+                {s.bg_type === 'image' && (s.bg_image_url || (s as any).image_url || s.public_url) ? (
                   <Image
-                    src={s.public_url || (s.bg_image_url as string)}
+                    src={(s.bg_image_url || (s as any).image_url || s.public_url) as string}
                     alt={s.title ?? 'Promoción'}
                     fill
                     priority={i === 0}
@@ -95,6 +95,8 @@ export default function HeroSlider({ slides }: { slides: HeroSlide[] }) {
                     style={{
                       background: s.bg_gradient_from && s.bg_gradient_to
                         ? `linear-gradient(90deg, ${s.bg_gradient_from}, ${s.bg_gradient_to})`
+                        : (s as any).gradient_from && (s as any).gradient_to
+                        ? `linear-gradient(90deg, ${(s as any).gradient_from}, ${(s as any).gradient_to})`
                         : 'linear-gradient(90deg, #14B8A6, #06B6D4)'
                     }}
                   />
