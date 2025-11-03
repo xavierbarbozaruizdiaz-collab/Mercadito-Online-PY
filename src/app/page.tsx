@@ -139,14 +139,39 @@ export default async function Home() {
     <main className="min-h-screen bg-gray-50">
       <div data-testid="hero-probe">HERO PROBE</div>
       
-      {/* Hero Section */}
-      {slides?.length > 0 ? (
-        <HeroSlider slides={slides} data-testid="hero-slider" />
-      ) : (
-        <div className="h-[300px] flex items-center justify-center text-gray-400">
-          No hay slides activos.
-        </div>
-      )}
+      {/* HERO - shim de prueba en cliente */}
+      <section id="hero-test">
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `window.__HERO_SLIDES__ = ${JSON.stringify(slides || [])}`,
+          }}
+        />
+        <div id="hero-client-root" data-testid="hero-client-root"></div>
+      </section>
+
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `
+          (function() {
+            function mountHero() {
+              var root = document.getElementById('hero-client-root');
+              if (!root) return;
+              var slides = window.__HERO_SLIDES__ || [];
+              if (slides.length > 0) {
+                root.innerHTML = '<div style="height:300px;display:flex;align-items:center;justify-content:center;background:#eee;font-size:20px;border-radius:12px">Hero cargado ('+slides.length+' slides)</div>';
+              } else {
+                root.innerHTML = '<div style="height:300px;display:flex;align-items:center;justify-content:center;color:#999">No hay slides</div>';
+              }
+            }
+            if (document.readyState === 'complete' || document.readyState === 'interactive') {
+              mountHero();
+            } else {
+              document.addEventListener('DOMContentLoaded', mountHero);
+            }
+          })();
+        `,
+        }}
+      />
 
       {/* Products Section */}
       <div id="products" className="py-8 sm:py-12 px-4 sm:px-8">
