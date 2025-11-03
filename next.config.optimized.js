@@ -182,7 +182,7 @@ const nextConfig: NextConfig = {
   // ============================================
   experimental: {
     // Optimizaciones de rendimiento
-    optimizeCss: true,
+    // optimizeCss: true, // DESHABILITADO - Elimina clases dinámicas
     optimizePackageImports: ['lucide-react', '@radix-ui/react-icons'],
     
     // Turbopack para desarrollo más rápido

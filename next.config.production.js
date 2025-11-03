@@ -2,7 +2,7 @@
 const nextConfig = {
   // Configuración de producción optimizada
   experimental: {
-    optimizeCss: true,
+    // optimizeCss: true, // DESHABILITADO - Elimina clases dinámicas
     optimizePackageImports: ['lucide-react', '@radix-ui/react-icons'],
   },
   

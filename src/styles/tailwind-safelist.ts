@@ -17,6 +17,13 @@
 
 export const dynamicClasses = `
   absolute active:scale-95 bg-[#252525] bg-amber-500 bg-background bg-black
+  bg-blue-100 bg-blue-800 bg-gray-100 bg-gray-600 bg-gray-700 bg-gray-800
+  bg-green-100 bg-green-800 bg-red-100 bg-red-600 bg-red-700 bg-red-800
+  bg-yellow-100 bg-yellow-800 text-blue-800 text-gray-600 text-gray-700
+  text-gray-800 text-green-800 text-red-800 text-white hover:bg-blue-700
+  hover:bg-gray-50 hover:bg-gray-100 hover:bg-gray-700 hover:bg-red-700
+  focus:ring-blue-500 focus:ring-gray-500 focus:ring-red-500
+  px-2 px-2.5 px-3 px-4 px-6 py-1 py-1.5 py-2 py-3 text-xs text-sm text-base
   bg-blue-100 bg-blue-50 bg-blue-500 bg-blue-600 bg-blue-900/30
   bg-emerald-400 bg-emerald-50 bg-emerald-500 bg-emerald-600
   bg-gradient-to-br bg-gray-100 bg-gray-200 bg-gray-300 bg-gray-400
