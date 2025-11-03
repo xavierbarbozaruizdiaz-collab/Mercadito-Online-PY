@@ -234,8 +234,9 @@ export default function SellersListPage() {
       }
 
       // Aplicar ordenamiento
-      filteredSellers.sort((a, b) => {
-        let aValue: string | number | Date | undefined, bValue: string | number | Date | undefined;
+      filteredSellers.sort((a: Seller, b: Seller) => {
+        let aValue: string | number | Date | undefined;
+        let bValue: string | number | Date | undefined;
         
         switch (filters.sort_by) {
           case 'rating':
@@ -261,6 +262,11 @@ export default function SellersListPage() {
           default:
             aValue = a.rating;
             bValue = b.rating;
+        }
+        
+        // Comparación segura con tipos explícitos
+        if (aValue === undefined || bValue === undefined) {
+          return 0;
         }
         
         if (filters.sort_order === 'asc') {

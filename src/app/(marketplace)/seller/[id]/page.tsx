@@ -140,7 +140,8 @@ export default function SellerProfilePage() {
         .eq('seller_id', sellerId);
 
       if (reviewsData && reviewsData.length > 0) {
-        const ratings = reviewsData.map((r: { rating?: number }) => r.rating || 0).filter((r: number) => r > 0);
+        const reviewsArray = reviewsData as Array<{ rating?: number }>;
+        const ratings = reviewsArray.map((r: { rating?: number }): number => r.rating || 0).filter((r: number): boolean => r > 0);
         if (ratings.length > 0) {
           const avgRating = ratings.reduce((sum: number, r: number) => sum + r, 0) / ratings.length;
           setRating(avgRating);

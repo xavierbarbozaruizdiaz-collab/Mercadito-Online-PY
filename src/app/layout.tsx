@@ -5,6 +5,7 @@ import Link from "next/link";
 import CartButton from "@/components/CartButton";
 import UserMenu from "@/components/UserMenu";
 import AuctionsNavLink from "@/components/AuctionsNavLink";
+import { ThemeProvider } from "@/contexts/ThemeContext";
 
 export const metadata: Metadata = {
   title: {
@@ -92,7 +93,8 @@ export default function RootLayout({
   return (
     <html lang="es">
       <body className="antialiased">
-        <header className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm">
+        <ThemeProvider>
+          <header className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between h-16 gap-4">
               {/* Logo */}
@@ -170,6 +172,7 @@ export default function RootLayout({
             `,
           }}
         />
+        </ThemeProvider>
       </body>
     </html>
   );
