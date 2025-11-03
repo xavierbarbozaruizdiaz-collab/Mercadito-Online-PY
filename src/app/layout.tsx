@@ -154,13 +154,18 @@ export default function RootLayout({
                     });
                   }
                   
-                  // Prevenir nuevos registros del SW
+                      // Prevenir nuevos registros del SW
                   const originalRegister = navigator.serviceWorker.register;
                   navigator.serviceWorker.register = function() {
                     console.warn('[SW Cleanup] Intento de registro de SW bloqueado');
                     return Promise.reject(new Error('Service Worker está deshabilitado temporalmente'));
                   };
                 }
+                
+                // Log consolidado cuando se montan los grupos de botones
+                setTimeout(function() {
+                  console.log('[BTN] Header/Login, Hero CTA, Card CTA -> montados');
+                }, 1000);
               })();
             `,
           }}

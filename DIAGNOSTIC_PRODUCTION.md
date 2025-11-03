@@ -259,3 +259,4 @@ Si todavía no funciona, comparte:
 5. **Variables de entorno** que tienes configuradas (sin valores sensibles)
 
 
+

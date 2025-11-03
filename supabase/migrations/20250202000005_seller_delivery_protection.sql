@@ -740,3 +740,4 @@ COMMENT ON FUNCTION confirm_delivery IS 'Permite que comprador confirme recepci√
 
 
 
+

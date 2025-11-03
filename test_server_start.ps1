@@ -69,3 +69,4 @@ Write-Host ""
 Write-Host "=== FIN DEL DIAGNOSTICO ===" -ForegroundColor Cyan
 
 
+

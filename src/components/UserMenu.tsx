@@ -83,10 +83,19 @@ export default function UserMenu() {
     }
   }
 
+  // Log cuando se montan los botones Header/Login
+  useEffect(() => {
+    console.log('[BTN] Header/Login buttons mounted');
+  }, []);
+
   // Si no hay sesión → link para entrar
   if (!email) {
     return (
-      <Link className="underline" href="/auth/sign-in">
+      <Link 
+        className="underline" 
+        href="/auth/sign-in"
+        data-testid="primary-btn"
+      >
         Entrar
       </Link>
     );
@@ -101,24 +110,27 @@ export default function UserMenu() {
       <Link 
         href="/dashboard" 
         className="text-blue-600 hover:text-blue-800 hover:underline transition-colors font-medium"
+        data-testid="primary-btn"
       >
         Dashboard
       </Link>
 
-      <button 
-        onClick={signOut}
-        disabled={isSigningOut}
-        className={`
-          flex items-center gap-1.5 px-3 py-1.5 rounded-lg
-          transition-all duration-200
-          ${isSigningOut 
-            ? 'bg-gray-400 text-white cursor-not-allowed' 
-            : 'bg-red-500 hover:bg-red-600 text-white hover:shadow-md active:scale-95'
-          }
-          font-medium text-sm
-        `}
-        title={isSigningOut ? 'Cerrando sesión...' : 'Cerrar sesión'}
-      >
+      {true && (
+        <button 
+          onClick={signOut}
+          disabled={isSigningOut}
+          className={`
+            flex items-center gap-1.5 px-3 py-1.5 rounded-lg
+            transition-all duration-200
+            ${isSigningOut 
+              ? 'bg-gray-400 text-white cursor-not-allowed' 
+              : 'bg-red-500 hover:bg-red-600 text-white hover:shadow-md active:scale-95'
+            }
+            font-medium text-sm
+          `}
+          title={isSigningOut ? 'Cerrando sesión...' : 'Cerrar sesión'}
+          data-testid="primary-btn"
+        >
         {isSigningOut ? (
           <>
             <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -135,7 +147,8 @@ export default function UserMenu() {
             <span>Salir</span>
           </>
         )}
-      </button>
+        </button>
+      )}
     </div>
   );
 }

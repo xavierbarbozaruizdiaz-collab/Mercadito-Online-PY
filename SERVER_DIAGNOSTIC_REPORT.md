@@ -40,3 +40,4 @@ cat .env.local | grep SUPABASE
 Verificar y configurar las variables de entorno faltantes, especialmente `SUPABASE_SERVICE_ROLE_KEY`.
 
 
+

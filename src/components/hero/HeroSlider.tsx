@@ -68,6 +68,13 @@ export default function HeroSlider({ slides }: { slides: HeroSlide[] }) {
   const prev = () => emblaApi?.scrollPrev();
   const next = () => emblaApi?.scrollNext();
 
+  // Log cuando se montan los botones Hero CTA
+  useEffect(() => {
+    if (slides?.length > 0) {
+      console.log('[BTN] Hero CTA buttons mounted');
+    }
+  }, [slides?.length]);
+
   if (!slides?.length) return null;
 
   // Solo mostrar controles si hay más de un slide
@@ -114,18 +121,20 @@ export default function HeroSlider({ slides }: { slides: HeroSlide[] }) {
                         <p className="mt-2 text-sm md:text-base opacity-90">{s.subtitle}</p>
                       )}
                       <div className="mt-4 flex gap-3">
-                        {s.cta_primary_label && s.cta_primary_href && (
+                        {true && s.cta_primary_label && s.cta_primary_href && (
                           <a
                             href={s.cta_primary_href}
                             className="rounded-md bg-white text-cyan-700 px-4 py-2 font-medium shadow hover:bg-white/90"
+                            data-testid="primary-btn"
                           >
                             {s.cta_primary_label}
                           </a>
                         )}
-                        {s.cta_secondary_label && s.cta_secondary_href && (
+                        {true && s.cta_secondary_label && s.cta_secondary_href && (
                           <a
                             href={s.cta_secondary_href}
                             className="rounded-md border border-white/70 px-4 py-2 font-medium hover:bg-white/10"
+                            data-testid="primary-btn"
                           >
                             {s.cta_secondary_label}
                           </a>

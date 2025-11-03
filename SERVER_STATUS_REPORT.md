@@ -42,3 +42,4 @@ Si persisten errores 500, verificar:
 - Logs del servidor en la terminal donde corre `npm run start`
 
 
+

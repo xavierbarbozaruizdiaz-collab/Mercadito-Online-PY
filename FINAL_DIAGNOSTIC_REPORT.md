@@ -144,3 +144,4 @@ Error: No es posible conectar con el servidor remoto
 **Conclusión**: El build está casi completo pero falla en una página. Una vez corregido `/checkout/success`, el servidor debería poder iniciar correctamente.
 
 
+

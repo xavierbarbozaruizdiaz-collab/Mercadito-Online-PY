@@ -82,3 +82,4 @@ Si necesitas seguir usando Node 22 temporalmente, el proyecto debería funcionar
 - Es mejor migrar a Node 20 cuando sea posible
 
 
+

@@ -85,6 +85,13 @@ export default function ProductCard({
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const isLiked = isInWishlist(product.id);
 
+  // Log cuando se montan los botones Card CTA
+  useEffect(() => {
+    if (showActions) {
+      console.log('[BTN] Card CTA buttons mounted');
+    }
+  }, [showActions]);
+
   // Verificar si el producto pertenece al usuario actual
   useEffect(() => {
     const checkOwnership = async () => {
@@ -325,26 +332,32 @@ export default function ProductCard({
                     {formatDate(product.created_at)}
                   </div>
 
-                  {showActions && (
+                  {true && showActions && (
                     <div className="flex items-center space-x-2 mt-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => handleActionClick(e, handleAddToFavorites)}
-                        className={isLiked ? 'text-red-500' : 'text-gray-400'}
-                      >
-                        <Heart className={`w-4 h-4 ${isLiked ? 'fill-current' : ''}`} />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={(e) => handleActionClick(e, handleAddToCart)}
-                        disabled={isAddingToCart || isOwnProduct}
-                        title={isOwnProduct ? 'No puedes agregar tus propios productos al carrito' : ''}
-                      >
-                        <ShoppingCart className="w-4 h-4 mr-1" />
-                        {isAddingToCart ? 'Agregando...' : isOwnProduct ? 'Tu producto' : 'Agregar'}
-                      </Button>
+                      {true && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => handleActionClick(e, handleAddToFavorites)}
+                          className={isLiked ? 'text-red-500' : 'text-gray-400'}
+                          data-testid="primary-btn"
+                        >
+                          <Heart className={`w-4 h-4 ${isLiked ? 'fill-current' : ''}`} />
+                        </Button>
+                      )}
+                      {true && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => handleActionClick(e, handleAddToCart)}
+                          disabled={isAddingToCart || isOwnProduct}
+                          title={isOwnProduct ? 'No puedes agregar tus propios productos al carrito' : ''}
+                          data-testid="primary-btn"
+                        >
+                          <ShoppingCart className="w-4 h-4 mr-1" />
+                          {isAddingToCart ? 'Agregando...' : isOwnProduct ? 'Tu producto' : 'Agregar'}
+                        </Button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -398,7 +411,7 @@ export default function ProductCard({
           )}
 
           {/* Botón de favoritos */}
-          {showActions && (
+          {true && showActions && (
             <Button
               variant="ghost"
               size="sm"
@@ -406,6 +419,7 @@ export default function ProductCard({
               className={`absolute top-2 right-2 ${
                 isLiked ? 'text-red-500' : 'text-gray-400'
               }`}
+              data-testid="primary-btn"
             >
               <Heart className={`w-4 h-4 ${isLiked ? 'fill-current' : ''}`} />
             </Button>
@@ -456,28 +470,34 @@ export default function ProductCard({
         </div>
       </CardContent>
 
-      {showActions && (
+      {true && showActions && (
         <CardFooter className="p-4 pt-0">
           <div className="flex items-center space-x-2 w-full">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={(e) => handleActionClick(e, handleAddToCart)}
-              disabled={isAddingToCart || isOwnProduct}
-              className="flex-1"
-              title={isOwnProduct ? 'No puedes agregar tus propios productos al carrito' : ''}
-            >
-              <ShoppingCart className="w-4 h-4 mr-1" />
-              {isAddingToCart ? 'Agregando...' : isOwnProduct ? 'Tu producto' : 'Agregar'}
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={(e) => handleActionClick(e, handleAddToFavorites)}
-              className={isLiked ? 'text-red-500' : 'text-gray-400'}
-            >
-              <Heart className={`w-4 h-4 ${isLiked ? 'fill-current' : ''}`} />
-            </Button>
+            {true && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={(e) => handleActionClick(e, handleAddToCart)}
+                disabled={isAddingToCart || isOwnProduct}
+                className="flex-1"
+                title={isOwnProduct ? 'No puedes agregar tus propios productos al carrito' : ''}
+                data-testid="primary-btn"
+              >
+                <ShoppingCart className="w-4 h-4 mr-1" />
+                {isAddingToCart ? 'Agregando...' : isOwnProduct ? 'Tu producto' : 'Agregar'}
+              </Button>
+            )}
+            {true && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={(e) => handleActionClick(e, handleAddToFavorites)}
+                className={isLiked ? 'text-red-500' : 'text-gray-400'}
+                data-testid="primary-btn"
+              >
+                <Heart className={`w-4 h-4 ${isLiked ? 'fill-current' : ''}`} />
+              </Button>
+            )}
           </div>
         </CardFooter>
       )}

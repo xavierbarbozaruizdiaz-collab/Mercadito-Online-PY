@@ -26,3 +26,4 @@ Si necesitas gestionar múltiples versiones de Node:
 El build ya funcionó con Node 22, pero el proyecto especifica Node 20.x en `package.json`. Es recomendable usar Node 20 para evitar incompatibilidades.
 
 
+

@@ -181,3 +181,4 @@ El SQL crea ambas versiones para compatibilidad:
 - [ ] Hero visible en producción
 - [ ] Sin errores en consola del navegador
 
+

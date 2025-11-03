@@ -171,7 +171,12 @@ export default async function Home() {
 
       {/* Products Section */}
       <div id="products" className="py-8 sm:py-12 px-4 sm:px-8">
-        <Suspense fallback={<div className="flex justify-center items-center h-32"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div></div>}>
+        <Suspense fallback={
+          <div className="flex justify-center items-center h-32">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+            <span className="ml-3 text-gray-600">Cargando productos...</span>
+          </div>
+        }>
           <ProductsListClient />
         </Suspense>
       </div>

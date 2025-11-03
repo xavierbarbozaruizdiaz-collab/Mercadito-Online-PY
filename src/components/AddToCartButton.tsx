@@ -167,16 +167,19 @@ export default function AddToCartButton({ productId }: AddToCartButtonProps) {
   }
 
   return (
-    <button
-      onClick={addToCart}
-      disabled={loading}
-      className={`mt-4 sm:mt-6 px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-medium transition-colors text-sm sm:text-base ${
-        added
-          ? 'bg-green-500 text-white'
-          : 'bg-black text-white hover:bg-gray-800'
-      } disabled:opacity-50 disabled:cursor-not-allowed`}
-    >
-      {loading ? 'Agregando...' : added ? '✓ Agregado al carrito' : 'Agregar al carrito'}
-    </button>
+    true && (
+      <button
+        onClick={addToCart}
+        disabled={loading}
+        className={`mt-4 sm:mt-6 px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-medium transition-colors text-sm sm:text-base ${
+          added
+            ? 'bg-green-500 text-white'
+            : 'bg-black text-white hover:bg-gray-800'
+        } disabled:opacity-50 disabled:cursor-not-allowed`}
+        data-testid="primary-btn"
+      >
+        {loading ? 'Agregando...' : added ? '✓ Agregado al carrito' : 'Agregar al carrito'}
+      </button>
+    )
   );
 }

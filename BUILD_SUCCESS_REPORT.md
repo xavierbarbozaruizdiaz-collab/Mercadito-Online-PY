@@ -117,3 +117,4 @@ Route (app)              ... (todas las rutas generadas)
 **Conclusión**: El proyecto está listo para ejecutarse en Node 20 con todas las correcciones aplicadas. El usuario solo necesita cambiar a Node 20 y configurar las variables de entorno reales.
 
 
+

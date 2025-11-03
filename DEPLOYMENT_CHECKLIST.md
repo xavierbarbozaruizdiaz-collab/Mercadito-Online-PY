@@ -128,3 +128,4 @@ Reemplazar todos los `.select('*')` por columnas específicas incluyendo `cover_
 - El refresh de PostgREST es **CRÍTICO** para que reconozca los cambios
 
 
+
