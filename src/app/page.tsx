@@ -40,6 +40,17 @@ export default async function Home() {
     console.log('[Hero] FEATURE_HERO enabled:', FEATURE_HERO);
   }
 
+  // ============================================
+  // DEBUG AGRESIVO PARA PRODUCCIÓN
+  // ============================================
+  console.log('[DEBUG] FEATURE_HERO:', FEATURE_HERO);
+  console.log('[DEBUG] NEXT_PUBLIC_FEATURE_HERO:', process.env.NEXT_PUBLIC_FEATURE_HERO);
+  console.log('[DEBUG] NODE_ENV:', process.env.NODE_ENV);
+  
+  if (!FEATURE_HERO) {
+    console.error('[ERROR] FEATURE_HERO está deshabilitado - Variable no configurada en Vercel Dashboard');
+  }
+
   if (FEATURE_HERO) {
     try {
       const { data, error } = await supabase
@@ -115,6 +126,7 @@ export default async function Home() {
           console.log('[Hero] Processed slides count:', slides.length);
           if (slides.length === 0) {
             console.warn('[Hero] ⚠️ No slides found! Will show placeholder.');
+            console.warn('[Hero] ⚠️ Verifica que hay slides con is_active=true en hero_slides');
           }
         }
       }
@@ -126,6 +138,10 @@ export default async function Home() {
       slides = [];
     }
   }
+  
+  // Debug final
+  console.log('[DEBUG] Final slides.length:', slides?.length);
+  console.log('[DEBUG] Will render hero?', FEATURE_HERO && slides.length > 0);
 
   // Log final en producción
   if (process.env.NODE_ENV === 'production') {

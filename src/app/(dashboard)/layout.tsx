@@ -97,6 +97,29 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           hasAccess = true;
         }
 
+        // ============================================
+        // DEBUG AGRESIVO PARA DASHBOARD
+        // ============================================
+        console.log('[DEBUG/DASHBOARD] Verificando permisos...');
+        console.log('[DEBUG/DASHBOARD] pathname:', pathname);
+        console.log('[DEBUG/DASHBOARD] session:', session ? 'existe' : 'no existe');
+        console.log('[DEBUG/DASHBOARD] profile:', profile ? JSON.stringify(profile, null, 2) : 'no existe');
+        console.log('[DEBUG/DASHBOARD] role:', role);
+        console.log('[DEBUG/DASHBOARD] hasAccess:', hasAccess);
+        
+        if (!session) {
+          console.error('[ERROR/DASHBOARD] No hay sesión - Usuario no autenticado');
+        }
+        
+        if (!profile) {
+          console.error('[ERROR/DASHBOARD] No hay perfil - Verifica que el usuario tiene registro en profiles');
+        }
+        
+        if (!hasAccess) {
+          console.error('[ERROR/DASHBOARD] No tiene acceso a:', pathname);
+          console.error('[ERROR/DASHBOARD] Role requerido vs actual - Ruta:', pathname, 'Role:', role);
+        }
+
         if (mounted) {
           setAllowed(hasAccess);
           setLoading(false);
