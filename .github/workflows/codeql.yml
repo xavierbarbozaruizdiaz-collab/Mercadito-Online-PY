@@ -3,8 +3,7 @@ name: "CodeQL Security Scan"
 on:
   push:
     branches: [main, dev]
-  pull_request:
-    branches: [main, dev]
+  # Removido pull_request para evitar ejecuciones en feat/* branches
   schedule:
     - cron: '0 0 * * 0' # Weekly on Sunday
 
