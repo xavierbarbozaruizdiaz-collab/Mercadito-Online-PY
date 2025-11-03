@@ -15,9 +15,8 @@ export const runtime = 'nodejs';
 // Prevenir cualquier optimización estática
 export const preferredRegion = 'auto';
 
-// FORZAR HERO ACTIVO PARA DEBUG - REMOVER DESPUÉS
-// Temporalmente forzado a true - NO DEPENDE DE VARIABLES DE ENTORNO
-const FEATURE_HERO = true;
+// Feature flag para hero slider
+const FEATURE_HERO = process.env.NEXT_PUBLIC_FEATURE_HERO === 'true' || false;
 
 type HeroSlide = {
   id: string;

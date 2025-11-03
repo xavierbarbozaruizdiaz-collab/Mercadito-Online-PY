@@ -34,39 +34,39 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
     (async () => {
       try {
-               // TEMPORALMENTE PERMITIR ACCESO PARA DEBUG - REMOVER DESPUÉS
-               let session: any = null;
-               let profile: any = null;
-               let role = 'buyer';
+        // Verificar sesión
+        const { data: { session: sessionData }, error: sessionErr } = await supabase.auth.getSession();
         
-        try {
-          // Verificar sesión
-          const { data: { session: sessionData }, error: sessionErr } = await supabase.auth.getSession();
-          if (sessionErr || !sessionData?.user) {
-            console.warn('[DEBUG] No hay sesión, pero permitiendo acceso temporalmente para debug');
-          } else {
-            session = sessionData;
-            const user = session.user;
-
-            // Verificar perfil y rol
-            const { data: profileData, error: pErr } = await supabase
-              .from('profiles')
-              .select('id, role, email')
-              .eq('id', user.id)
-              .single();
-
-            if (pErr) {
-              console.warn('[DEBUG] Error obteniendo perfil, pero permitiendo acceso temporalmente');
-            } else {
-              profile = profileData;
-              if (profile) {
-                role = (profile as { role?: string }).role || 'buyer';
-              }
-            }
+        if (sessionErr || !sessionData?.user) {
+          if (mounted) {
+            setAllowed(false);
+            setLoading(false);
+            window.location.href = '/auth/sign-in';
           }
-        } catch (err) {
-          console.warn('[DEBUG] Error en verificación, pero permitiendo acceso temporalmente');
+          return;
         }
+
+        const session = sessionData;
+        const user = session.user;
+
+        // Verificar perfil y rol
+        const { data: profileData, error: pErr } = await supabase
+          .from('profiles')
+          .select('id, role, email')
+          .eq('id', user.id)
+          .single();
+
+        if (pErr || !profileData) {
+          if (mounted) {
+            setAllowed(false);
+            setLoading(false);
+            window.location.href = '/auth/sign-in';
+          }
+          return;
+        }
+
+        const profile = profileData;
+        const role = (profile as { role?: string }).role || 'buyer';
 
         if (mounted) {
           setUserRole(role);
@@ -80,11 +80,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         let hasAccess = false;
 
-        // TEMPORALMENTE PERMITIR ACCESO PARA DEBUG
-        if (!session || !profile) {
-          console.warn('[DEBUG] No hay sesión o perfil, permitiendo acceso temporalmente para debug');
-          hasAccess = true;
-        } else if (isAdminRoute) {
+        if (isAdminRoute) {
           hasAccess = role === 'admin';
         } else if (isSellerRoute) {
           hasAccess = role === 'seller' || role === 'admin';
@@ -95,29 +91,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         } else {
           // Para otras rutas de dashboard, permitir si está autenticado
           hasAccess = true;
-        }
-
-        // ============================================
-        // DEBUG AGRESIVO PARA DASHBOARD
-        // ============================================
-        console.log('[DEBUG/DASHBOARD] Verificando permisos...');
-        console.log('[DEBUG/DASHBOARD] pathname:', pathname);
-        console.log('[DEBUG/DASHBOARD] session:', session ? 'existe' : 'no existe');
-        console.log('[DEBUG/DASHBOARD] profile:', profile ? JSON.stringify(profile, null, 2) : 'no existe');
-        console.log('[DEBUG/DASHBOARD] role:', role);
-        console.log('[DEBUG/DASHBOARD] hasAccess:', hasAccess);
-        
-        if (!session) {
-          console.error('[ERROR/DASHBOARD] No hay sesión - Usuario no autenticado');
-        }
-        
-        if (!profile) {
-          console.error('[ERROR/DASHBOARD] No hay perfil - Verifica que el usuario tiene registro en profiles');
-        }
-        
-        if (!hasAccess) {
-          console.error('[ERROR/DASHBOARD] No tiene acceso a:', pathname);
-          console.error('[ERROR/DASHBOARD] Role requerido vs actual - Ruta:', pathname, 'Role:', role);
         }
 
         if (mounted) {

@@ -7,17 +7,22 @@
 const nextConfig = {
   // Configuración de imágenes
   images: {
-    domains: [
-      'hqdatzhliaordlsqtjea.supabase.co',
-      'placehold.co',
-      'images.unsplash.com',
-      'via.placeholder.com',
-    ],
     remotePatterns: [
       {
         protocol: 'https',
         hostname: '**.supabase.co',
-        pathname: '/storage/v1/object/public/hero-banners/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'placehold.co',
+      },
+      {
+        protocol: 'https',
+        hostname: 'images.unsplash.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'via.placeholder.com',
       },
     ],
     formats: ['image/webp', 'image/avif'],
@@ -135,12 +140,6 @@ const nextConfig = {
     return config;
   },
 
-  // Configuración de output
-  // NO usar 'standalone' para evitar generación estática
-  // output: 'standalone', // Comentado para forzar render dinámico
-  
-  // NOTA: dynamicIO puede no estar disponible en Next.js 16
-  // Se ha removido para evitar errores de build
 
   // Configuración de poweredByHeader
   poweredByHeader: false,
