@@ -24,7 +24,8 @@
     "verify:migrations": "node scripts/comparar-migraciones.js",
     "compare:migrations": "node scripts/comparar-migraciones-produccion.js",
     "diagnostico:visual": "node scripts/diagnostico-diferencias-visuales.js",
-    "extraer:clases-dinamicas": "node scripts/extraer-clases-dinamicas.js"
+    "extraer:clases-dinamicas": "node scripts/extraer-clases-dinamicas.js",
+    "verificar:build-css": "node scripts/verificar-build-css.js"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx}": [
