@@ -137,28 +137,20 @@ export default async function Home() {
 
   return (
     <main className="min-h-screen bg-gray-50">
+      <div data-testid="hero-probe">HERO PROBE</div>
+      
       {/* Hero Section */}
-      {slides.length > 0 ? (
-        <HeroSlider slides={slides} />
-      ) : FEATURE_HERO && slides.length === 0 ? (
-        // Placeholder cuando feature está habilitado pero no hay slides
+      {slides?.length > 0 && <HeroSlider slides={slides} data-testid="hero-slider" />}
+      
+      {!slides?.length && (
+        // Placeholder cuando no hay slides
         <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-12 sm:py-16">
           <div className="max-w-7xl mx-auto px-4 sm:px-8 text-center">
-            <div className="bg-yellow-500/20 border border-yellow-500/50 rounded-lg p-4 mb-4">
-              <p className="text-sm font-semibold">⚠️ Hero habilitado pero sin slides activos</p>
-            </div>
-            <h1 className="text-3xl sm:text-4xl md:text-6xl font-bold mb-4">🛒 Mercadito Online PY</h1>
-            <p className="text-lg sm:text-xl md:text-2xl mb-6 sm:mb-8 opacity-90 px-4">Encuentra los mejores productos en Paraguay</p>
-            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center px-4">
-              <a href="#products" className="px-6 sm:px-8 py-3 bg-white text-blue-600 rounded-lg font-semibold hover:bg-gray-100 transition-colors">Explorar productos</a>
-              <a href="/dashboard" className="px-6 sm:px-8 py-3 border-2 border-white text-white rounded-lg font-semibold hover:bg-white hover:text-blue-600 transition-colors">Vender productos</a>
-            </div>
-          </div>
-        </div>
-      ) : (
-        // Placeholder cuando feature está deshabilitado
-        <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-12 sm:py-16">
-          <div className="max-w-7xl mx-auto px-4 sm:px-8 text-center">
+            {FEATURE_HERO && (
+              <div className="bg-yellow-500/20 border border-yellow-500/50 rounded-lg p-4 mb-4">
+                <p className="text-sm font-semibold">⚠️ Hero habilitado pero sin slides activos</p>
+              </div>
+            )}
             <h1 className="text-3xl sm:text-4xl md:text-6xl font-bold mb-4">🛒 Mercadito Online PY</h1>
             <p className="text-lg sm:text-xl md:text-2xl mb-6 sm:mb-8 opacity-90 px-4">Encuentra los mejores productos en Paraguay</p>
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center px-4">
