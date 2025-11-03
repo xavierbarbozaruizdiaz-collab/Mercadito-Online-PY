@@ -142,10 +142,6 @@ export default async function Home() {
            }
          }
 
-  // Timestamp dinámico para forzar que cada render sea único
-  const renderTimestamp = Date.now();
-  const renderRandom = Math.random().toString(36).substring(7);
-
   return (
     <main className="min-h-screen bg-gray-50">
       {/* Probe para asignar slides a window en cliente */}
