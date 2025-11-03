@@ -22,7 +22,9 @@
     "test:unit": "vitest run",
     "verify:env": "node scripts/verificar-env-vars.js",
     "verify:migrations": "node scripts/comparar-migraciones.js",
-    "compare:migrations": "node scripts/comparar-migraciones-produccion.js"
+    "compare:migrations": "node scripts/comparar-migraciones-produccion.js",
+    "diagnostico:visual": "node scripts/diagnostico-diferencias-visuales.js",
+    "extraer:clases-dinamicas": "node scripts/extraer-clases-dinamicas.js"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx}": [
