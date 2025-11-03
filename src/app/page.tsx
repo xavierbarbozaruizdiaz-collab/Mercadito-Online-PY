@@ -8,7 +8,9 @@ import HeroSliderClient from '@/components/hero/HeroSliderClient';
 export const revalidate = 0;
 export const dynamic = 'force-dynamic'; // Desactivar caché estático
 
-const FEATURE_HERO = process.env.NEXT_PUBLIC_FEATURE_HERO === 'true';
+// FORZAR HERO ACTIVO PARA DEBUG - REMOVER DESPUÉS
+const FEATURE_HERO = true; // Temporalmente forzado a true para debug
+// const FEATURE_HERO = process.env.NEXT_PUBLIC_FEATURE_HERO === 'true';
 
 type HeroSlide = {
   id: string;
@@ -161,9 +163,19 @@ export default async function Home() {
       {Array.isArray(slides) && <HeroMountProbe slides={slides} />}
       
       {/* HERO - componente real sin SSR */}
-      {Array.isArray(slides) && slides.length > 0 ? (
+      {FEATURE_HERO && Array.isArray(slides) && slides.length > 0 ? (
         <HeroSliderClient slides={slides} />
-      ) : null}
+      ) : (
+        // PLACEHOLDER TEMPORAL PARA DEBUG
+        <div className="w-full h-96 bg-gradient-to-r from-blue-600 to-purple-600 flex items-center justify-center">
+          <div className="text-center text-white">
+            <h2 className="text-3xl font-bold mb-2">Hero Placeholder</h2>
+            <p className="text-lg">FEATURE_HERO: {FEATURE_HERO ? 'true' : 'false'}</p>
+            <p className="text-lg">Slides: {slides?.length || 0}</p>
+            <p className="text-sm mt-4">NEXT_PUBLIC_FEATURE_HERO: {process.env.NEXT_PUBLIC_FEATURE_HERO || 'undefined'}</p>
+          </div>
+        </div>
+      )}
 
       {/* Products Section */}
       <div id="products" className="py-8 sm:py-12 px-4 sm:px-8">
