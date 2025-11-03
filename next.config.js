@@ -114,11 +114,7 @@ const nextConfig = {
 
   // Configuración experimental
   experimental: {
-    // Temporalmente deshabilitado para evitar que elimine clases dinámicas
-    // optimizeCss: true, // Deshabilitado temporalmente para debug
     optimizePackageImports: ['lucide-react', '@radix-ui/react-icons'],
-    // dynamicIO puede no ser una opción válida en Next.js 16
-    // dynamicIO: true, // Comentado - puede estar causando errores de build
   },
 
   // Configuración de webpack
