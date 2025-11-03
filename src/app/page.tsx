@@ -4,9 +4,12 @@ import { supabase } from '@/lib/supabaseServer';
 import HeroMountProbe from '@/components/hero/HeroMountProbe';
 import HeroSliderClient from '@/components/hero/HeroSliderClient';
 
-// Forzar revalidación para evitar caché en producción
+// FORZAR RENDER DINÁMICO - NO GENERAR ESTÁTICAMENTE
+export const dynamic = 'force-dynamic';
 export const revalidate = 0;
-export const dynamic = 'force-dynamic'; // Desactivar caché estático
+export const dynamicParams = true;
+export const fetchCache = 'force-no-store';
+export const runtime = 'nodejs';
 
 // FORZAR HERO ACTIVO PARA DEBUG - REMOVER DESPUÉS
 // Temporalmente forzado a true - NO DEPENDE DE VARIABLES DE ENTORNO

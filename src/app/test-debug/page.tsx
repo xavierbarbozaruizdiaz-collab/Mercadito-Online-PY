@@ -3,6 +3,10 @@
 // Esta página SIEMPRE debe mostrar el banner
 // ============================================
 
+// FORZAR RENDER DINÁMICO
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export default function TestDebugPage() {
   return (
     <main className="min-h-screen bg-gray-50">

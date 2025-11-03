@@ -134,7 +134,8 @@ const nextConfig = {
   },
 
   // Configuración de output
-  output: 'standalone',
+  // NO usar 'standalone' para evitar generación estática
+  // output: 'standalone', // Comentado para forzar render dinámico
 
   // Configuración de poweredByHeader
   poweredByHeader: false,
