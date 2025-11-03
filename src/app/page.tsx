@@ -1,7 +1,8 @@
 import ProductsListClient from '@/components/ProductsListClient';
 import { Suspense } from 'react';
 import dynamic from 'next/dynamic';
-import { supabase } from '@/lib/supabase/client';
+import { supabase } from '@/lib/supabaseServer';
+import HeroMountProbe from '@/components/hero/HeroMountProbe';
 
 // Import dinámico sin SSR para evitar bloqueos en prod
 const HeroSlider = dynamic(() => import('@/components/hero/HeroSlider'), {
@@ -145,12 +146,8 @@ export default async function Home() {
     <main className="min-h-screen bg-gray-50">
       <div data-testid="hero-probe">HERO PROBE</div>
       
-      {/* Asignar slides a window para acceso en cliente */}
-      <script
-        dangerouslySetInnerHTML={{
-          __html: `if (typeof window !== 'undefined') { window.__HERO_SLIDES__ = ${JSON.stringify(slides || [])}; }`,
-        }}
-      />
+      {/* Probe para asignar slides a window en cliente */}
+      {Array.isArray(slides) && <HeroMountProbe slides={slides} />}
       
       {/* HERO - componente real sin SSR */}
       {Array.isArray(slides) && slides.length > 0 ? (

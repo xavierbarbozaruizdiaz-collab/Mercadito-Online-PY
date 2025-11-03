@@ -4,7 +4,7 @@
 // ============================================
 
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase/client';
+import { supabase } from '@/lib/supabaseServer';
 
 interface HealthCheck {
   status: 'ok' | 'error';
@@ -32,13 +32,16 @@ export async function GET(): Promise<NextResponse<HealthResponse>> {
 
   const startTime = Date.now();
 
-  // Check Database
+  // Check Database - Query hero_slides para verificar conectividad
   try {
     const dbStart = Date.now();
-    const { error } = await supabase
-      .from('products')
-      .select('id')
-      .limit(1);
+    const { data, error } = await supabase
+      .from('hero_slides')
+      .select('id,is_active,sort_order,created_at')
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: false })
+      .limit(10);
     
     checks.database = {
       status: error ? 'error' : 'ok',
@@ -86,12 +89,52 @@ export async function GET(): Promise<NextResponse<HealthResponse>> {
     overallStatus = 'degraded';
   }
 
-  const response: HealthResponse = {
+  // Agregar información de debug de variables de entorno
+  const response: HealthResponse & {
+    env?: {
+      SUPABASE_URL: boolean;
+      SUPABASE_ANON_KEY: boolean;
+      NEXT_PUBLIC_SUPABASE_URL: boolean;
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: boolean;
+    };
+    heroSlides?: {
+      count?: number;
+      error?: string;
+    };
+  } = {
     status: overallStatus,
     timestamp: new Date().toISOString(),
     checks,
     version: process.env.npm_package_version || 'unknown',
+    env: {
+      SUPABASE_URL: !!process.env.SUPABASE_URL,
+      SUPABASE_ANON_KEY: !!process.env.SUPABASE_ANON_KEY,
+      NEXT_PUBLIC_SUPABASE_URL: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    },
   };
+
+  // Agregar información específica de hero_slides si la query fue exitosa
+  if (checks.database.status === 'ok') {
+    try {
+      const { data, error } = await supabase
+        .from('hero_slides')
+        .select('id,is_active,sort_order,created_at')
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true })
+        .order('created_at', { ascending: false })
+        .limit(10);
+      
+      response.heroSlides = {
+        count: data?.length ?? 0,
+        error: error?.message ?? undefined,
+      };
+    } catch (err: any) {
+      response.heroSlides = {
+        error: err?.message || 'Failed to fetch hero slides',
+      };
+    }
+  }
 
   // Return 200 for healthy/degraded, 503 for unhealthy
   const statusCode = overallStatus === 'unhealthy' ? 503 : 200;
