@@ -4,9 +4,8 @@ name: Production Deployment
 on:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened]
+  # Removido pull_request para evitar ejecuciones en feat/* branches
+  # Vercel hace deploy automático desde git push a main
 
 env:
   NODE_VERSION: '20'
@@ -16,10 +15,8 @@ env:
 jobs:
   test:
     runs-on: ubuntu-latest
-    # Solo ejecutar en main, no en feat/*
-    if: |
-      github.event_name == 'push' && github.ref == 'refs/heads/main' ||
-      github.event_name == 'pull_request' && github.base_ref == 'main' && github.head_ref && !startsWith(github.head_ref, 'feat/') && !startsWith(github.head_ref, 'feature/') && !startsWith(github.head_ref, 'hotfix/')
+    # Solo ejecutar en push a main
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v4
       
@@ -30,7 +27,7 @@ jobs:
           cache: 'npm'
       
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: npm ci
       
       - name: Run linting
         run: npm run lint -- --max-warnings 0 || echo "ESLint found warnings/errors (non-blocking for now)"
