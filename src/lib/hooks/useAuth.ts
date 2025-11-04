@@ -29,7 +29,7 @@ export function useAuth() {
       const userPromise = getCurrentUser();
       const currentUser = await Promise.race([userPromise, timeoutPromise]);
       
-      if (currentUser === null && userPromise) {
+      if (currentUser === null) {
         // Si fue timeout, intentar obtener al menos la sesión básica
         try {
           const { data: { session } } = await supabase.auth.getSession();

@@ -1053,7 +1053,7 @@ export default function ProductsListClient() {
                         endAtMs={auctionEndAt}
                         serverNowMs={serverNow}
                         variant="compact"
-                        size="sm"
+                        size="md"
                         tickMs={1000}
                       />
                     </div>

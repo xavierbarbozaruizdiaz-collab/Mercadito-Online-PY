@@ -78,29 +78,35 @@ export default function BuyRaffleTicketsButton({
 
       // Crear orden para la compra de cupones
       // Por ahora, creamos tickets directamente (en producción, deberías crear una orden primero)
-      const ticketsToCreate = [];
+      const ticketsToCreate: Array<{
+        raffle_id: string;
+        user_id: string;
+        ticket_number: string;
+        ticket_type: string;
+        purchase_amount: number;
+      }> = [];
       const userId = session.user.id;
 
       // Obtener siguiente número de secuencia
-      const { data: lastTicket } = await supabase
+      const { data: lastTickets } = await supabase
         .from('raffle_tickets')
         .select('ticket_number')
         .eq('raffle_id', raffleId)
         .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
+        .limit(1);
 
       let sequence = 1;
-      if (lastTicket?.ticket_number) {
-        const match = lastTicket.ticket_number.match(/RAFFLE-[0-9]+-([0-9]+)$/);
+      if (lastTickets && lastTickets.length > 0 && lastTickets[0]?.ticket_number) {
+        const match = lastTickets[0].ticket_number.match(/RAFFLE-[A-Z0-9]+-([0-9]+)$/);
         if (match) {
-          sequence = parseInt(match[1]) + 1;
+          sequence = parseInt(match[1], 10) + 1;
         }
       }
 
-      // Generar tickets
+      // Generar tickets con números únicos
+      const raffleShortId = raffleId.replace(/-/g, '').substring(0, 8).toUpperCase();
       for (let i = 0; i < quantity; i++) {
-        const ticketNumber = `RAFFLE-${raffleId.substring(0, 8).padStart(8, '0')}-${String(sequence + i).padStart(6, '0')}`;
+        const ticketNumber = `RAFFLE-${raffleShortId}-${String(sequence + i).padStart(6, '0')}`;
         
         ticketsToCreate.push({
           raffle_id: raffleId,
@@ -119,19 +125,26 @@ export default function BuyRaffleTicketsButton({
       if (insertError) {
         // Si hay error de duplicado, intentar con números diferentes
         if (insertError.code === '23505') {
-          // Regenerar números
-          const retrySequence = sequence + 1000;
-          const retryTickets = [];
-          for (let i = 0; i < quantity; i++) {
-            const ticketNumber = `RAFFLE-${raffleId.substring(0, 8).padStart(8, '0')}-${String(retrySequence + i).padStart(6, '0')}`;
-            retryTickets.push({
-              raffle_id: raffleId,
-              user_id: userId,
-              ticket_number: ticketNumber,
-              ticket_type: 'manual',
-              purchase_amount: ticketPrice,
-            });
-          }
+        // Regenerar números con timestamp para evitar duplicados
+        const retrySequence = Date.now();
+        const retryTickets: Array<{
+          raffle_id: string;
+          user_id: string;
+          ticket_number: string;
+          ticket_type: string;
+          purchase_amount: number;
+        }> = [];
+        const raffleShortId = raffleId.replace(/-/g, '').substring(0, 8).toUpperCase();
+        for (let i = 0; i < quantity; i++) {
+          const ticketNumber = `RAFFLE-${raffleShortId}-${String(retrySequence + i).padStart(6, '0')}`;
+          retryTickets.push({
+            raffle_id: raffleId,
+            user_id: userId,
+            ticket_number: ticketNumber,
+            ticket_type: 'manual',
+            purchase_amount: ticketPrice,
+          });
+        }
           
           const { error: retryError } = await supabase
             .from('raffle_tickets')

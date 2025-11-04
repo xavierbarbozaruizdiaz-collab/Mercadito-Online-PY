@@ -127,7 +127,7 @@ export async function getSessionWithTimeout(options?: { timeoutMs?: number; retr
   }
 
   try {
-    const first = await withTimeout(supabase.auth.getSession(), timeoutMs);
+    const first: any = await withTimeout(supabase.auth.getSession(), timeoutMs);
     if (first?.data?.session) {
       return first;
     }

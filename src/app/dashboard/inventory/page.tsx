@@ -35,7 +35,7 @@ type StockMovement = {
   quantity: number;
   previous_stock: number;
   new_stock: number;
-  notes: string | null;
+  notes?: string | null;
   created_at: string;
 };
 
@@ -104,7 +104,12 @@ export default function InventoryPage() {
     try {
       setLoadingMovements(true);
       const movementsData = await getStockMovements(productId, 20);
-      setMovements(movementsData);
+      // Normalizar notes de undefined a null para compatibilidad
+      const normalizedMovements = movementsData.map(m => ({
+        ...m,
+        notes: m.notes ?? null
+      }));
+      setMovements(normalizedMovements);
     } catch (err: any) {
       console.error('Error cargando movimientos:', err);
     } finally {
@@ -133,7 +138,7 @@ export default function InventoryPage() {
         const difference = quantity - currentStock;
         
         if (difference > 0) {
-          await increaseStock(product.id, difference, 'adjustment', undefined, `Ajuste manual: establecer a ${quantity}`);
+          await increaseStock(product.id, difference, 'restock', undefined, `Ajuste manual: establecer a ${quantity}`);
         } else if (difference < 0) {
           // Para disminuir, necesitamos usar decrease_stock pero con cantidad absoluta
           const { error } = await (supabase as any).rpc('decrease_stock', {

@@ -26,7 +26,7 @@ interface TicketWithRaffle {
   raffle: {
     id: string;
     title: string;
-    product_id: string;
+    product_id?: string | null;
     draw_date: string;
     status: 'draft' | 'active' | 'ended' | 'cancelled' | 'drawn';
     product?: {

@@ -160,7 +160,9 @@ export async function getActiveAuctions(filters?: {
       const { data: refreshed, error: refreshError } = await refreshedQuery;
       if (!refreshError && refreshed) {
         refreshedData = refreshed;
-        logger.debug('Datos recargados después de actualizar estados', { count: refreshedData.length });
+        if (refreshedData) {
+          logger.debug('Datos recargados después de actualizar estados', { count: refreshedData.length });
+        }
       }
     }
 

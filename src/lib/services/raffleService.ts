@@ -108,8 +108,7 @@ export async function getActiveRaffles(options?: {
       .from('raffles')
       .select(`
         *,
-        product:products(id, title, price, cover_url),
-        seller:profiles!raffles_seller_id_fkey(id, first_name, last_name, email)
+        product:products(id, title, price, cover_url)
       `)
       .eq('is_enabled', true);
     
@@ -124,7 +123,24 @@ export async function getActiveRaffles(options?: {
     
     if (error) throw error;
     
-    return (data || []) as Raffle[];
+    // Cargar información de sellers por separado
+    const raffles = (data || []) as any[];
+    if (raffles.length > 0) {
+      const sellerIds = [...new Set(raffles.map(r => r.seller_id).filter(Boolean))];
+      const { data: sellersData } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email')
+        .in('id', sellerIds);
+      
+      const sellersMap = new Map();
+      (sellersData || []).forEach((s: any) => sellersMap.set(s.id, s));
+      
+      raffles.forEach((r: any) => {
+        r.seller = sellersMap.get(r.seller_id) || null;
+      });
+    }
+    
+    return raffles as Raffle[];
   } catch (error) {
     console.error('Error loading active raffles:', error);
     throw error;
@@ -140,9 +156,7 @@ export async function getRaffleById(raffleId: string): Promise<Raffle | null> {
       .from('raffles')
       .select(`
         *,
-        product:products(id, title, price, cover_url, description),
-        seller:profiles!raffles_seller_id_fkey(id, first_name, last_name, email),
-        winner:profiles!raffles_winner_id_fkey(id, first_name, last_name, email)
+        product:products(id, title, price, cover_url, description)
       `)
       .eq('id', raffleId)
       .single();
@@ -152,7 +166,31 @@ export async function getRaffleById(raffleId: string): Promise<Raffle | null> {
       throw error;
     }
     
-    return data as Raffle;
+    const raffle = data as any;
+    
+    // Cargar información de seller y winner por separado
+    const idsToLoad: string[] = [];
+    if (raffle.seller_id) idsToLoad.push(raffle.seller_id);
+    if (raffle.winner_id) idsToLoad.push(raffle.winner_id);
+    
+    if (idsToLoad.length > 0) {
+      const { data: profilesData } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email')
+        .in('id', idsToLoad);
+      
+      const profilesMap = new Map();
+      (profilesData || []).forEach((p: any) => profilesMap.set(p.id, p));
+      
+      if (raffle.seller_id) {
+        raffle.seller = profilesMap.get(raffle.seller_id) || null;
+      }
+      if (raffle.winner_id) {
+        raffle.winner = profilesMap.get(raffle.winner_id) || null;
+      }
+    }
+    
+    return raffle as Raffle;
   } catch (error) {
     console.error('Error loading raffle:', error);
     throw error;
@@ -243,7 +281,7 @@ export async function getUserRaffleStats(userId: string): Promise<RaffleStats> {
 export async function createRaffle(data: CreateRaffleData, userId: string): Promise<Raffle> {
   try {
     // Verificar que el producto existe y pertenece al vendedor (si es seller_raffle)
-    if (data.raffle_type === 'seller_raffle') {
+    if (data.raffle_type === 'seller_raffle' && data.product_id) {
       const { data: product, error: productError } = await supabase
         .from('products')
         .select('id, seller_id')
@@ -270,13 +308,13 @@ export async function createRaffle(data: CreateRaffleData, userId: string): Prom
       .from('raffles')
       .insert({
         title: data.title,
-        description: data.description,
-        product_id: data.product_id,
+        description: data.description || null,
+        product_id: data.product_id || null,
         seller_id: userId,
         raffle_type: data.raffle_type,
         min_purchase_amount: data.min_purchase_amount || 0,
         tickets_per_amount: data.tickets_per_amount || 100000,
-        max_tickets_per_user: data.max_tickets_per_user,
+        max_tickets_per_user: data.max_tickets_per_user || null,
         start_date: data.start_date,
         end_date: data.end_date,
         draw_date: data.draw_date,
@@ -377,8 +415,7 @@ export async function getPendingRaffles(): Promise<Raffle[]> {
       .from('raffles')
       .select(`
         *,
-        product:products(id, title, price, cover_url),
-        seller:profiles!raffles_seller_id_fkey(id, first_name, last_name, email)
+        product:products(id, title, price, cover_url)
       `)
       .eq('status', 'draft')
       .eq('admin_approved', false)
@@ -386,7 +423,24 @@ export async function getPendingRaffles(): Promise<Raffle[]> {
     
     if (error) throw error;
     
-    return (data || []) as Raffle[];
+    // Cargar información de sellers por separado
+    const raffles = (data || []) as any[];
+    if (raffles.length > 0) {
+      const sellerIds = [...new Set(raffles.map(r => r.seller_id).filter(Boolean))];
+      const { data: sellersData } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email')
+        .in('id', sellerIds);
+      
+      const sellersMap = new Map();
+      (sellersData || []).forEach((s: any) => sellersMap.set(s.id, s));
+      
+      raffles.forEach((r: any) => {
+        r.seller = sellersMap.get(r.seller_id) || null;
+      });
+    }
+    
+    return raffles as Raffle[];
   } catch (error) {
     console.error('Error loading pending raffles:', error);
     throw error;

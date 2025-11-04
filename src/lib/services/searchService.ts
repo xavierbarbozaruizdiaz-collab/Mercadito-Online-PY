@@ -457,7 +457,7 @@ export class SearchService {
       }, {} as Record<string, number>) || {};
 
       const popularCategoriesList = Object.entries(categoryCounts)
-        .map(([name, count]) => ({ name, count }))
+        .map(([name, count]) => ({ name, count: count as number }))
         .sort((a, b) => b.count - a.count)
         .slice(0, 10);
 
