@@ -62,23 +62,8 @@ export default function RafflesNavLink() {
     }
   }
 
-  if (loading && activeCount === 0) {
-    return (
-      <Link
-        href="/raffles"
-        className="relative flex items-center gap-2 px-3 py-2 rounded-md text-gray-700 hover:text-gray-900 hover:bg-gray-100 transition-colors"
-      >
-        <Ticket className="h-5 w-5" />
-        <span className="hidden sm:inline">Sorteos</span>
-      </Link>
-    );
-  }
-
-  // No mostrar si no hay sorteos activos o el sistema está deshabilitado
-  if (activeCount === 0) {
-    return null;
-  }
-
+  // Siempre mostrar el link, pero solo mostrar badge si hay sorteos activos
+  // El sistema puede estar habilitado pero sin sorteos activos aún
   return (
     <Link
       href="/raffles"
@@ -87,7 +72,7 @@ export default function RafflesNavLink() {
       <Ticket className="h-5 w-5" />
       <span className="hidden sm:inline">Sorteos</span>
       
-      {activeCount > 0 && (
+      {!loading && activeCount > 0 && (
         <Badge 
           variant="success" 
           size="sm"
