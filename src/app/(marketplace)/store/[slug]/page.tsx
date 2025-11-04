@@ -11,6 +11,8 @@ import Link from 'next/link';
 import { supabase } from '@/lib/supabaseClient';
 import { getStoreBySlug, getStoreProducts } from '@/lib/services/storeService';
 import { isStoreFavorite, toggleStoreFavorite } from '@/lib/services/storeFavoriteService';
+import { formatPhoneForWhatsApp } from '@/lib/utils';
+import Breadcrumbs from '@/components/Breadcrumbs';
 import { 
   Star,
   MapPin,
@@ -327,25 +329,50 @@ export default function StoreProfilePage() {
         });
       }
 
-      // Aplicar ordenamiento
-      switch (sortBy) {
-        case 'price_asc':
-          filteredProducts.sort((a: any, b: any) => a.price - b.price);
-          break;
-        case 'price_desc':
-          filteredProducts.sort((a: any, b: any) => b.price - a.price);
-          break;
-        case 'date_asc':
-          filteredProducts.sort((a: any, b: any) => 
-            new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-          );
-          break;
-        case 'date_desc':
-        default:
-          filteredProducts.sort((a: any, b: any) => 
-            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-          );
-          break;
+      // Verificar si hay búsqueda o filtros activos
+      const hasActiveSearch = searchQuery.trim() !== '' ||
+        filters.minPrice !== '' ||
+        filters.maxPrice !== '' ||
+        filters.condition !== '' ||
+        filters.saleType !== '' ||
+        filters.category !== '' ||
+        vehicleFields.marca !== '' ||
+        vehicleFields.modelo !== '' ||
+        vehicleFields.año !== '' ||
+        vehicleFields.kilometraje !== '' ||
+        vehicleFields.color !== '' ||
+        vehicleFields.documentacion !== '';
+
+      // Aplicar ordenamiento o aleatoriedad
+      const shouldRandomize = !hasActiveSearch && sortBy === 'date_desc';
+      
+      if (shouldRandomize) {
+        // Algoritmo Fisher-Yates para mezclar aleatoriamente
+        for (let i = filteredProducts.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [filteredProducts[i], filteredProducts[j]] = [filteredProducts[j], filteredProducts[i]];
+        }
+      } else {
+        // Aplicar ordenamiento solo si no es aleatorio
+        switch (sortBy) {
+          case 'price_asc':
+            filteredProducts.sort((a: any, b: any) => a.price - b.price);
+            break;
+          case 'price_desc':
+            filteredProducts.sort((a: any, b: any) => b.price - a.price);
+            break;
+          case 'date_asc':
+            filteredProducts.sort((a: any, b: any) => 
+              new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+            );
+            break;
+          case 'date_desc':
+          default:
+            filteredProducts.sort((a: any, b: any) => 
+              new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+            );
+            break;
+        }
       }
 
       // Mapear productos para asegurar que tienen image_url
@@ -378,8 +405,9 @@ export default function StoreProfilePage() {
 
   function getWhatsAppLink() {
     if (!store?.contact_phone) return '#';
-    const phone = store.contact_phone.replace(/\D/g, '');
-    return `https://wa.me/${phone}`;
+    const formattedPhone = formatPhoneForWhatsApp(store.contact_phone);
+    if (!formattedPhone) return '#';
+    return `https://wa.me/${formattedPhone}`;
   }
 
   function getLocationDisplay() {
@@ -461,16 +489,15 @@ export default function StoreProfilePage() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#1A1A1A]">
-      {/* Header mínimo - solo botón de volver */}
-      <div className="bg-white dark:bg-[#252525] border-b border-gray-200 dark:border-gray-700 px-4 py-2 flex items-center gap-4">
-        <Link
-          href="/"
-          className="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 transition-colors"
-        >
-          <ArrowLeft className="w-5 h-5" />
-          <Home className="w-5 h-5" />
-        </Link>
-        <div className="flex-1"></div>
+      {/* Header con breadcrumbs */}
+      <div className="bg-white dark:bg-[#252525] border-b border-gray-200 dark:border-gray-700 px-4 py-3">
+        <Breadcrumbs
+          items={[
+            { label: 'Tiendas', href: '/stores' },
+            { label: store.name }
+          ]}
+          className="dark:text-gray-300"
+        />
       </div>
 
       {/* Foto de Portada - Estilo Facebook */}
@@ -900,14 +927,14 @@ export default function StoreProfilePage() {
       {/* Productos - Grid estilo Facebook */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {products.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div className="grid grid-cols-3 lg:grid-cols-9 gap-2 sm:gap-3 lg:gap-4">
             {products.map((product) => (
               <Link
                 key={product.id}
                 href={`/products/${product.id}`}
                 className="bg-white dark:bg-[#252525] rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-lg transition-shadow"
               >
-                <div className="relative h-48 bg-gray-100 dark:bg-gray-800">
+                <div className="relative h-24 bg-gray-100 dark:bg-gray-800">
                   {product.image_url ? (
                     <img
                       src={product.image_url}
@@ -921,12 +948,12 @@ export default function StoreProfilePage() {
                   )}
                 </div>
 
-                <div className="p-3">
-                  <p className="text-lg font-semibold text-gray-900 dark:text-gray-200 mb-1">
+                <div className="p-1.5 sm:p-2">
+                  <p className="text-xs font-semibold text-gray-900 dark:text-gray-200 mb-0.5">
                     {product.price.toLocaleString('es-PY')} G
                   </p>
                   {getLocationDisplay() && (
-                    <p className="text-sm text-gray-600 dark:text-gray-400">{getLocationDisplay()}</p>
+                    <p className="text-[10px] text-gray-600 dark:text-gray-400 line-clamp-1">{getLocationDisplay()}</p>
                   )}
                 </div>
               </Link>

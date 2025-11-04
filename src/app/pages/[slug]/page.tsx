@@ -1,4 +1,5 @@
 import { getPageBySlug } from '@/lib/services/staticPagesService';
+import { sanitizeHtml } from '@/lib/utils/sanitize';
 import { notFound } from 'next/navigation';
 
 export default async function StaticPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -16,7 +17,7 @@ export default async function StaticPage({ params }: { params: Promise<{ slug: s
           <h1 className="text-3xl font-bold mb-4">{page.title}</h1>
           <div
             className="prose max-w-none"
-            dangerouslySetInnerHTML={{ __html: page.content }}
+            dangerouslySetInnerHTML={{ __html: sanitizeHtml(page.content) }}
           />
         </article>
       </div>

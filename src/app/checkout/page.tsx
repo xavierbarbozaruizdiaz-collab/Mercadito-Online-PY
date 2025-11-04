@@ -9,6 +9,8 @@ import { CouponValidationResult } from '@/lib/services/couponService';
 import { getAuctionById, type AuctionProduct } from '@/lib/services/auctionService';
 import { logger } from '@/lib/utils/logger';
 import toast from 'react-hot-toast';
+import { useFacebookPixel } from '@/lib/services/facebookPixelService';
+import { useGoogleAnalytics } from '@/lib/services/googleAnalyticsService';
 
 type CartItem = {
   id: string;
@@ -39,6 +41,8 @@ function CheckoutContent() {
   const planId = searchParams.get('plan_id');
   const subscriptionType = searchParams.get('subscription_type') as 'monthly' | 'yearly' | 'one_time' | null;
   const membershipAmount = searchParams.get('amount');
+  const facebookPixel = useFacebookPixel();
+  const googleAnalytics = useGoogleAnalytics();
   
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [auctionProduct, setAuctionProduct] = useState<AuctionProduct | null>(null);
@@ -281,6 +285,31 @@ function CheckoutContent() {
       setLoading(false);
     }
   }
+
+  // Track initiate checkout cuando se cargan los items
+  useEffect(() => {
+    if (cartItems.length > 0 && !loading) {
+      const total = cartItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
+      const products = cartItems.map(item => ({
+        id: item.product.id,
+        quantity: item.quantity,
+        price: item.product.price,
+      }));
+
+      facebookPixel.trackInitiateCheckout(products, total, 'PYG');
+      googleAnalytics.trackBeginCheckout(
+        cartItems.map(item => ({
+          id: item.product.id,
+          name: item.product.title,
+          category: '',
+          price: item.product.price,
+          quantity: item.quantity,
+        })),
+        total,
+        'PYG'
+      );
+    }
+  }, [cartItems, loading, facebookPixel, googleAnalytics]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

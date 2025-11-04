@@ -4,6 +4,8 @@ import { useEffect, useState, Suspense } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
+import { useFacebookPixel } from '@/lib/services/facebookPixelService';
+import { useGoogleAnalytics } from '@/lib/services/googleAnalyticsService';
 
 type Order = {
   id: string;
@@ -28,6 +30,8 @@ function CheckoutSuccessContent() {
   const orderId = searchParams.get('orderId');
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
+  const facebookPixel = useFacebookPixel();
+  const googleAnalytics = useGoogleAnalytics();
 
   useEffect(() => {
     if (orderId) {
@@ -61,7 +65,37 @@ function CheckoutSuccessContent() {
         .single();
 
       if (error) throw error;
-      setOrder(data as unknown as Order);
+      const orderData = data as unknown as Order;
+      setOrder(orderData);
+
+      // Track purchase
+      if (orderData && orderData.order_items && orderData.order_items.length > 0) {
+        const products = orderData.order_items.map(item => ({
+          id: item.product.id,
+          quantity: item.quantity,
+          price: item.unit_price,
+        }));
+
+        facebookPixel.trackPurchase({
+          orderId: orderData.id,
+          products,
+          total: orderData.total_amount,
+          currency: 'PYG',
+        });
+
+        googleAnalytics.trackPurchase({
+          transactionId: orderData.id,
+          products: orderData.order_items.map(item => ({
+            id: item.product.id,
+            name: item.product.title,
+            category: '',
+            price: item.unit_price,
+            quantity: item.quantity,
+          })),
+          total: orderData.total_amount,
+          currency: 'PYG',
+        });
+      }
     } catch (err) {
       console.error('Error loading order:', err);
     } finally {

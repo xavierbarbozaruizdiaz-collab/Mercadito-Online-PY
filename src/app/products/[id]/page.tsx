@@ -10,6 +10,7 @@ import ProductImageGallery from '@/components/ProductImageGallery';
 import ProductQuantitySelector from './ProductQuantitySelector';
 import WholesalePriceBadge from '@/components/WholesalePriceBadge';
 import ProductPageClient from './ProductPageClient';
+import Breadcrumbs from '@/components/Breadcrumbs';
 import { Metadata } from 'next';
 import { generateProductStructuredData, generateBreadcrumbStructuredData } from '@/lib/structuredData';
 
@@ -294,7 +295,14 @@ export default async function ProductPage(
       />
       
       <main className="min-h-screen bg-gray-50 p-4 sm:p-8">
-        <Link href="/" className="underline text-sm">← Volver</Link>
+        <div className="mb-4">
+          <Breadcrumbs
+            items={[
+              ...(category ? [{ label: category.name, href: `/search?category=${category.id}` }] : []),
+              { label: p.title }
+            ]}
+          />
+        </div>
 
       <div className="bg-white rounded-lg sm:rounded-2xl shadow p-4 sm:p-6 mt-3">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">

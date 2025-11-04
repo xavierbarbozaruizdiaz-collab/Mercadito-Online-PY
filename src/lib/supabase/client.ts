@@ -363,7 +363,8 @@ export async function signIn(credentials: SignInData) {
 // Función para cerrar sesión
 export async function signOut() {
   try {
-    const { error } = await supabase.auth.signOut();
+    // Usar scope global para asegurar que se cierre en todos los lugares y prevenir errores 403
+    const { error } = await supabase.auth.signOut({ scope: 'global' });
     return { error };
   } catch (error) {
     console.error('Error signing out:', error);

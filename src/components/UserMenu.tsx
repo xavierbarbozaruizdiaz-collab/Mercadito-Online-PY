@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabaseClient';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { User, LogIn, LogOut, LayoutDashboard } from 'lucide-react';
+import { useToast } from '@/lib/hooks/useToast';
 
 export default function UserMenu() {
   const [email, setEmail] = useState<string | null>(null);
@@ -12,6 +13,7 @@ export default function UserMenu() {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+  const toast = useToast();
 
   useEffect(() => {
     let mounted = true;
@@ -47,12 +49,42 @@ export default function UserMenu() {
     setIsSigningOut(true);
     
     try {
-      // Cerrar sesión en Supabase
-      const { error } = await supabase.auth.signOut();
+      // Cerrar sesión en Supabase con scope global para asegurar que se cierre en todos los lugares
+      // Esto previene errores 403 en producción
+      const { error } = await supabase.auth.signOut({ scope: 'global' });
       
       if (error) {
         console.error('Error al cerrar sesión:', error);
-        alert('Error al cerrar sesión. Por favor intenta nuevamente.');
+        
+        // Si el error es 403, intentar cerrar sesión localmente de todas formas
+        if (error.message?.includes('403') || error.message?.includes('Forbidden')) {
+          console.warn('Error 403 al cerrar sesión, limpiando sesión localmente');
+          
+          // Limpiar el estado local y localStorage
+          setEmail(null);
+          if (typeof window !== 'undefined') {
+            Object.keys(localStorage).forEach(key => {
+              if (key.includes('supabase') || key.includes('auth')) {
+                localStorage.removeItem(key);
+              }
+            });
+            // También limpiar sessionStorage
+            sessionStorage.clear();
+          }
+          
+          // Redirigir de todas formas
+          router.push('/');
+          router.refresh();
+          setTimeout(() => {
+            window.location.href = '/';
+          }, 100);
+          
+          toast.success('Sesión cerrada localmente');
+          setIsSigningOut(false);
+          return;
+        }
+        
+        toast.error('Error al cerrar sesión. Por favor intenta nuevamente.');
         setIsSigningOut(false);
         return;
       }
@@ -68,7 +100,11 @@ export default function UserMenu() {
             localStorage.removeItem(key);
           }
         });
+        // También limpiar sessionStorage
+        sessionStorage.clear();
       }
+      
+      toast.success('Sesión cerrada exitosamente');
       
       // Redirigir y refrescar
       router.push('/');
@@ -81,7 +117,19 @@ export default function UserMenu() {
       
     } catch (err) {
       console.error('Error al cerrar sesión:', err);
-      alert('Error al cerrar sesión. Por favor intenta nuevamente.');
+      
+      // Intentar limpiar localmente aunque haya error
+      setEmail(null);
+      if (typeof window !== 'undefined') {
+        Object.keys(localStorage).forEach(key => {
+          if (key.includes('supabase') || key.includes('auth')) {
+            localStorage.removeItem(key);
+          }
+        });
+        sessionStorage.clear();
+      }
+      
+      toast.error('Error al cerrar sesión. Por favor intenta nuevamente.');
       setIsSigningOut(false);
     }
   }

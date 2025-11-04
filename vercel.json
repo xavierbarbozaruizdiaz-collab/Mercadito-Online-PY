@@ -27,7 +27,7 @@
   "regions": ["iad1"],
   "framework": "nextjs",
   "outputDirectory": ".next",
-  "installCommand": "npm install",
+  "installCommand": "npm ci",
   "buildCommand": "npm run build",
   "devCommand": "npm run dev",
   "crons": [
@@ -41,7 +41,7 @@
     },
     {
       "path": "/api/cron/close-auctions",
-      "schedule": "* * * * *"
+      "schedule": "*/5 * * * *"
     }
   ]
 }

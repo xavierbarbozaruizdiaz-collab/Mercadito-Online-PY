@@ -136,7 +136,7 @@ export default function VitrinaPage() {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-3 lg:grid-cols-9 gap-2 sm:gap-3 lg:gap-4">
               {products.map((product) => (
                 <Link
                   key={product.id}
@@ -144,7 +144,7 @@ export default function VitrinaPage() {
                   className="bg-white rounded-lg shadow-md border overflow-hidden hover:shadow-lg transition-all group"
                 >
                   {/* Imagen del producto */}
-                  <div className="relative h-48 bg-gray-100">
+                  <div className="relative h-24 bg-gray-100">
                     {product.cover_url ? (
                       <Image
                         src={product.cover_url}
@@ -161,25 +161,25 @@ export default function VitrinaPage() {
                     
                     {/* Badge de vitrina */}
                     <div className="absolute top-2 right-2">
-                      <span className="px-2 py-1 bg-purple-600 text-white text-xs font-semibold rounded-full shadow-lg">
+                      <span className="px-1.5 py-0.5 sm:px-2 sm:py-1 bg-purple-600 text-white text-[8px] sm:text-[9px] font-semibold rounded-full shadow-lg">
                         ⭐ Destacado
                       </span>
                     </div>
                   </div>
 
                   {/* Información del producto */}
-                  <div className="p-4">
+                  <div className="p-1.5 sm:p-2">
                     {/* Tienda */}
-                    <div className="flex items-center gap-2 mb-2">
+                    <div className="flex items-center gap-1 sm:gap-1.5 lg:gap-2 mb-1 sm:mb-1.5 lg:mb-2">
                       {product.store.logo_url ? (
                         <img
                           src={product.store.logo_url}
                           alt={product.store.name}
-                          className="w-6 h-6 rounded-full object-cover"
+                          className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 rounded-full object-cover"
                         />
                       ) : (
-                        <div className="w-6 h-6 rounded-full bg-purple-100 flex items-center justify-center">
-                          <Store className="w-4 h-4 text-purple-600" />
+                        <div className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 rounded-full bg-purple-100 flex items-center justify-center">
+                          <Store className="w-3 h-3 sm:w-3.5 sm:h-3.5 lg:w-4 lg:h-4 text-purple-600" />
                         </div>
                       )}
                       <span
@@ -187,25 +187,25 @@ export default function VitrinaPage() {
                           e.stopPropagation();
                           window.location.href = `/store/${product.store.slug}`;
                         }}
-                        className="text-xs text-gray-600 hover:text-purple-600 font-medium truncate cursor-pointer"
+                        className="text-[9px] sm:text-[10px] text-gray-600 hover:text-purple-600 font-medium truncate cursor-pointer"
                       >
                         {product.store.name}
                       </span>
                     </div>
 
                     {/* Título */}
-                    <h3 className="font-semibold text-lg text-gray-900 mb-2 line-clamp-2 group-hover:text-purple-600 transition-colors">
+                    <h3 className="font-semibold text-[10px] sm:text-xs text-gray-900 mb-1 line-clamp-2 group-hover:text-purple-600 transition-colors">
                       {product.title}
                     </h3>
 
                     {/* Precio */}
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1 sm:gap-1.5">
                       {product.compare_price && (
-                        <span className="text-sm text-gray-500 line-through">
+                        <span className="text-[9px] sm:text-[10px] text-gray-500 line-through">
                           {product.compare_price.toLocaleString('es-PY')} Gs.
                         </span>
                       )}
-                      <span className="text-xl font-bold text-purple-600">
+                      <span className="text-xs sm:text-sm font-bold text-purple-600">
                         {product.price.toLocaleString('es-PY')} Gs.
                       </span>
                     </div>
@@ -213,7 +213,7 @@ export default function VitrinaPage() {
                     {/* Badge de descuento si hay compare_price */}
                     {product.compare_price && product.compare_price > product.price && (
                       <div className="mt-2">
-                        <span className="px-2 py-1 bg-red-100 text-red-700 text-xs font-semibold rounded">
+                        <span className="px-1.5 py-0.5 sm:px-2 sm:py-1 bg-red-100 text-red-700 text-[8px] sm:text-[9px] font-semibold rounded">
                           {Math.round(((product.compare_price - product.price) / product.compare_price) * 100)}% OFF
                         </span>
                       </div>

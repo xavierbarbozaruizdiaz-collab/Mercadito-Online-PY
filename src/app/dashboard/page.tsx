@@ -29,6 +29,7 @@ import {
 import Image from 'next/image';
 import DashboardSidebar from '@/components/DashboardSidebar';
 import StatsPanel from '@/components/StatsPanel';
+import { useToast } from '@/lib/hooks/useToast';
 // import AdminRoleAssigner from '@/components/AdminRoleAssigner'; // Temporalmente comentado
 
 type Product = {
@@ -105,6 +106,7 @@ export default function Dashboard() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [statsPanelOpen, setStatsPanelOpen] = useState(false);
   const [storeId, setStoreId] = useState<string | null>(null);
+  const toast = useToast();
 
   useEffect(() => {
     (async () => {
@@ -754,7 +756,7 @@ export default function Dashboard() {
       window.location.reload();
     } catch (err: any) {
       logger.error('Error al actualizar vitrina', err);
-      alert('Error: ' + (err.message || 'No se pudo actualizar la vitrina'));
+      toast.error('Error: ' + (err.message || 'No se pudo actualizar la vitrina'));
     } finally {
       setUpdatingShowcase(null);
     }
@@ -1116,12 +1118,12 @@ export default function Dashboard() {
       } else {
         // El producto fue eliminado exitosamente (verificado en la base de datos)
         logger.info('Eliminación confirmada: el producto ya no existe en la base de datos', { productId });
-        alert('✅ Producto eliminado correctamente');
+        toast.success('✅ Producto eliminado correctamente');
       }
 
     } catch (err: any) {
       logger.error('Error completo al eliminar producto', err, { productId });
-      alert('Error al eliminar producto: ' + err.message);
+      toast.error('Error al eliminar producto: ' + err.message);
     } finally {
       setDeletingId(null);
     }

@@ -8,6 +8,7 @@
 import { useState } from 'react';
 import { Ticket, Plus, Minus, ShoppingCart } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
+import { useToast } from '@/lib/hooks/useToast';
 
 interface BuyRaffleTicketsButtonProps {
   raffleId: string;
@@ -26,6 +27,7 @@ export default function BuyRaffleTicketsButton({
 }: BuyRaffleTicketsButtonProps) {
   const [quantity, setQuantity] = useState(1);
   const [loading, setLoading] = useState(false);
+  const toast = useToast();
 
   const maxAllowed = maxTicketsPerUser 
     ? Math.max(0, maxTicketsPerUser - currentUserTickets)
@@ -35,12 +37,12 @@ export default function BuyRaffleTicketsButton({
 
   async function handlePurchase() {
     if (quantity <= 0) {
-      alert('La cantidad debe ser mayor a 0');
+      toast.error('La cantidad debe ser mayor a 0');
       return;
     }
 
     if (maxTicketsPerUser && (currentUserTickets + quantity) > maxTicketsPerUser) {
-      alert(`Solo puedes tener máximo ${maxTicketsPerUser} tickets en este sorteo`);
+      toast.error(`Solo puedes tener máximo ${maxTicketsPerUser} tickets en este sorteo`);
       return;
     }
 
@@ -49,7 +51,8 @@ export default function BuyRaffleTicketsButton({
 
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user?.id) {
-        alert('Debes iniciar sesión para comprar cupones');
+        toast.error('Debes iniciar sesión para comprar cupones');
+        setLoading(false);
         return;
       }
 
@@ -156,7 +159,7 @@ export default function BuyRaffleTicketsButton({
         }
       }
 
-      alert(`✅ Has comprado ${quantity} cupón${quantity > 1 ? 'es' : ''} exitosamente!`);
+      toast.success(`✅ Has comprado ${quantity} cupón${quantity > 1 ? 'es' : ''} exitosamente!`);
       setQuantity(1);
       
       if (onPurchaseComplete) {
@@ -164,7 +167,7 @@ export default function BuyRaffleTicketsButton({
       }
     } catch (err: any) {
       console.error('Error purchasing tickets:', err);
-      alert(`Error: ${err.message || 'Error al comprar cupones'}`);
+      toast.error(`Error: ${err.message || 'Error al comprar cupones'}`);
     } finally {
       setLoading(false);
     }

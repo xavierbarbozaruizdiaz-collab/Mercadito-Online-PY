@@ -42,3 +42,4 @@ Verificar y configurar las variables de entorno faltantes, especialmente `SUPABA
 
 
 
+

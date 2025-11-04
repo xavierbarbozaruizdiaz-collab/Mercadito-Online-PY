@@ -73,6 +73,9 @@ export interface Store {
   total_sales?: number;
   is_verified?: boolean;
   is_active: boolean;
+  fb_pixel_id?: string | null;
+  ga_measurement_id?: string | null;
+  gtm_id?: string | null;
   social_links?: {
     facebook?: string;
     instagram?: string;

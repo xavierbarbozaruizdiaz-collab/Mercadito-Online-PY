@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { calculateWholesalePrice, getUnitsToWholesale } from '@/lib/utils/wholesalePrice';
 import WholesalePriceBadge from '@/components/WholesalePriceBadge';
 import { Plus, Minus } from 'lucide-react';
+import { useToast } from '@/lib/hooks/useToast';
 
 interface ProductWithWholesale {
   id: string;
@@ -28,6 +29,17 @@ export default function ProductQuantitySelector({
 }: ProductQuantitySelectorProps) {
   const [quantity, setQuantity] = useState(initialQuantity);
   const [cartQuantity, setCartQuantity] = useState(0);
+  const toast = useToast();
+  
+  // Calcular precio en tiempo real basado en cantidad
+  const { currentPrice, savings, isWholesale } = useMemo(() => {
+    const priceCalc = calculateWholesalePrice(product, quantity);
+    return {
+      currentPrice: priceCalc.totalPrice,
+      savings: priceCalc.savings,
+      isWholesale: priceCalc.isWholesale,
+    };
+  }, [quantity, product]);
 
   // Cargar cantidad actual del carrito
   useEffect(() => {
@@ -83,7 +95,7 @@ export default function ProductQuantitySelector({
       
       if (totalRequested > maxAvailable) {
         if (availableToAdd <= 0) {
-          alert(`Lo sentimos, no hay suficiente inventario. Solo hay ${maxAvailable} unidad${maxAvailable !== 1 ? 'es' : ''} disponible${maxAvailable !== 1 ? 's' : ''} y ya tienes ${cartQuantity} en tu carrito.`);
+          toast.error(`Lo sentimos, no hay suficiente inventario. Solo hay ${maxAvailable} unidad${maxAvailable !== 1 ? 'es' : ''} disponible${maxAvailable !== 1 ? 's' : ''} y ya tienes ${cartQuantity} en tu carrito.`);
           // Ajustar a la cantidad máxima disponible (o 1 si no hay nada disponible)
           const adjustedQuantity = Math.max(1, availableToAdd);
           setQuantity(adjustedQuantity);
@@ -92,7 +104,7 @@ export default function ProductQuantitySelector({
           }
           return;
         } else {
-          alert(`Solo puedes agregar ${availableToAdd} unidad${availableToAdd !== 1 ? 'es' : ''} más. Hay ${maxAvailable} disponible${maxAvailable !== 1 ? 's' : ''} en total y ya tienes ${cartQuantity} en tu carrito. Se ajustará la cantidad automáticamente.`);
+          toast.warning(`Solo puedes agregar ${availableToAdd} unidad${availableToAdd !== 1 ? 'es' : ''} más. Hay ${maxAvailable} disponible${maxAvailable !== 1 ? 's' : ''} en total y ya tienes ${cartQuantity} en tu carrito. Se ajustará la cantidad automáticamente.`);
           // Ajustar la cantidad al máximo disponible
           const adjustedQuantity = Math.min(newQuantity, availableToAdd);
           setQuantity(adjustedQuantity);
@@ -221,31 +233,42 @@ export default function ProductQuantitySelector({
         )}
       </div>
 
-      {/* Precio calculado */}
-      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+      {/* Precio calculado en tiempo real */}
+      <div className={`border rounded-lg p-4 transition-colors ${
+        isWholesale ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'
+      }`}>
         <div className="flex items-center justify-between mb-2">
           <span className="text-sm text-gray-600">Precio unitario:</span>
           <span className={`text-lg font-semibold ${
-            priceCalc.isWholesale ? 'text-green-600' : 'text-gray-900'
+            isWholesale ? 'text-green-600' : 'text-gray-900'
           }`}>
-            {formatCurrency(priceCalc.unitPrice)}
+            {formatCurrency(isWholesale ? currentPrice / quantity : product.price)}
           </span>
         </div>
-        {priceCalc.isWholesale && (
+        {isWholesale && (
           <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
             <span>Precio normal:</span>
-            <span className="line-through">{formatCurrency(priceCalc.originalPrice)}</span>
+            <span className="line-through">{formatCurrency(product.price)}</span>
           </div>
         )}
         <div className="flex items-center justify-between pt-2 border-t border-gray-200">
           <span className="text-sm font-medium text-gray-700">Total ({quantity} {quantity === 1 ? 'unidad' : 'unidades'}):</span>
-          <span className="text-xl font-bold text-blue-600">
-            {formatCurrency(priceCalc.totalPrice)}
+          <span className={`text-xl font-bold ${
+            isWholesale ? 'text-green-600' : 'text-blue-600'
+          }`}>
+            {formatCurrency(currentPrice)}
           </span>
         </div>
-        {priceCalc.isWholesale && (
-          <p className="text-xs text-green-600 mt-2 font-medium">
-            ✓ Ahorras {formatCurrency(priceCalc.savings)} con precio mayorista
+        {isWholesale && savings > 0 && (
+          <div className="mt-2 pt-2 border-t border-green-200">
+            <p className="text-sm text-green-700 font-medium flex items-center gap-1">
+              <span className="text-green-600">✓</span> Ahorras {formatCurrency(savings)} con precio mayorista
+            </p>
+          </div>
+        )}
+        {!isWholesale && product.wholesale_enabled && product.wholesale_min_quantity && quantity < product.wholesale_min_quantity && (
+          <p className="text-xs text-gray-500 mt-2">
+            Agrega {product.wholesale_min_quantity - quantity} {product.wholesale_min_quantity - quantity === 1 ? 'unidad más' : 'unidades más'} para precio mayorista
           </p>
         )}
       </div>

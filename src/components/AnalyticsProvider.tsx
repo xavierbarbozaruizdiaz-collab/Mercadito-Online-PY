@@ -10,6 +10,8 @@ import { usePathname, useSearchParams } from 'next/navigation';
 import { analytics } from '@/lib/services/analyticsService';
 import { errorMonitoring } from '@/lib/monitoring/errorMonitoring';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { facebookPixel as facebookPixelService } from '@/lib/services/facebookPixelService';
+import { googleAnalytics as googleAnalyticsService } from '@/lib/services/googleAnalyticsService';
 
 interface AnalyticsProviderProps {
   children: React.ReactNode;
@@ -20,6 +22,21 @@ function AnalyticsTracker() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { user } = useAuth();
+
+  // Inicializar servicios de analytics
+  useEffect(() => {
+    // Inicializar Facebook Pixel
+    const fbPixelId = process.env.NEXT_PUBLIC_FACEBOOK_PIXEL_ID;
+    if (fbPixelId && typeof window !== 'undefined' && !window.fbq) {
+      facebookPixelService.initialize(fbPixelId);
+    }
+
+    // Inicializar Google Analytics
+    const gaId = process.env.NEXT_PUBLIC_GA_ID;
+    if (gaId && typeof window !== 'undefined' && !window.gtag) {
+      googleAnalyticsService.initialize(gaId);
+    }
+  }, []);
 
   // Track page views
   useEffect(() => {
@@ -45,11 +62,23 @@ function AnalyticsTracker() {
       pageName = 'auth';
     }
 
+    // Track en todos los servicios
     analytics.trackPageView(pageName, {
       url,
       pathname,
       search_params: searchParams.toString(),
     });
+
+    // Facebook Pixel ya trackea PageView automáticamente desde layout.tsx
+    // Pero podemos trackear también manualmente si es necesario
+    if (typeof window !== 'undefined' && window.fbq) {
+      facebookPixelService.trackPageView();
+    }
+
+    // Google Analytics
+    if (typeof window !== 'undefined' && window.gtag) {
+      googleAnalyticsService.trackPageView(pathname, document.title);
+    }
   }, [pathname, searchParams]);
 
   // Set user ID when user changes
@@ -57,8 +86,24 @@ function AnalyticsTracker() {
     if (user?.id) {
       analytics.setUserId(user.id);
       errorMonitoring.setUserId(user.id);
+      
+      // Identificar usuario en Facebook Pixel
+      if (typeof window !== 'undefined' && window.fbq) {
+        facebookPixelService.identify(user.id, {
+          email: user.email,
+        });
+      }
+
+      // Identificar usuario en Google Analytics
+      if (typeof window !== 'undefined' && window.gtag) {
+        googleAnalyticsService.setUserId(user.id);
+        googleAnalyticsService.setUserProperties({
+          userId: user.id,
+          email: user.email,
+        });
+      }
     }
-  }, [user?.id]);
+  }, [user?.id, user?.email]);
 
   // Track performance metrics
   useEffect(() => {

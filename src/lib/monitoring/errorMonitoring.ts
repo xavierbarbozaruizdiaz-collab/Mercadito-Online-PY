@@ -78,13 +78,40 @@ class ErrorMonitoringService {
 
   private setupOnlineOfflineHandlers(): void {
     if (typeof window !== 'undefined') {
+      // Detectar si estamos en desarrollo local
+      const isLocalhost = 
+        window.location.hostname === 'localhost' || 
+        window.location.hostname === '127.0.0.1' ||
+        window.location.hostname.startsWith('192.168.') ||
+        window.location.hostname.startsWith('10.') ||
+        window.location.hostname.startsWith('172.') ||
+        window.location.hostname.includes('local');
+      
+      // En desarrollo local, siempre considerar online
+      if (isLocalhost) {
+        this.isOnline = true;
+        return; // No escuchar eventos en desarrollo
+      }
+
       window.addEventListener('online', () => {
         this.isOnline = true;
         this.flushQueues();
       });
 
       window.addEventListener('offline', () => {
-        this.isOnline = false;
+        // Solo marcar como offline si realmente está offline
+        // Verificar con una prueba rápida antes de cambiar el estado
+        fetch(window.location.origin + '/api/health', { 
+          method: 'HEAD', 
+          cache: 'no-cache',
+          signal: AbortSignal.timeout(2000)
+        }).then(() => {
+          // Si el fetch funciona, está online
+          this.isOnline = true;
+        }).catch(() => {
+          // Solo si falla, marcar como offline
+          this.isOnline = false;
+        });
       });
     }
   }

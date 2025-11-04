@@ -74,6 +74,9 @@ export interface Database {
           social_links: Record<string, string>;
           settings: Record<string, any>;
           is_active: boolean;
+          fb_pixel_id?: string | null;
+          ga_measurement_id?: string | null;
+          gtm_id?: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -108,6 +111,9 @@ export interface Database {
           social_links?: Record<string, string>;
           settings?: Record<string, any>;
           is_active?: boolean;
+          fb_pixel_id?: string | null;
+          ga_measurement_id?: string | null;
+          gtm_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };

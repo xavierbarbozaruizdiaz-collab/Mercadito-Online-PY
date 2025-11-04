@@ -10,9 +10,11 @@ import Link from 'next/link';
 import { Ticket, Clock, Gift, Users, ArrowLeft, CheckCircle } from 'lucide-react';
 import { 
   getRaffleById, 
-  getUserTicketsInRaffle, 
+  getUserTicketsInRaffle,
+  getRaffleWinnerPhotos,
   type Raffle, 
-  type RaffleTicket 
+  type RaffleTicket,
+  type RaffleWinnerPhoto
 } from '@/lib/services/raffleService';
 import { supabase } from '@/lib/supabaseClient';
 import { formatDistanceToNow } from 'date-fns';
@@ -29,6 +31,7 @@ export default function RaffleDetailPage() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [winnerPhotos, setWinnerPhotos] = useState<RaffleWinnerPhoto[]>([]);
 
   useEffect(() => {
     loadData();
@@ -61,6 +64,16 @@ export default function RaffleDetailPage() {
       if (userId) {
         const tickets = await getUserTicketsInRaffle(raffleId, userId);
         setUserTickets(tickets);
+      }
+
+      // Cargar fotos del ganador si el sorteo ya fue realizado
+      if (raffleData.status === 'drawn' && raffleData.winner_id) {
+        try {
+          const photos = await getRaffleWinnerPhotos(raffleId);
+          setWinnerPhotos(photos);
+        } catch (err) {
+          console.warn('Error loading winner photos:', err);
+        }
       }
     } catch (err: any) {
       console.error('Error loading raffle:', err);
@@ -195,6 +208,31 @@ export default function RaffleDetailPage() {
                     Sorteado el {new Date(raffle.drawn_at).toLocaleDateString('es-PY')}
                   </p>
                 )}
+              </div>
+            )}
+
+            {/* Fotos del ganador */}
+            {isDrawn && winnerPhotos.length > 0 && (
+              <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                  📸 Fotos del ganador con su premio
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {winnerPhotos.map((photo) => (
+                    <div key={photo.id} className="relative group">
+                      <div className="relative aspect-square rounded-lg overflow-hidden bg-gray-100">
+                        <img
+                          src={photo.image_url}
+                          alt={photo.caption || 'Foto del premio'}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      {photo.caption && (
+                        <p className="mt-2 text-sm text-gray-600">{photo.caption}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 

@@ -9,6 +9,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabaseClient';
+import { formatPhoneForWhatsApp } from '@/lib/utils';
 import { 
   Star,
   MapPin,
@@ -224,41 +225,73 @@ export default function SellerProfilePage() {
         query = query.eq('sale_type', filters.saleType);
       }
 
-      // Aplicar ordenamiento
-      let orderColumn = 'created_at';
-      let ascending = false;
+      // Verificar si hay búsqueda o filtros activos
+      const hasActiveSearch = searchQuery.trim() !== '' ||
+        filters.minPrice !== '' ||
+        filters.maxPrice !== '' ||
+        filters.condition !== '' ||
+        filters.saleType !== '' ||
+        filters.category !== '';
+
+      // Aplicar ordenamiento o aleatoriedad
+      const shouldRandomize = !hasActiveSearch && sortBy === 'date_desc';
       
-      switch (sortBy) {
-        case 'price_asc':
-          orderColumn = 'price';
-          ascending = true;
-          break;
-        case 'price_desc':
-          orderColumn = 'price';
-          ascending = false;
-          break;
-        case 'date_asc':
-          orderColumn = 'created_at';
-          ascending = true;
-          break;
-        case 'date_desc':
-        default:
-          orderColumn = 'created_at';
-          ascending = false;
-          break;
+      let productsData: any[] = [];
+      
+      if (shouldRandomize) {
+        // Si es aleatorio, obtener sin orden y mezclar después
+        const { data: data, error: productsError } = await query;
+        
+        if (productsError) {
+          console.error('❌ Error loading products:', productsError);
+          throw productsError;
+        }
+        
+        productsData = data || [];
+        
+        // Algoritmo Fisher-Yates para mezclar aleatoriamente
+        for (let i = productsData.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [productsData[i], productsData[j]] = [productsData[j], productsData[i]];
+        }
+      } else {
+        // Aplicar ordenamiento en la query
+        let orderColumn = 'created_at';
+        let ascending = false;
+        
+        switch (sortBy) {
+          case 'price_asc':
+            orderColumn = 'price';
+            ascending = true;
+            break;
+          case 'price_desc':
+            orderColumn = 'price';
+            ascending = false;
+            break;
+          case 'date_asc':
+            orderColumn = 'created_at';
+            ascending = true;
+            break;
+          case 'date_desc':
+          default:
+            orderColumn = 'created_at';
+            ascending = false;
+            break;
+        }
+
+        const { data: data, error: productsError } = await query
+          .order(orderColumn, { ascending });
+
+        if (productsError) {
+          console.error('❌ Error loading products:', productsError);
+          throw productsError;
+        }
+        
+        productsData = data || [];
       }
 
-      const { data: productsData, error: productsError } = await query
-        .order(orderColumn, { ascending });
-
-      if (productsError) {
-        console.error('❌ Error loading products:', productsError);
-        throw productsError;
-      }
-
-      console.log('✅ Products loaded:', productsData?.length || 0, 'products');
-      console.log('📦 Products data:', productsData);
-      setProducts(productsData || []);
+      console.log('✅ Products loaded:', productsData.length, 'products');
+      setProducts(productsData);
     } catch (err: unknown) {
       console.error('❌ Error loading products:', err);
     }
@@ -283,8 +316,9 @@ export default function SellerProfilePage() {
 
   function getWhatsAppLink() {
     if (!profile?.phone) return '#';
-    const phone = profile.phone.replace(/\D/g, '');
-    return `https://wa.me/${phone}`;
+    const formattedPhone = formatPhoneForWhatsApp(profile.phone);
+    if (!formattedPhone) return '#';
+    return `https://wa.me/${formattedPhone}`;
   }
 
   const hasActiveFilters = Object.values(filters).some(v => v !== '') || searchQuery.trim() !== '';
@@ -587,14 +621,14 @@ export default function SellerProfilePage() {
       {/* Productos - Grid estilo Facebook */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {products.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div className="grid grid-cols-3 lg:grid-cols-9 gap-2 sm:gap-3 lg:gap-4">
             {products.map((product) => (
               <Link
                 key={product.id}
                 href={`/products/${product.id}`}
                 className="bg-white rounded-lg overflow-hidden border hover:shadow-lg transition-shadow"
               >
-                <div className="relative h-48 bg-gray-100">
+                <div className="relative h-24 bg-gray-100">
                   {product.cover_url ? (
                     <img
                       src={product.cover_url}
@@ -608,12 +642,12 @@ export default function SellerProfilePage() {
                   )}
                 </div>
 
-                <div className="p-3">
-                  <p className="text-lg font-semibold text-gray-900 mb-1">
+                <div className="p-1.5 sm:p-2">
+                  <p className="text-xs font-semibold text-gray-900 mb-0.5">
                     {product.price.toLocaleString('es-PY')} G
                   </p>
                   {profile.location && (
-                    <p className="text-sm text-gray-500">{profile.location}</p>
+                    <p className="text-[10px] text-gray-500 line-clamp-1">{profile.location}</p>
                   )}
                 </div>
               </Link>

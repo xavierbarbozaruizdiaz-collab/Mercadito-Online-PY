@@ -15,6 +15,8 @@
     "lint:hero": "eslint src/app/page.tsx src/components/hero src/app/api/hero-slides src/app/api/site-stats",
     "typecheck:hero": "tsc --noEmit src/app/page.tsx src/components/hero/HeroCarousel.tsx src/app/api/hero-slides/route.ts src/app/api/site-stats/route.ts",
     "db:push": "npx supabase db push",
+    "db:push:all": "npx supabase db push --include-all",
+    "db:marketing": "powershell -Command \"Get-Content supabase/migrations/20250203000001_marketing_system.sql | Set-Clipboard; Write-Host '✅ SQL copiado al portapapeles. Pega en Supabase Dashboard SQL Editor'\"",
     "typegen": "supabase gen types typescript --linked > src/types/supabase.ts",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",

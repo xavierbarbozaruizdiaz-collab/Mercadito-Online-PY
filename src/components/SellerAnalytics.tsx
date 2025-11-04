@@ -6,13 +6,9 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import {
-  SellerAnalyticsService,
-  SalesStats,
-  SalesTrendData,
-  TopProduct,
-  CategoryStats,
-  ConversionMetrics,
-  RepeatCustomer,
+  getSellerAnalyticsReport,
+  type SellerAnalyticsReport,
+  type TimeRange,
 } from '@/lib/services/sellerAnalyticsService';
 import { Card, CardHeader, CardTitle, CardContent } from './ui/Card';
 import LoadingSpinner from './ui/LoadingSpinner';
@@ -32,15 +28,57 @@ interface SellerAnalyticsProps {
   periodDays?: number;
 }
 
+// Tipos derivados del servicio
+interface SalesStats {
+  total_revenue: number;
+  total_orders: number;
+  average_order_value: number;
+}
+
+interface SalesTrendData {
+  period_date: string;
+  total_revenue: number;
+}
+
+interface TopProduct {
+  product_id: string;
+  product_title: string;
+  total_quantity: number;
+  total_revenue: number;
+  order_count: number;
+  average_rating: number;
+}
+
+interface CategoryStats {
+  category_id: string;
+  category_name: string;
+  total_revenue: number;
+  total_products: number;
+  total_sales: number;
+}
+
+interface ConversionMetrics {
+  total_product_views: number;
+  total_adds_to_cart: number;
+  total_checkouts: number;
+  total_orders: number;
+  cart_conversion_rate: number;
+  checkout_conversion_rate: number;
+  overall_conversion_rate: number;
+}
+
+interface RepeatCustomer {
+  customer_id: string;
+  customer_name: string;
+  order_count: number;
+  total_spent: number;
+  last_order_date: string;
+}
+
 export default function SellerAnalytics({ periodDays = 30 }: SellerAnalyticsProps) {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [salesStats, setSalesStats] = useState<SalesStats | null>(null);
-  const [salesTrend, setSalesTrend] = useState<SalesTrendData[]>([]);
-  const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
-  const [categoryStats, setCategoryStats] = useState<CategoryStats[]>([]);
-  const [conversionMetrics, setConversionMetrics] = useState<ConversionMetrics | null>(null);
-  const [repeatCustomers, setRepeatCustomers] = useState<RepeatCustomer[]>([]);
+  const [report, setReport] = useState<SellerAnalyticsReport | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -52,19 +90,63 @@ export default function SellerAnalytics({ periodDays = 30 }: SellerAnalyticsProp
 
     setLoading(true);
     try {
-      const metrics = await SellerAnalyticsService.getDashboardMetrics(user.id, periodDays);
-      setSalesStats(metrics.salesStats);
-      setSalesTrend(metrics.salesTrend);
-      setTopProducts(metrics.topProducts);
-      setCategoryStats(metrics.categoryStats);
-      setConversionMetrics(metrics.conversionMetrics);
-      setRepeatCustomers(metrics.repeatCustomers);
+      // Convertir periodDays a TimeRange
+      const timeRange: TimeRange = periodDays <= 7 ? '7d' : periodDays <= 30 ? '30d' : periodDays <= 90 ? '90d' : '1y';
+      const analyticsReport = await getSellerAnalyticsReport(user.id, timeRange);
+      setReport(analyticsReport);
     } catch (error) {
       console.error('Error loading analytics:', error);
     } finally {
       setLoading(false);
     }
   };
+
+  // Convertir el reporte a los tipos esperados por los componentes
+  const salesStats: SalesStats | null = report ? {
+    total_revenue: report.summary.totalRevenue,
+    total_orders: report.summary.totalOrders,
+    average_order_value: report.summary.averageOrderValue,
+  } : null;
+
+  const salesTrend: SalesTrendData[] = report?.salesTrend.map(t => ({
+    period_date: t.date,
+    total_revenue: t.revenue,
+  })) || [];
+
+  const topProducts: TopProduct[] = report?.topProducts.map(p => ({
+    product_id: p.id,
+    product_title: p.title,
+    total_quantity: p.total_sold,
+    total_revenue: p.revenue,
+    order_count: 0, // No disponible en el reporte
+    average_rating: 0, // No disponible en el reporte
+  })) || [];
+
+  const categoryStats: CategoryStats[] = report?.salesByCategory.map(c => ({
+    category_id: c.category_id,
+    category_name: c.category_name,
+    total_revenue: c.revenue,
+    total_products: c.products,
+    total_sales: c.orders,
+  })) || [];
+
+  const conversionMetrics: ConversionMetrics | null = report ? {
+    total_product_views: 0, // No disponible en el reporte actual
+    total_adds_to_cart: 0, // No disponible en el reporte actual
+    total_checkouts: 0, // No disponible en el reporte actual
+    total_orders: report.summary.totalOrders,
+    cart_conversion_rate: 0, // No disponible en el reporte actual
+    checkout_conversion_rate: 0, // No disponible en el reporte actual
+    overall_conversion_rate: report.summary.conversionRate,
+  } : null;
+
+  const repeatCustomers: RepeatCustomer[] = report?.topCustomers.map(c => ({
+    customer_id: c.user_id,
+    customer_name: c.name,
+    order_count: c.total_orders,
+    total_spent: c.total_spent,
+    last_order_date: c.last_order_date,
+  })) || [];
 
   if (loading) {
     return (
@@ -98,7 +180,7 @@ export default function SellerAnalytics({ periodDays = 30 }: SellerAnalyticsProp
         />
         <MetricCard
           title="Tasa Conversión"
-          value={`${conversionMetrics?.overall_conversion_rate.toFixed(1) || 0}%`}
+          value={`${conversionMetrics?.overall_conversion_rate?.toFixed(1) || '0.0'}%`}
           icon={<Target className="w-5 h-5" />}
           color="orange"
         />

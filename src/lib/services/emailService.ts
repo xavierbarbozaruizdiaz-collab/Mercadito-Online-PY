@@ -1,7 +1,9 @@
 // src/lib/services/emailService.ts
-// Servicio de email usando Resend
+// Servicio de email usando Resend con templates profesionales
 
 import { Resend } from 'resend';
+import { getBaseEmailTemplate } from '@/lib/templates/email/baseTemplate';
+import { getOrderConfirmationTemplate, type OrderConfirmationData } from '@/lib/templates/email/orderConfirmation';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -22,6 +24,7 @@ export class EmailService {
    */
   static async sendEmail(options: EmailOptions): Promise<{ id: string } | null> {
     if (!process.env.RESEND_API_KEY) {
+      // Warnings se mantienen para debugging de configuración
       console.warn('RESEND_API_KEY no configurada. Email no enviado:', options.to);
       return null;
     }
@@ -37,89 +40,62 @@ export class EmailService {
       });
 
       if (error) {
+        // Errores se mantienen para debugging
         console.error('Error enviando email:', error);
         return null;
       }
 
       return { id: data?.id || '' };
     } catch (error) {
+      // Errores se mantienen para debugging
       console.error('Error en emailService:', error);
       return null;
     }
   }
 
   /**
-   * Envía confirmación de pedido
+   * Envía confirmación de pedido con template mejorado
    */
   static async sendOrderConfirmation(
     email: string,
     orderNumber: string,
     orderDetails: {
-      items: Array<{ name: string; quantity: number; price: number }>;
+      items: Array<{ name: string; quantity: number; price: number; imageUrl?: string }>;
       total: number;
-      shippingAddress: any;
+      subtotal?: number;
+      shipping?: number;
+      tax?: number;
+      shippingAddress: {
+        name: string;
+        address: string;
+        city?: string;
+        department?: string;
+        phone?: string;
+      };
+      trackingNumber?: string;
+      estimatedDelivery?: string;
     }
   ): Promise<boolean> {
-    const html = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="utf-8">
-          <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { background: #3b82f6; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
-            .content { background: #f9fafb; padding: 20px; border: 1px solid #e5e7eb; }
-            .order-info { background: white; padding: 15px; margin: 15px 0; border-radius: 8px; }
-            .item { padding: 10px; border-bottom: 1px solid #e5e7eb; }
-            .total { font-size: 18px; font-weight: bold; margin-top: 15px; padding-top: 15px; border-top: 2px solid #3b82f6; }
-            .footer { text-align: center; padding: 20px; color: #6b7280; font-size: 12px; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header">
-              <h1>🛒 Confirmación de Pedido</h1>
-              <p>¡Gracias por tu compra!</p>
-            </div>
-            <div class="content">
-              <p>Hola,</p>
-              <p>Tu pedido ha sido confirmado. Aquí están los detalles:</p>
-              
-              <div class="order-info">
-                <h3>Pedido #${orderNumber}</h3>
-                <p><strong>Fecha:</strong> ${new Date().toLocaleDateString('es-PY')}</p>
-              </div>
+    const orderData: OrderConfirmationData = {
+      orderNumber,
+      orderDate: new Date().toLocaleDateString('es-PY', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
+      items: orderDetails.items,
+      subtotal: orderDetails.subtotal || orderDetails.total,
+      shipping: orderDetails.shipping,
+      tax: orderDetails.tax,
+      total: orderDetails.total,
+      shippingAddress: orderDetails.shippingAddress,
+      trackingNumber: orderDetails.trackingNumber,
+      estimatedDelivery: orderDetails.estimatedDelivery,
+    };
 
-              <h3>Productos:</h3>
-              ${orderDetails.items.map(item => `
-                <div class="item">
-                  <strong>${item.name}</strong><br>
-                  Cantidad: ${item.quantity} | Precio: ${item.price.toLocaleString('es-PY')} Gs.
-                </div>
-              `).join('')}
-
-              <div class="total">
-                Total: ${orderDetails.total.toLocaleString('es-PY')} Gs.
-              </div>
-
-              <div class="order-info">
-                <h3>Dirección de Envío:</h3>
-                <p>${JSON.stringify(orderDetails.shippingAddress)}</p>
-              </div>
-
-              <p>Te notificaremos cuando tu pedido sea enviado.</p>
-              
-              <p>Si tienes alguna pregunta, no dudes en contactarnos.</p>
-            </div>
-            <div class="footer">
-              <p>Mercadito Online PY - El mejor marketplace de Paraguay</p>
-              <p>Este es un email automático, por favor no responder.</p>
-            </div>
-          </div>
-        </body>
-      </html>
-    `;
+    const html = getOrderConfirmationTemplate(orderData);
 
     const result = await this.sendEmail({
       to: email,
@@ -131,49 +107,30 @@ export class EmailService {
   }
 
   /**
-   * Envía email de bienvenida
+   * Envía email de bienvenida con template mejorado
    */
   static async sendWelcomeEmail(email: string, userName: string): Promise<boolean> {
-    const html = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="utf-8">
-          <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { background: #3b82f6; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
-            .content { background: #f9fafb; padding: 20px; border: 1px solid #e5e7eb; }
-            .button { display: inline-block; padding: 12px 24px; background: #3b82f6; color: white; text-decoration: none; border-radius: 6px; margin: 20px 0; }
-            .footer { text-align: center; padding: 20px; color: #6b7280; font-size: 12px; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header">
-              <h1>🎉 ¡Bienvenido a Mercadito Online PY!</h1>
-            </div>
-            <div class="content">
-              <p>Hola ${userName},</p>
-              <p>¡Gracias por unirte a Mercadito Online PY!</p>
-              <p>Estamos emocionados de tenerte como parte de nuestra comunidad. Ahora puedes:</p>
-              <ul>
-                <li>🛍️ Comprar productos de cientos de vendedores</li>
-                <li>🏪 Crear tu propia tienda y comenzar a vender</li>
-                <li>💬 Chatear directamente con vendedores</li>
-                <li>⭐ Dejar reseñas y calificaciones</li>
-              </ul>
-              <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}" class="button">Explorar Productos</a>
-              <p>Si tienes alguna pregunta, estamos aquí para ayudarte.</p>
-              <p>¡Que disfrutes de tu experiencia de compra!</p>
-            </div>
-            <div class="footer">
-              <p>Mercadito Online PY - El mejor marketplace de Paraguay</p>
-            </div>
-          </div>
-        </body>
-      </html>
+    const content = `
+      <p style="margin: 0 0 20px 0;">¡Gracias por unirte a Mercadito Online PY!</p>
+      <p style="margin: 0 0 20px 0;">Estamos emocionados de tenerte como parte de nuestra comunidad. Ahora puedes:</p>
+      <ul style="margin: 0 0 20px 0; padding-left: 20px; color: #374151;">
+        <li style="margin-bottom: 8px;">🛍️ Comprar productos de cientos de vendedores</li>
+        <li style="margin-bottom: 8px;">🏪 Crear tu propia tienda y comenzar a vender</li>
+        <li style="margin-bottom: 8px;">💬 Chatear directamente con vendedores</li>
+        <li style="margin-bottom: 8px;">⭐ Dejar reseñas y calificaciones</li>
+        <li style="margin-bottom: 8px;">🎟️ Participar en sorteos y ganar premios</li>
+      </ul>
+      <p style="margin: 20px 0 0 0;">Si tienes alguna pregunta, estamos aquí para ayudarte.</p>
+      <p style="margin: 10px 0 0 0;">¡Que disfrutes de tu experiencia de compra!</p>
     `;
+
+    const html = getBaseEmailTemplate({
+      title: `¡Bienvenido${userName ? `, ${userName}` : ''}!`,
+      content,
+      buttonText: 'Explorar Productos',
+      buttonUrl: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+      footerText: 'Mercadito Online PY - El mejor marketplace de Paraguay',
+    });
 
     const result = await this.sendEmail({
       to: email,
@@ -185,53 +142,30 @@ export class EmailService {
   }
 
   /**
-   * Envía email de recuperación de contraseña (requiere token)
+   * Envía email de recuperación de contraseña con template mejorado
    */
   static async sendPasswordReset(email: string, resetLink: string): Promise<boolean> {
-    const html = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="utf-8">
-          <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { background: #dc2626; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
-            .content { background: #f9fafb; padding: 20px; border: 1px solid #e5e7eb; }
-            .button { display: inline-block; padding: 12px 24px; background: #dc2626; color: white; text-decoration: none; border-radius: 6px; margin: 20px 0; }
-            .warning { background: #fef2f2; border-left: 4px solid #dc2626; padding: 15px; margin: 15px 0; }
-            .footer { text-align: center; padding: 20px; color: #6b7280; font-size: 12px; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header">
-              <h1>🔐 Restablecer Contraseña</h1>
-            </div>
-            <div class="content">
-              <p>Hola,</p>
-              <p>Recibimos una solicitud para restablecer tu contraseña en Mercadito Online PY.</p>
-              <p>Haz clic en el botón a continuación para crear una nueva contraseña:</p>
-              <div style="text-align: center;">
-                <a href="${resetLink}" class="button">Restablecer Contraseña</a>
-              </div>
-              <div class="warning">
-                <strong>⚠️ Importante:</strong>
-                <ul>
-                  <li>Este link expirará en 1 hora</li>
-                  <li>Si no solicitaste este cambio, ignora este email</li>
-                  <li>Nunca compartas este link con nadie</li>
-                </ul>
-              </div>
-            </div>
-            <div class="footer">
-              <p>Mercadito Online PY</p>
-              <p>Si no solicitaste este cambio, puedes ignorar este email de forma segura.</p>
-            </div>
-          </div>
-        </body>
-      </html>
+    const content = `
+      <p style="margin: 0 0 20px 0;">Recibimos una solicitud para restablecer tu contraseña en Mercadito Online PY.</p>
+      <p style="margin: 0 0 20px 0;">Haz clic en el botón a continuación para crear una nueva contraseña:</p>
+      <div style="background-color: #fef2f2; border-left: 4px solid #dc2626; border-radius: 4px; padding: 16px; margin: 20px 0;">
+        <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #991b1b;">⚠️ Importante:</p>
+        <ul style="margin: 0; padding-left: 20px; color: #991b1b; font-size: 14px;">
+          <li style="margin-bottom: 4px;">Este link expirará en 1 hora</li>
+          <li style="margin-bottom: 4px;">Si no solicitaste este cambio, ignora este email</li>
+          <li>Nunca compartas este link con nadie</li>
+        </ul>
+      </div>
+      <p style="margin: 20px 0 0 0; color: #6b7280; font-size: 14px;">Si no solicitaste este cambio, puedes ignorar este email de forma segura.</p>
     `;
+
+    const html = getBaseEmailTemplate({
+      title: 'Restablecer Contraseña',
+      content,
+      buttonText: 'Restablecer Contraseña',
+      buttonUrl: resetLink,
+      footerText: 'Mercadito Online PY - El mejor marketplace de Paraguay',
+    });
 
     const result = await this.sendEmail({
       to: email,
@@ -243,7 +177,7 @@ export class EmailService {
   }
 
   /**
-   * Envía notificación de nuevo mensaje
+   * Envía notificación de nuevo mensaje con template mejorado
    */
   static async sendNewMessageNotification(
     email: string,
@@ -251,43 +185,21 @@ export class EmailService {
     messagePreview: string,
     conversationLink: string
   ): Promise<boolean> {
-    const html = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="utf-8">
-          <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { background: #3b82f6; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
-            .content { background: #f9fafb; padding: 20px; border: 1px solid #e5e7eb; }
-            .message-box { background: white; padding: 15px; border-left: 4px solid #3b82f6; margin: 15px 0; }
-            .button { display: inline-block; padding: 12px 24px; background: #3b82f6; color: white; text-decoration: none; border-radius: 6px; margin: 20px 0; }
-            .footer { text-align: center; padding: 20px; color: #6b7280; font-size: 12px; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header">
-              <h1>💬 Nuevo Mensaje</h1>
-            </div>
-            <div class="content">
-              <p>Hola,</p>
-              <p><strong>${senderName}</strong> te ha enviado un mensaje:</p>
-              <div class="message-box">
-                <p>"${messagePreview}"</p>
-              </div>
-              <div style="text-align: center;">
-                <a href="${conversationLink}" class="button">Ver Conversación</a>
-              </div>
-            </div>
-            <div class="footer">
-              <p>Mercadito Online PY</p>
-            </div>
-          </div>
-        </body>
-      </html>
+    const content = `
+      <p style="margin: 0 0 20px 0;"><strong>${senderName}</strong> te ha enviado un mensaje:</p>
+      <div style="background-color: #ffffff; padding: 20px; border-left: 4px solid #3b82f6; border-radius: 4px; margin: 20px 0;">
+        <p style="margin: 0; font-style: italic; color: #374151;">"${messagePreview}"</p>
+      </div>
+      <p style="margin: 20px 0 0 0;">Responde al mensaje para continuar la conversación.</p>
     `;
+
+    const html = getBaseEmailTemplate({
+      title: '💬 Nuevo Mensaje',
+      content,
+      buttonText: 'Ver Conversación',
+      buttonUrl: conversationLink,
+      footerText: 'Mercadito Online PY - El mejor marketplace de Paraguay',
+    });
 
     const result = await this.sendEmail({
       to: email,
@@ -371,6 +283,106 @@ export class EmailService {
     }
 
     return { sent, failed };
+  }
+
+  /**
+   * Envía email al ganador de un sorteo
+   */
+  static async sendRaffleWinnerEmail(
+    email: string,
+    winnerName: string,
+    raffleTitle: string,
+    raffleDetails: {
+      prize?: string;
+      productName?: string;
+      drawDate: string;
+      raffleId: string;
+    }
+  ): Promise<boolean> {
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const raffleUrl = `${appUrl}/raffles/${raffleDetails.raffleId}`;
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 30px 20px; text-align: center; border-radius: 8px 8px 0 0; }
+            .header h1 { margin: 0; font-size: 28px; }
+            .content { background: #f9fafb; padding: 30px 20px; border: 1px solid #e5e7eb; }
+            .winner-box { background: white; padding: 25px; border: 3px solid #10b981; border-radius: 8px; margin: 20px 0; text-align: center; }
+            .winner-box h2 { color: #10b981; margin: 0 0 10px 0; font-size: 24px; }
+            .prize-info { background: #ecfdf5; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #10b981; }
+            .button { display: inline-block; padding: 14px 28px; background: #10b981; color: white; text-decoration: none; border-radius: 6px; margin: 20px 0; font-weight: bold; }
+            .button:hover { background: #059669; }
+            .footer { text-align: center; padding: 20px; color: #6b7280; font-size: 12px; border-top: 1px solid #e5e7eb; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>🎉 ¡FELICITACIONES! 🎉</h1>
+              <p style="margin: 10px 0 0 0; font-size: 18px;">Has ganado un sorteo</p>
+            </div>
+            <div class="content">
+              <p>Hola <strong>${winnerName}</strong>,</p>
+              <p>¡Tenemos excelentes noticias para ti!</p>
+              
+              <div class="winner-box">
+                <h2>🎊 ¡ERES EL GANADOR! 🎊</h2>
+                <p style="font-size: 18px; margin: 10px 0;"><strong>${raffleTitle}</strong></p>
+              </div>
+
+              <div class="prize-info">
+                <h3 style="margin-top: 0; color: #059669;">Premio:</h3>
+                ${raffleDetails.productName ? `<p style="font-size: 18px; font-weight: bold; margin: 10px 0;">${raffleDetails.productName}</p>` : ''}
+                ${raffleDetails.prize ? `<p style="font-size: 18px; font-weight: bold; margin: 10px 0;">${raffleDetails.prize}</p>` : ''}
+                <p style="margin: 10px 0; color: #6b7280;">Fecha del sorteo: ${new Date(raffleDetails.drawDate).toLocaleDateString('es-PY', { 
+                  year: 'numeric', 
+                  month: 'long', 
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })}</p>
+              </div>
+
+              <p>Para reclamar tu premio, por favor:</p>
+              <ol style="text-align: left; max-width: 500px; margin: 20px auto;">
+                <li>Visita tu perfil en Mercadito Online PY</li>
+                <li>Revisa la sección "Sorteos Ganados"</li>
+                <li>Contacta al administrador o vendedor según corresponda</li>
+              </ol>
+
+              <div style="text-align: center;">
+                <a href="${raffleUrl}" class="button">Ver Detalles del Sorteo</a>
+              </div>
+
+              <p style="margin-top: 30px; color: #6b7280; font-size: 14px;">
+                <strong>Nota importante:</strong> Tienes 30 días para reclamar tu premio. 
+                Si no lo reclamas en ese tiempo, el premio será sorteado nuevamente.
+              </p>
+            </div>
+            <div class="footer">
+              <p><strong>Mercadito Online PY</strong></p>
+              <p>El mejor marketplace de Paraguay</p>
+              <p style="margin-top: 15px; color: #9ca3af;">Este es un email automático, por favor no responder.</p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+
+    const result = await this.sendEmail({
+      to: email,
+      subject: `🎉 ¡Felicidades! Ganaste: ${raffleTitle}`,
+      html,
+    });
+
+    return result !== null;
   }
 
   /**

@@ -47,29 +47,54 @@ export function useNetworkStatus(): UseNetworkStatusReturn {
         (navigator as any).mozConnection ||
         (navigator as any).webkitConnection;
 
-      // Verificar conexión real haciendo un ping ligero
+      // Confiar en navigator.onLine como fuente principal
+      // Solo hacer verificación adicional si navigator dice offline Y hay información de conexión
       let isReallyOnline = navigator.onLine;
       
-      // Si navigator dice offline, verificar con un fetch rápido
+      // Si navigator dice offline, hacer una verificación más robusta
       if (!navigator.onLine) {
-        try {
-          // Intentar hacer un fetch a un recurso pequeño para verificar conexión real
-          const response = await fetch('/favicon.ico', { 
-            method: 'HEAD', 
-            cache: 'no-cache',
-            signal: AbortSignal.timeout(2000) // Timeout de 2 segundos
-          });
-          isReallyOnline = response.ok;
-        } catch (err) {
-          // Si falla, está realmente offline
-          isReallyOnline = false;
+        // Si hay información de conexión activa, confiar en eso antes que hacer fetch
+        if (connection && (connection.effectiveType || connection.downlink)) {
+          // Si hay información de conexión, probablemente está online pero el navegador lo detectó mal
+          isReallyOnline = true;
+        } else {
+          // Solo hacer fetch si realmente no hay información de conexión
+          // Usar un endpoint más confiable que favicon.ico
+          try {
+            // Intentar hacer un fetch a la API de Supabase (que siempre está disponible)
+            // Usar un endpoint que sabemos que existe y responde rápido
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 1500); // Timeout más corto
+            
+            try {
+              // Intentar con un endpoint conocido que debería responder
+              const response = await fetch(window.location.origin + '/api/health', { 
+                method: 'HEAD', 
+                cache: 'no-cache',
+                signal: controller.signal
+              });
+              isReallyOnline = response.ok || response.status < 500; // Cualquier respuesta válida indica conexión
+            } catch (fetchErr) {
+              // Si /api/health no existe, intentar con la raíz
+              try {
+                const rootResponse = await fetch(window.location.origin, { 
+                  method: 'HEAD', 
+                  cache: 'no-cache',
+                  signal: controller.signal
+                });
+                isReallyOnline = rootResponse.ok || rootResponse.status < 500;
+              } catch {
+                // Si ambos fallan, confiar en navigator.onLine (false)
+                isReallyOnline = false;
+              }
+            } finally {
+              clearTimeout(timeoutId);
+            }
+          } catch (err) {
+            // Si hay un error de red real, confiar en navigator.onLine
+            isReallyOnline = false;
+          }
         }
-      }
-      
-      // Si navigator dice offline pero tenemos información de conexión activa, confiar en eso
-      if (!isReallyOnline && connection && connection.effectiveType) {
-        // Si hay información de conexión, probablemente está online pero el navegador lo detectó mal
-        isReallyOnline = true;
       }
 
       const newStatus: UseNetworkStatusReturn = {

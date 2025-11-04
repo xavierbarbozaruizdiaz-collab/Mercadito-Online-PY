@@ -31,6 +31,8 @@ import {
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { useWishlist } from '@/lib/hooks/useWishlist';
 import { supabase } from '@/lib/supabaseClient';
+import { useFacebookPixel } from '@/lib/services/facebookPixelService';
+import { useGoogleAnalytics } from '@/lib/services/googleAnalyticsService';
 
 // ============================================
 // TIPOS
@@ -49,6 +51,9 @@ interface Product {
   stock_quantity?: number | null;
   stock_management_enabled?: boolean;
   low_stock_threshold?: number | null;
+  wholesale_enabled?: boolean;
+  wholesale_min_quantity?: number | null;
+  wholesale_discount_percent?: number | null;
   store: {
     name: string;
     slug: string;
@@ -87,6 +92,8 @@ export default function ProductCard({
   const [isOwnProduct, setIsOwnProduct] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const isLiked = isInWishlist(product.id);
+  const facebookPixel = useFacebookPixel();
+  const googleAnalytics = useGoogleAnalytics();
   
   // Calcular estado de stock
   const stockInfo = product.stock_management_enabled && product.stock_quantity !== null && product.stock_quantity !== undefined
@@ -136,6 +143,25 @@ export default function ProductCard({
     checkOwnership();
   }, [product.id, product.seller_id]);
 
+  // Track view content cuando se monta el componente
+  useEffect(() => {
+    facebookPixel.trackViewContent({
+      id: product.id,
+      title: product.title,
+      price: product.price,
+      category: product.category?.name,
+      currency: 'PYG',
+    });
+
+    googleAnalytics.trackViewItem({
+      id: product.id,
+      name: product.title,
+      category: product.category?.name,
+      price: product.price,
+      currency: 'PYG',
+    });
+  }, [product.id, product.title, product.price, product.category?.name, facebookPixel, googleAnalytics]);
+
   // Manejar clic en la tarjeta
   const handleCardClick = () => {
     if (onClick) {
@@ -161,6 +187,25 @@ export default function ProductCard({
       alert('No puedes agregar tus propios productos al carrito');
       return;
     }
+
+    // Track add to cart
+    facebookPixel.trackAddToCart({
+      id: product.id,
+      title: product.title,
+      price: product.price,
+      quantity: 1,
+      category: product.category?.name,
+      currency: 'PYG',
+    });
+
+    googleAnalytics.trackAddToCart({
+      id: product.id,
+      name: product.title,
+      category: product.category?.name,
+      price: product.price,
+      quantity: 1,
+      currency: 'PYG',
+    });
 
     setIsAddingToCart(true);
     try {
@@ -207,10 +252,10 @@ export default function ProductCard({
         }
       }
 
-      alert('Producto agregado al carrito');
+      // toast.success('Producto agregado al carrito');
     } catch (err: any) {
       console.error('Error adding to cart:', err);
-      alert(err.message || 'Error al agregar al carrito');
+      // toast.error(err.message || 'Error al agregar al carrito');
     } finally {
       setIsAddingToCart(false);
     }
@@ -420,6 +465,17 @@ export default function ProductCard({
               className="absolute top-2 right-2"
             >
               -{discount}%
+            </Badge>
+          )}
+
+          {/* Badge de precio mayorista */}
+          {product.wholesale_enabled && product.wholesale_min_quantity && (
+            <Badge 
+              variant="success" 
+              size="sm" 
+              className="absolute top-2 left-2 bg-green-500 text-white"
+            >
+              💰 Mayorista {product.wholesale_min_quantity}+
             </Badge>
           )}
 

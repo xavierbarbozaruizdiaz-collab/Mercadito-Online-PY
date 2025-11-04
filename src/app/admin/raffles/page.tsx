@@ -31,6 +31,7 @@ import {
   type Raffle
 } from '@/lib/services/raffleService';
 import { supabase } from '@/lib/supabaseClient';
+import { useToast } from '@/lib/hooks/useToast';
 
 type Tab = 'active' | 'pending' | 'ended' | 'settings';
 
@@ -44,6 +45,7 @@ export default function AdminRafflesPage() {
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const toast = useToast();
 
   useEffect(() => {
     loadData();
@@ -91,7 +93,7 @@ export default function AdminRafflesPage() {
       setSettings(settingsData);
     } catch (err: any) {
       console.error('Error loading admin raffles:', err);
-      alert(`Error: ${err.message || 'Error al cargar datos'}`);
+      toast.error(`Error: ${err.message || 'Error al cargar datos'}`);
     } finally {
       setLoading(false);
     }
@@ -106,9 +108,9 @@ export default function AdminRafflesPage() {
       setProcessing(raffleId);
       await approveRaffle(raffleId, currentUserId);
       await loadData();
-      alert('✅ Sorteo aprobado y activado exitosamente');
+      toast.success('✅ Sorteo aprobado y activado exitosamente');
     } catch (err: any) {
-      alert(`Error: ${err.message || 'Error al aprobar sorteo'}`);
+      toast.error(`Error: ${err.message || 'Error al aprobar sorteo'}`);
     } finally {
       setProcessing(null);
     }
@@ -121,9 +123,9 @@ export default function AdminRafflesPage() {
       setProcessing(raffleId);
       await rejectRaffle(raffleId);
       await loadData();
-      alert('✅ Sorteo rechazado');
+      toast.success('✅ Sorteo rechazado');
     } catch (err: any) {
-      alert(`Error: ${err.message || 'Error al rechazar sorteo'}`);
+      toast.error(`Error: ${err.message || 'Error al rechazar sorteo'}`);
     } finally {
       setProcessing(null);
     }
@@ -136,9 +138,10 @@ export default function AdminRafflesPage() {
       setProcessing(raffleId);
       const result = await drawRaffleWinner(raffleId);
       await loadData();
-      alert(`✅ Sorteo realizado! Ganador: ${result.winner_name} (${result.winner_email})`);
+      toast.success(`✅ Sorteo realizado! Ganador: ${result.winner_name} (${result.winner_email})`);
+      toast.info('📧 Email de notificación enviado al ganador');
     } catch (err: any) {
-      alert(`Error: ${err.message || 'Error al realizar sorteo'}`);
+      toast.error(`Error: ${err.message || 'Error al realizar sorteo'}`);
     } finally {
       setProcessing(null);
     }
@@ -153,9 +156,9 @@ export default function AdminRafflesPage() {
       setProcessing('settings');
       await updateRaffleSetting('global_enabled', { enabled: newValue }, currentUserId);
       await loadData();
-      alert(`✅ Sistema de sorteos ${newValue ? 'habilitado' : 'deshabilitado'}`);
+      toast.success(`✅ Sistema de sorteos ${newValue ? 'habilitado' : 'deshabilitado'}`);
     } catch (err: any) {
-      alert(`Error: ${err.message || 'Error al actualizar configuración'}`);
+      toast.error(`Error: ${err.message || 'Error al actualizar configuración'}`);
     } finally {
       setProcessing(null);
     }

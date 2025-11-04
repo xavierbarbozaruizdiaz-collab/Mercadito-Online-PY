@@ -1,261 +1,388 @@
-// src/lib/services/sellerAnalyticsService.ts
-// Servicio para analytics avanzados de vendedores
+// ============================================
+// MERCADITO ONLINE PY - SELLER ANALYTICS SERVICE
+// Servicio para analytics de vendedores
+// ============================================
 
-import { supabase } from '@/lib/supabaseClient';
-import { normalizeRpcResult, normalizeRpcList } from '@/lib/supabase/rpc';
+import { supabase } from '@/lib/supabase/client';
 
-export interface SalesStats {
-  total_orders: number;
-  total_revenue: number;
-  average_order_value: number;
-  completed_orders: number;
-  pending_orders: number;
-  cancelled_orders: number;
+export type TimeRange = '7d' | '30d' | '90d' | '1y' | 'all';
+
+export interface SellerAnalyticsReport {
+  // Resumen general
+  summary: {
+    totalRevenue: number;
+    totalOrders: number;
+    totalProducts: number;
+    activeProducts: number;
+    averageOrderValue: number;
+    conversionRate: number;
+    totalCustomers: number;
+    returningCustomers: number;
+  };
+
+  // Tendencias temporales
+  salesTrend: Array<{
+    date: string;
+    revenue: number;
+    orders: number;
+    customers: number;
+  }>;
+
+  // Productos
+  topProducts: Array<{
+    id: string;
+    title: string;
+    cover_url: string | null;
+    total_sold: number;
+    revenue: number;
+    views?: number;
+  }>;
+
+  // Órdenes
+  ordersByStatus: {
+    pending: number;
+    confirmed: number;
+    shipped: number;
+    delivered: number;
+    cancelled: number;
+  };
+
+  // Categorías
+  salesByCategory: Array<{
+    category_id: string;
+    category_name: string;
+    revenue: number;
+    orders: number;
+    products: number;
+  }>;
+
+  // Clientes
+  topCustomers: Array<{
+    user_id: string;
+    name: string;
+    email: string;
+    total_orders: number;
+    total_spent: number;
+    last_order_date: string;
+  }>;
+
+  // Comparación con período anterior
+  comparison: {
+    revenueChange: number;
+    ordersChange: number;
+    customersChange: number;
+    revenueChangePercent: number;
+    ordersChangePercent: number;
+    customersChangePercent: number;
+  };
 }
 
-export interface SalesTrendData {
-  period_date: string;
-  total_revenue: number;
-  order_count: number;
-}
+/**
+ * Obtiene el reporte de analytics para un vendedor
+ */
+export async function getSellerAnalyticsReport(
+  sellerId: string,
+  timeRange: TimeRange = '30d'
+): Promise<SellerAnalyticsReport | null> {
+  try {
+    const { startDate, endDate, previousStartDate } = getDateRange(timeRange);
 
-export interface TopProduct {
-  product_id: string;
-  product_title: string;
-  total_quantity: number;
-  total_revenue: number;
-  order_count: number;
-  average_rating: number;
-}
+    // Obtener todas las órdenes del vendedor
+    const { data: orders, error: ordersError } = await supabase
+      .from('orders')
+      .select(`
+        id,
+        buyer_id,
+        status,
+        total_amount,
+        created_at,
+        order_items (
+          id,
+          product_id,
+          quantity,
+          unit_price,
+          total_price,
+          products (
+            id,
+            title,
+            cover_url,
+            category_id,
+            categories (
+              id,
+              name
+            )
+          )
+        )
+      `)
+      .eq('seller_id', sellerId)
+      .gte('created_at', startDate)
+      .lte('created_at', endDate)
+      .order('created_at', { ascending: false });
 
-export interface CategoryStats {
-  category_id: string;
-  category_name: string;
-  total_products: number;
-  total_sales: number;
-  total_revenue: number;
-}
-
-export interface ConversionMetrics {
-  total_product_views: number;
-  total_adds_to_cart: number;
-  total_checkouts: number;
-  total_orders: number;
-  cart_conversion_rate: number;
-  checkout_conversion_rate: number;
-  overall_conversion_rate: number;
-}
-
-export interface RepeatCustomer {
-  customer_id: string;
-  customer_name: string;
-  order_count: number;
-  total_spent: number;
-  last_order_date: string;
-}
-
-export class SellerAnalyticsService {
-  /**
-   * Obtiene estadísticas de ventas por período
-   */
-  static async getSalesStatsByPeriod(
-    sellerId: string,
-    startDate: Date,
-    endDate: Date
-  ): Promise<SalesStats | null> {
-    try {
-      const { data, error } = await supabase.rpc('get_sales_stats_by_period', {
-        seller_id_param: sellerId,
-        period_start: startDate.toISOString(),
-        period_end: endDate.toISOString(),
-      } as any);
-
-      if (error) throw error;
-      return normalizeRpcResult<SalesStats>(data);
-    } catch (error) {
-      console.error('Error getting sales stats:', error);
+    if (ordersError) {
+      console.error('Error fetching orders:', ordersError);
       return null;
     }
-  }
 
-  /**
-   * Obtiene tendencia de ventas (por día o mes)
-   */
-  static async getSalesTrend(
-    sellerId: string,
-    startDate: Date,
-    endDate: Date,
-    groupBy: 'day' | 'month' = 'day'
-  ): Promise<SalesTrendData[]> {
-    try {
-      const { data, error } = await supabase.rpc('get_sales_trend', {
-        seller_id_param: sellerId,
-        start_date: startDate.toISOString(),
-        end_date: endDate.toISOString(),
-        group_by: groupBy,
-      } as any);
+    // Obtener órdenes del período anterior para comparación
+    const { data: previousOrders } = await supabase
+      .from('orders')
+      .select('id, total_amount, created_at')
+      .eq('seller_id', sellerId)
+      .gte('created_at', previousStartDate)
+      .lt('created_at', startDate);
 
-      if (error) throw error;
-      return normalizeRpcList<SalesTrendData>(data);
-    } catch (error) {
-      console.error('Error getting sales trend:', error);
-      return [];
+    // Obtener productos del vendedor
+    const { data: products } = await supabase
+      .from('products')
+      .select('id, title, category_id, status')
+      .eq('seller_id', sellerId);
+
+    // Calcular métricas
+    const totalRevenue = (orders || []).reduce((sum, order) => sum + (order.total_amount || 0), 0);
+    const totalOrders = orders?.length || 0;
+    const totalProducts = products?.length || 0;
+    const activeProducts = products?.filter(p => p.status === 'active' || !p.status).length || 0;
+
+    // Agrupar por fecha para tendencias
+    const salesByDate = new Map<string, { revenue: number; orders: number; customers: Set<string> }>();
+    const customersSet = new Set<string>();
+    const ordersByStatus: any = {
+      pending: 0,
+      confirmed: 0,
+      shipped: 0,
+      delivered: 0,
+      cancelled: 0,
+    };
+
+    orders?.forEach(order => {
+      const date = new Date(order.created_at).toISOString().split('T')[0];
+      if (!salesByDate.has(date)) {
+        salesByDate.set(date, { revenue: 0, orders: 0, customers: new Set() });
+      }
+      const dayData = salesByDate.get(date)!;
+      dayData.revenue += order.total_amount || 0;
+      dayData.orders += 1;
+      dayData.customers.add(order.buyer_id);
+      customersSet.add(order.buyer_id);
+
+      const status = order.status as keyof typeof ordersByStatus;
+      if (ordersByStatus.hasOwnProperty(status)) {
+        ordersByStatus[status]++;
+      }
+    });
+
+    // Generar array de tendencias
+    const salesTrend = Array.from(salesByDate.entries())
+      .map(([date, data]) => ({
+        date,
+        revenue: data.revenue,
+        orders: data.orders,
+        customers: data.customers.size,
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    // Productos más vendidos
+    const productSales = new Map<string, { id: string; title: string; cover_url: string | null; sold: number; revenue: number }>();
+    orders?.forEach(order => {
+      order.order_items?.forEach((item: any) => {
+        const productId = item.product_id;
+        if (!productSales.has(productId)) {
+          productSales.set(productId, {
+            id: productId,
+            title: item.products?.title || 'Producto',
+            cover_url: item.products?.cover_url || null,
+            sold: 0,
+            revenue: 0,
+          });
+        }
+        const product = productSales.get(productId)!;
+        product.sold += item.quantity || 0;
+        product.revenue += item.total_price || 0;
+      });
+    });
+
+    const topProducts = Array.from(productSales.values())
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 10)
+      .map(p => ({
+        ...p,
+        total_sold: p.sold,
+      }));
+
+    // Ventas por categoría
+    const categorySales = new Map<string, { category_id: string; category_name: string; revenue: number; orders: number; products: Set<string> }>();
+    orders?.forEach(order => {
+      order.order_items?.forEach((item: any) => {
+        const categoryId = item.products?.category_id;
+        const categoryName = item.products?.categories?.name || 'Sin categoría';
+        if (!categorySales.has(categoryId)) {
+          categorySales.set(categoryId, {
+            category_id: categoryId,
+            category_name: categoryName,
+            revenue: 0,
+            orders: 0,
+            products: new Set(),
+          });
+        }
+        const cat = categorySales.get(categoryId)!;
+        cat.revenue += item.total_price || 0;
+        cat.products.add(item.product_id);
+      });
+    });
+
+    const salesByCategory = Array.from(categorySales.values())
+      .map(cat => ({
+        ...cat,
+        orders: 1, // Simplificado
+        products: cat.products.size,
+      }))
+      .sort((a, b) => b.revenue - a.revenue);
+
+    // Top clientes
+    const customerData = new Map<string, { user_id: string; name: string; email: string; orders: number; spent: number; lastOrder: string }>();
+    orders?.forEach(order => {
+      if (!customerData.has(order.buyer_id)) {
+        customerData.set(order.buyer_id, {
+          user_id: order.buyer_id,
+          name: 'Cliente',
+          email: '',
+          orders: 0,
+          spent: 0,
+          lastOrder: order.created_at,
+        });
+      }
+      const customer = customerData.get(order.buyer_id)!;
+      customer.orders += 1;
+      customer.spent += order.total_amount || 0;
+      if (order.created_at > customer.lastOrder) {
+        customer.lastOrder = order.created_at;
+      }
+    });
+
+    // Obtener información de perfiles de clientes
+    const buyerIds = Array.from(customerData.keys());
+    if (buyerIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email')
+        .in('id', buyerIds);
+
+      profiles?.forEach(profile => {
+        const customer = customerData.get(profile.id);
+        if (customer) {
+          customer.name = `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || profile.email?.split('@')[0] || 'Cliente';
+          customer.email = profile.email || '';
+        }
+      });
     }
-  }
 
-  /**
-   * Obtiene productos más vendidos
-   */
-  static async getTopSellingProducts(
-    sellerId: string,
-    limit: number = 10,
-    startDate?: Date,
-    endDate?: Date
-  ): Promise<TopProduct[]> {
-    try {
-      const start = startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-      const end = endDate || new Date();
+    const topCustomers = Array.from(customerData.values())
+      .sort((a, b) => b.spent - a.spent)
+      .slice(0, 10)
+      .map(c => ({
+        user_id: c.user_id,
+        name: c.name,
+        email: c.email,
+        total_orders: c.orders,
+        total_spent: c.spent,
+        last_order_date: c.lastOrder,
+      }));
 
-      const { data, error } = await supabase.rpc('get_top_selling_products', {
-        seller_id_param: sellerId,
-        period_start: start.toISOString(),
-        period_end: end.toISOString(),
-        limit_count: limit,
-      } as any);
+    // Calcular comparación con período anterior
+    const previousRevenue = (previousOrders || []).reduce((sum, order) => sum + (order.total_amount || 0), 0);
+    const previousOrdersCount = previousOrders?.length || 0;
+    const previousCustomers = new Set(previousOrders?.map(o => o.buyer_id) || []).size;
 
-      if (error) throw error;
-      return normalizeRpcList<TopProduct>(data);
-    } catch (error) {
-      console.error('Error getting top products:', error);
-      return [];
-    }
-  }
+    const revenueChange = totalRevenue - previousRevenue;
+    const ordersChange = totalOrders - previousOrdersCount;
+    const customersChange = customersSet.size - previousCustomers;
 
-  /**
-   * Obtiene estadísticas por categoría
-   */
-  static async getCategorySalesStats(
-    sellerId: string,
-    startDate?: Date,
-    endDate?: Date
-  ): Promise<CategoryStats[]> {
-    try {
-      const start = startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-      const end = endDate || new Date();
+    const revenueChangePercent = previousRevenue > 0 ? (revenueChange / previousRevenue) * 100 : 0;
+    const ordersChangePercent = previousOrdersCount > 0 ? (ordersChange / previousOrdersCount) * 100 : 0;
+    const customersChangePercent = previousCustomers > 0 ? (customersChange / previousCustomers) * 100 : 0;
 
-      const { data, error } = await supabase.rpc('get_category_sales_stats', {
-        seller_id_param: sellerId,
-        period_start: start.toISOString(),
-        period_end: end.toISOString(),
-      } as any);
+    // Calcular clientes recurrentes
+    const previousCustomerIds = new Set(previousOrders?.map(o => o.buyer_id) || []);
+    const returningCustomers = Array.from(customersSet).filter(id => previousCustomerIds.has(id)).length;
 
-      if (error) throw error;
-      return normalizeRpcList<CategoryStats>(data);
-    } catch (error) {
-      console.error('Error getting category stats:', error);
-      return [];
-    }
-  }
+    // Calcular conversión (simplificado: órdenes / productos activos)
+    const conversionRate = activeProducts > 0 ? (totalOrders / activeProducts) * 100 : 0;
 
-  /**
-   * Obtiene métricas de conversión
-   */
-  static async getConversionMetrics(
-    sellerId: string,
-    startDate?: Date,
-    endDate?: Date
-  ): Promise<ConversionMetrics | null> {
-    try {
-      const start = startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-      const end = endDate || new Date();
-
-      const { data, error } = await supabase.rpc('get_conversion_metrics', {
-        seller_id_param: sellerId,
-        period_start: start.toISOString(),
-        period_end: end.toISOString(),
-      } as any);
-
-      if (error) throw error;
-      return normalizeRpcResult<ConversionMetrics>(data);
-    } catch (error) {
-      console.error('Error getting conversion metrics:', error);
-      return null;
-    }
-  }
-
-  /**
-   * Obtiene clientes recurrentes
-   */
-  static async getRepeatCustomers(
-    sellerId: string,
-    startDate?: Date,
-    endDate?: Date
-  ): Promise<RepeatCustomer[]> {
-    try {
-      const start = startDate || new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
-      const end = endDate || new Date();
-
-      const { data, error } = await supabase.rpc('get_repeat_customers', {
-        seller_id_param: sellerId,
-        period_start: start.toISOString(),
-        period_end: end.toISOString(),
-      } as any);
-
-      if (error) throw error;
-      return normalizeRpcList<RepeatCustomer>(data);
-    } catch (error) {
-      console.error('Error getting repeat customers:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Obtiene todas las métricas del dashboard en una llamada
-   */
-  static async getDashboardMetrics(
-    sellerId: string,
-    periodDays: number = 30
-  ): Promise<{
-    salesStats: SalesStats | null;
-    salesTrend: SalesTrendData[];
-    topProducts: TopProduct[];
-    categoryStats: CategoryStats[];
-    conversionMetrics: ConversionMetrics | null;
-    repeatCustomers: RepeatCustomer[];
-  }> {
-    const endDate = new Date();
-    const startDate = new Date(endDate.getTime() - periodDays * 24 * 60 * 60 * 1000);
-
-    try {
-      const [salesStats, salesTrend, topProducts, categoryStats, conversionMetrics, repeatCustomers] =
-        await Promise.all([
-          this.getSalesStatsByPeriod(sellerId, startDate, endDate),
-          this.getSalesTrend(sellerId, startDate, endDate, 'day'),
-          this.getTopSellingProducts(sellerId, 10, startDate, endDate),
-          this.getCategorySalesStats(sellerId, startDate, endDate),
-          this.getConversionMetrics(sellerId, startDate, endDate),
-          this.getRepeatCustomers(sellerId, startDate, endDate),
-        ]);
-
-      return {
-        salesStats,
-        salesTrend,
-        topProducts,
-        categoryStats,
-        conversionMetrics,
-        repeatCustomers,
-      };
-    } catch (error) {
-      console.error('Error getting dashboard metrics:', error);
-      return {
-        salesStats: null,
-        salesTrend: [],
-        topProducts: [],
-        categoryStats: [],
-        conversionMetrics: null,
-        repeatCustomers: [],
-      };
-    }
+    return {
+      summary: {
+        totalRevenue,
+        totalOrders,
+        totalProducts,
+        activeProducts,
+        averageOrderValue: totalOrders > 0 ? totalRevenue / totalOrders : 0,
+        conversionRate,
+        totalCustomers: customersSet.size,
+        returningCustomers,
+      },
+      salesTrend,
+      topProducts,
+      ordersByStatus,
+      salesByCategory,
+      topCustomers,
+      comparison: {
+        revenueChange,
+        ordersChange,
+        customersChange,
+        revenueChangePercent,
+        ordersChangePercent,
+        customersChangePercent,
+      },
+    };
+  } catch (error) {
+    console.error('Error generating seller analytics report:', error);
+    return null;
   }
 }
 
+/**
+ * Obtiene el rango de fechas según el período seleccionado
+ */
+function getDateRange(timeRange: TimeRange): {
+  startDate: string;
+  endDate: string;
+  previousStartDate: string;
+} {
+  const endDate = new Date();
+  endDate.setHours(23, 59, 59, 999);
+  
+  let startDate = new Date();
+  let previousStartDate = new Date();
+
+  switch (timeRange) {
+    case '7d':
+      startDate.setDate(endDate.getDate() - 7);
+      previousStartDate.setDate(startDate.getDate() - 7);
+      break;
+    case '30d':
+      startDate.setDate(endDate.getDate() - 30);
+      previousStartDate.setDate(startDate.getDate() - 30);
+      break;
+    case '90d':
+      startDate.setDate(endDate.getDate() - 90);
+      previousStartDate.setDate(startDate.getDate() - 90);
+      break;
+    case '1y':
+      startDate.setFullYear(endDate.getFullYear() - 1);
+      previousStartDate.setFullYear(startDate.getFullYear() - 1);
+      break;
+    case 'all':
+      startDate = new Date(0); // Desde el inicio
+      previousStartDate = new Date(0);
+      break;
+  }
+
+  startDate.setHours(0, 0, 0, 0);
+  previousStartDate.setHours(0, 0, 0, 0);
+
+  return {
+    startDate: startDate.toISOString(),
+    endDate: endDate.toISOString(),
+    previousStartDate: previousStartDate.toISOString(),
+  };
+}

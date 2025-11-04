@@ -25,6 +25,15 @@ const nextConfig: NextConfig = {
     ],
   },
   
+  // Remover console.logs en producción (excepto error y warn)
+  compiler: {
+    removeConsole: process.env.NODE_ENV === 'production' 
+      ? { 
+          exclude: ['error', 'warn'] // Mantener errores y warnings en producción
+        } 
+      : false,
+  },
+  
   // Headers de seguridad
   async headers() {
     return [
@@ -63,7 +72,10 @@ const nextConfig: NextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://*.supabase.co",
+              // Scripts: mantener unsafe-inline temporalmente para Next.js, pero eliminar unsafe-eval si es posible
+              // Nota: 'unsafe-inline' puede ser necesario para scripts inline de Next.js
+              // 'unsafe-eval' se mantiene solo si es estrictamente necesario para Supabase
+              "script-src 'self' 'unsafe-inline' https://*.supabase.co https://vercel.live",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com data:",
               "img-src 'self' data: https: blob:",

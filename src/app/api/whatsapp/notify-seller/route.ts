@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabaseClient';
 import type { Database } from '@/types/database';
+import { formatPhoneForWhatsApp } from '@/lib/utils';
 
 /**
  * API Route para enviar notificaciones de WhatsApp a vendedores cuando reciben un pedido
@@ -109,18 +110,19 @@ Puedes ver y gestionar este pedido desde tu panel de vendedor.
 
 ¡Gracias por usar Mercadito Online PY! 🎉`;
 
-    // Limpiar teléfono (remover espacios, guiones, etc.)
-    const cleanPhone = sellerPhone.replace(/[\s\-\(\)]/g, '');
-    // Asegurar formato internacional (Paraguay: +595)
-    let formattedPhone = cleanPhone;
-    if (!formattedPhone.startsWith('+')) {
-      if (formattedPhone.startsWith('595')) {
-        formattedPhone = '+' + formattedPhone;
-      } else if (formattedPhone.startsWith('0')) {
-        formattedPhone = '+595' + formattedPhone.substring(1);
-      } else {
-        formattedPhone = '+595' + formattedPhone;
-      }
+    // Formatear teléfono usando función utilitaria
+    const formattedPhone = formatPhoneForWhatsApp(sellerPhone);
+    
+    if (!formattedPhone) {
+      console.warn('⚠️ Número de teléfono inválido para WhatsApp:', sellerPhone);
+      return NextResponse.json(
+        { 
+          error: 'Número de teléfono inválido',
+          whatsapp_url: null,
+          message: 'No se pudo generar el enlace de WhatsApp debido a un número inválido'
+        },
+        { status: 400 }
+      );
     }
 
     // Codificar mensaje para URL
@@ -128,7 +130,7 @@ Puedes ver y gestionar este pedido desde tu panel de vendedor.
 
     // Crear URL de WhatsApp
     // Opción 1: URL directa de WhatsApp (abre la app/web)
-    const whatsappUrl = `https://wa.me/${formattedPhone.replace('+', '')}?text=${encodedMessage}`;
+    const whatsappUrl = `https://wa.me/${formattedPhone}?text=${encodedMessage}`;
 
     // Opción 2: Usar API externa si está configurada (ej: Twilio, ChatAPI, etc.)
     // Por ahora usamos la URL directa, pero puedes agregar integración con API aquí

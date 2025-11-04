@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
+import { useToast } from '@/lib/hooks/useToast';
 
 interface AddToCartButtonProps {
   productId: string;
@@ -11,6 +12,7 @@ interface AddToCartButtonProps {
 export default function AddToCartButton({ productId, quantity = 1 }: AddToCartButtonProps) {
   const [loading, setLoading] = useState(false);
   const [added, setAdded] = useState(false);
+  const toast = useToast();
 
   async function addToCart() {
     setLoading(true);
@@ -20,14 +22,14 @@ export default function AddToCartButton({ productId, quantity = 1 }: AddToCartBu
     const qtyToAdd = Math.max(1, Math.floor(quantity || 1));
     if (qtyToAdd <= 0) {
       setLoading(false);
-      alert('La cantidad debe ser mayor a 0');
+      toast.error('La cantidad debe ser mayor a 0');
       return;
     }
     
     // Timeout de seguridad: si después de 15 segundos no hay respuesta, resetear
     const timeoutId = setTimeout(() => {
       setLoading(false);
-      alert('⏱️ Tiempo de espera agotado. Por favor intenta nuevamente.');
+      toast.error('⏱️ Tiempo de espera agotado. Por favor intenta nuevamente.');
     }, 15000);
     
     try {
@@ -36,14 +38,14 @@ export default function AddToCartButton({ productId, quantity = 1 }: AddToCartBu
       if (sessionError) {
         clearTimeout(timeoutId);
         console.error('Session error:', sessionError);
-        alert('Error al verificar la sesión. Por favor, inicia sesión de nuevo.');
+        toast.error('Error al verificar la sesión. Por favor, inicia sesión de nuevo.');
         setLoading(false);
         return;
       }
       
       if (!session?.session?.user?.id) {
         clearTimeout(timeoutId);
-        alert('Debes iniciar sesión para agregar productos al carrito');
+        toast.error('Debes iniciar sesión para agregar productos al carrito');
         setLoading(false);
         return;
       }
@@ -269,6 +271,7 @@ export default function AddToCartButton({ productId, quantity = 1 }: AddToCartBu
       clearTimeout(timeoutId);
       setLoading(false);
       setAdded(true);
+      toast.success(`✅ ${qtyToAdd} ${qtyToAdd === 1 ? 'unidad agregada' : 'unidades agregadas'} al carrito`);
       // Recargar el carrito en el componente CartButton si está montado
       setTimeout(() => setAdded(false), 2000);
 
@@ -277,7 +280,7 @@ export default function AddToCartButton({ productId, quantity = 1 }: AddToCartBu
       setLoading(false);
       console.error('Error in addToCart:', err);
       const errorMessage = err?.message || 'Error desconocido al agregar al carrito';
-      alert(`Error: ${errorMessage}`);
+      toast.error(`Error: ${errorMessage}`);
     }
   }
 

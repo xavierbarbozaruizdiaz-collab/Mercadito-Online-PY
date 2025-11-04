@@ -16,13 +16,14 @@ import {
   Store, 
   Settings,
   Shield,
-  Gavel,
   Menu,
   X,
   UserPlus,
   BarChart3,
   Package,
-  Ticket
+  Ticket,
+  Gift,
+  Target
 } from 'lucide-react';
 
 interface SidebarItem {
@@ -36,6 +37,7 @@ interface SidebarItem {
 const baseSidebarItems: SidebarItem[] = [
   { icon: Home, label: 'Home', href: '/dashboard' },
   { icon: User, label: 'Perfil', href: '/dashboard/profile' },
+  { icon: Gift, label: 'Sorteos Ganados', href: '/dashboard/raffles-won' },
 ];
 
 // Items para vendedores (sin estadísticas, se agregará como botón especial)
@@ -43,12 +45,13 @@ const sellerSidebarItems: SidebarItem[] = [
   { icon: Plus, label: 'Nuevo Producto', href: '/dashboard/new-product', roles: ['seller', 'admin'] },
   { icon: ShoppingCart, label: 'Pedidos', href: '/dashboard/orders', roles: ['seller', 'admin'] },
   { icon: Package, label: 'Inventario', href: '/dashboard/inventory', roles: ['seller', 'admin'] },
+  { icon: BarChart3, label: 'Analytics', href: '/dashboard/analytics', roles: ['seller', 'admin'] },
   { icon: DollarSign, label: 'Retiros', href: '/dashboard/payouts', roles: ['seller', 'admin'] },
   { icon: ArrowLeftRight, label: 'Transacciones', href: '/dashboard/transactions', roles: ['seller', 'admin'] },
   { icon: Store, label: 'Tienda', href: '/dashboard/store', roles: ['seller', 'admin'] },
   { icon: UserPlus, label: 'Afiliados', href: '/dashboard/store/affiliates', roles: ['seller', 'admin'] },
   { icon: Ticket, label: 'Sorteos', href: '/dashboard/raffles', roles: ['seller', 'admin'] },
-  { icon: Gavel, label: 'Dashboard Vendedor', href: '/dashboard/seller', roles: ['seller', 'admin'] },
+  { icon: Target, label: 'Marketing', href: '/dashboard/marketing', roles: ['seller', 'admin'] },
 ];
 
 // Items para afiliados

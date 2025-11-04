@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabaseClient';
 import SearchBar from '@/components/SearchBar';
 import AuctionTimer from '@/components/auction/AuctionTimer';
 import { Clock, Users, Gavel } from 'lucide-react';
+import { ProductListSkeleton } from '@/components/ui/Skeleton';
 
 type Product = { 
   id: string; 
@@ -20,6 +21,9 @@ type Product = {
   seller_id: string;
   store_id: string | null;
   created_at: string;
+  wholesale_enabled?: boolean;
+  wholesale_min_quantity?: number | null;
+  wholesale_discount_percent?: number | null;
   // Campos de subasta
   auction_status?: 'scheduled' | 'active' | 'ended' | 'cancelled';
   auction_start_at?: string;
@@ -189,7 +193,10 @@ export default function ProductsListClient() {
           auction_end_at,
           current_bid,
           total_bids,
-          attributes
+          attributes,
+          wholesale_enabled,
+          wholesale_min_quantity,
+          wholesale_discount_percent
         `)
         .or('status.is.null,status.eq.active'); // Incluir productos sin status o activos
 
@@ -367,7 +374,10 @@ export default function ProductsListClient() {
               auction_start_at,
               auction_end_at,
               current_bid,
-              total_bids
+              total_bids,
+              wholesale_enabled,
+              wholesale_min_quantity,
+              wholesale_discount_percent
             `)
             .or('status.is.null,status.eq.active');
           
@@ -950,9 +960,7 @@ export default function ProductsListClient() {
 
       {/* Resultados */}
       {loading ? (
-        <div className="flex justify-center items-center h-32">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-        </div>
+        <ProductListSkeleton count={8} />
       ) : error ? (
         <div className="bg-red-50 text-red-700 p-4 rounded-lg">
           <b>Error:</b> {error}
@@ -984,7 +992,7 @@ export default function ProductsListClient() {
             </p>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
+          <div className="grid grid-cols-3 lg:grid-cols-9 gap-2 sm:gap-3 lg:gap-4">
             {products.map((product) => {
               const isAuction = product.sale_type === 'auction';
               const isActiveAuction = isAuction && product.auction_status === 'active';
@@ -1000,7 +1008,7 @@ export default function ProductsListClient() {
                   <img
                     src={product.image_url ?? 'https://placehold.co/400x300?text=Producto'}
                     alt={product.title}
-                    className="w-full h-28 sm:h-40 lg:h-48 object-cover"
+                    className="w-full h-24 object-cover"
                   />
                   {/* Badges de condición y tipo de venta - OCULTOS */}
                   {/* <div className="absolute top-2 left-2 flex flex-col gap-1">
@@ -1040,10 +1048,10 @@ export default function ProductsListClient() {
                   </div>
                 </div>
                 
-                <div className="p-2 sm:p-3 lg:p-4">
-                  <h3 className="font-semibold text-xs sm:text-sm lg:text-base mb-1 line-clamp-2 leading-tight">{product.title}</h3>
+                <div className="p-1.5 sm:p-2">
+                  <h3 className="font-semibold text-[10px] sm:text-xs mb-0.5 line-clamp-2 leading-tight">{product.title}</h3>
                   {product.description && (
-                    <p className="text-gray-600 text-xs sm:text-sm mb-2 line-clamp-1 hidden sm:block">{product.description}</p>
+                    <p className="text-gray-600 text-[9px] sm:text-[10px] mb-1 line-clamp-1 hidden sm:block">{product.description}</p>
                   )}
                   
                   {/* Timer para subastas activas */}
@@ -1061,23 +1069,23 @@ export default function ProductsListClient() {
                   
                   {/* Información del vendedor/tienda */}
                   {(product.store || product.seller) && (
-                    <div className="mb-1.5 pb-1.5 border-b text-xs">
+                    <div className="mb-1 pb-1 border-b text-[9px] sm:text-[10px]">
                       {product.store ? (
                         <Link
                           href={`/store/${product.store.slug}`}
                           onClick={(e) => e.stopPropagation()}
-                          className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800 hover:underline transition-colors cursor-pointer"
+                          className="inline-flex items-center gap-0.5 sm:gap-1 text-[9px] sm:text-[10px] font-medium text-blue-600 hover:text-blue-800 hover:underline transition-colors cursor-pointer"
                         >
-                          <span className="text-xs">🏪</span>
+                          <span className="text-[9px] sm:text-[10px]">🏪</span>
                           <span className="truncate">{product.store.name}</span>
                         </Link>
                       ) : product.seller ? (
                         <Link
                           href={(product.store as any)?.slug ? `/store/${(product.store as any).slug}` : `/seller/${product.seller?.id}`}
                           onClick={(e) => e.stopPropagation()}
-                          className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800 hover:underline transition-colors cursor-pointer"
+                          className="inline-flex items-center gap-0.5 sm:gap-1 text-[9px] sm:text-[10px] font-medium text-blue-600 hover:text-blue-800 hover:underline transition-colors cursor-pointer"
                         >
-                          <span className="text-xs">👤</span>
+                          <span className="text-[9px] sm:text-[10px]">👤</span>
                           <span className="truncate">
                             {(product.seller as any)?.display_name || 
                              ((product.seller as any)?.first_name || (product.seller as any)?.last_name 
@@ -1089,33 +1097,33 @@ export default function ProductsListClient() {
                         <Link
                           href={`/seller/${product.seller_id}`}
                           onClick={(e) => e.stopPropagation()}
-                          className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800 hover:underline transition-colors cursor-pointer"
+                          className="inline-flex items-center gap-0.5 sm:gap-1 text-[9px] sm:text-[10px] font-medium text-blue-600 hover:text-blue-800 hover:underline transition-colors cursor-pointer"
                         >
-                          <span className="text-xs">👤</span>
+                          <span className="text-[9px] sm:text-[10px]">👤</span>
                           <span className="truncate">{`Vendedor ${product.seller_id.slice(0, 6)}`}</span>
                         </Link>
                       ) : null}
                     </div>
                   )}
                   
-                  <div className="flex flex-col gap-1.5 sm:gap-2">
+                  <div className="flex flex-col gap-1 sm:gap-1.5">
                     <div className="flex justify-between items-center">
                       {isAuction && isActiveAuction ? (
                         <div className="flex flex-col">
-                          <span className="text-xs text-gray-500 hidden sm:block">Puja actual</span>
-                          <p className="text-base sm:text-lg lg:text-xl font-bold text-purple-600">
+                          <span className="text-[9px] sm:text-[10px] text-gray-500 hidden sm:block">Puja actual</span>
+                          <p className="text-xs sm:text-sm font-bold text-purple-600">
                             {(product.current_bid || product.price).toLocaleString('es-PY')} Gs.
                           </p>
                         </div>
                       ) : (
-                        <p className="text-base sm:text-lg lg:text-xl font-bold text-green-600">
+                        <p className="text-xs sm:text-sm font-bold text-green-600">
                           {product.price.toLocaleString('es-PY')} Gs.
                         </p>
                       )}
                     </div>
                     <a
                       href={isAuction ? `/auctions/${product.id}` : `/products/${product.id}`}
-                      className="px-2 py-1.5 sm:px-3 sm:py-2 bg-blue-500 text-white text-xs sm:text-sm rounded hover:bg-blue-600 transition-colors text-center font-medium"
+                      className="px-1.5 py-1 sm:px-2 sm:py-1.5 bg-blue-500 text-white text-[9px] sm:text-[10px] rounded hover:bg-blue-600 transition-colors text-center font-medium"
                     >
                       {isAuction ? 'Ver subasta' : 'Ver detalles'}
                     </a>
