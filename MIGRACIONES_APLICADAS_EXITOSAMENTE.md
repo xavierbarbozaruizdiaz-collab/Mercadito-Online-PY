@@ -64,3 +64,4 @@ Todas las migraciones del sistema de comisiones e inventario han sido aplicadas 
 
 
 
+

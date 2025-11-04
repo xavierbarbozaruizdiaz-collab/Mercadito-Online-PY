@@ -15,14 +15,46 @@ export function useAuth() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Función para cargar el usuario actual
+  // Función para cargar el usuario actual con timeout
   const loadUser = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const currentUser = await getCurrentUser();
-      setUser(currentUser);
+      
+      // Timeout de 5 segundos para evitar que se quede cargando indefinidamente
+      const timeoutPromise = new Promise<null>((resolve) => {
+        setTimeout(() => resolve(null), 5000);
+      });
+      
+      const userPromise = getCurrentUser();
+      const currentUser = await Promise.race([userPromise, timeoutPromise]);
+      
+      if (currentUser === null && userPromise) {
+        // Si fue timeout, intentar obtener al menos la sesión básica
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.user) {
+            // Crear usuario básico sin perfil completo
+            setUser({
+              id: session.user.id,
+              email: session.user.email || '',
+              role: 'buyer' as const,
+              verified: false,
+              membership_level: 'free' as const,
+              created_at: session.user.created_at || new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            });
+          } else {
+            setUser(null);
+          }
+        } catch {
+          setUser(null);
+        }
+      } else {
+        setUser(currentUser);
+      }
     } catch (err) {
+      console.error('Error loading user:', err);
       setError(err instanceof Error ? err.message : 'Error desconocido');
       setUser(null);
     } finally {

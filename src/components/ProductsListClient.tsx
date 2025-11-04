@@ -157,6 +157,9 @@ export default function ProductsListClient() {
       setLoading(false);
     }, 30000);
 
+    // Declarar filteredProductsData al inicio para evitar errores de referencia
+    let filteredProductsData: any[] = [];
+
     try {
       // Esperar un poco para asegurar que la sesión de Supabase está lista
       // Esto ayuda a evitar errores en la primera carga
@@ -169,7 +172,10 @@ export default function ProductsListClient() {
         .select(`
           id, 
           title, 
-          description, 
+          description,
+          stock_quantity,
+          stock_management_enabled,
+          low_stock_threshold,
           price, 
           image_url:cover_url,
           condition,
@@ -291,38 +297,92 @@ export default function ProductsListClient() {
       }
 
       // Ordenamiento
-      switch (filters.sortBy) {
-        case 'price_asc':
-          query = query.order('price', { ascending: true });
-          break;
-        case 'price_desc':
-          query = query.order('price', { ascending: false });
-          break;
-        case 'date_asc':
-          query = query.order('created_at', { ascending: true });
-          break;
-        case 'date_desc':
-          query = query.order('created_at', { ascending: false });
-          break;
-        case 'title_asc':
-          query = query.order('title', { ascending: true });
-          break;
-        case 'auction_ending':
-          query = query.order('auction_end_at', { ascending: true });
-          break;
-        case 'auction_bids':
-          query = query.order('total_bids', { ascending: false });
-          break;
+      // Si no hay búsqueda activa y es el orden por defecto, no aplicar orden en la query
+      // (el ordenamiento aleatorio se hará en el cliente después)
+      const hasActiveSearch = filters.search.trim() !== '' || 
+                               filters.category !== '' || 
+                               filters.minPrice !== '' || 
+                               filters.maxPrice !== '' ||
+                               filters.condition !== '' ||
+                               filters.saleType !== '' ||
+                               filters.auctionFilter !== '';
+      
+      const shouldRandomize = !hasActiveSearch && filters.sortBy === 'date_desc';
+      
+      if (!shouldRandomize) {
+        // Aplicar ordenamiento solo si no es aleatorio
+        switch (filters.sortBy) {
+          case 'price_asc':
+            query = query.order('price', { ascending: true });
+            break;
+          case 'price_desc':
+            query = query.order('price', { ascending: false });
+            break;
+          case 'date_asc':
+            query = query.order('created_at', { ascending: true });
+            break;
+          case 'date_desc':
+            query = query.order('created_at', { ascending: false });
+            break;
+          case 'title_asc':
+            query = query.order('title', { ascending: true });
+            break;
+          case 'auction_ending':
+            query = query.order('auction_end_at', { ascending: true });
+            break;
+          case 'auction_bids':
+            query = query.order('total_bids', { ascending: false });
+            break;
+        }
       }
+      // Si shouldRandomize es true, no aplicamos orden en la query
+      // El ordenamiento aleatorio se hará en el cliente después
 
       const { data: productsData, error: queryError } = await query;
 
       if (queryError) {
-        throw queryError;
+        console.error('[ProductsListClient] Query error:', queryError);
+        // Si es error de columna inexistente, intentar sin campos nuevos
+        if (queryError.code === '42703' || queryError.message?.includes('does not exist')) {
+          console.warn('[ProductsListClient] Column error, trying simpler query');
+          // Intentar query más simple sin campos que pueden no existir
+          const simpleQuery = supabase
+            .from('products')
+            .select(`
+              id, 
+              title, 
+              description, 
+              price, 
+              image_url:cover_url,
+              condition,
+              sale_type,
+              category_id,
+              seller_id,
+              store_id,
+              stock_quantity,
+              stock_management_enabled,
+              low_stock_threshold,
+              created_at,
+              auction_status,
+              auction_start_at,
+              auction_end_at,
+              current_bid,
+              total_bids
+            `)
+            .or('status.is.null,status.eq.active');
+          
+          const { data: simpleData, error: simpleError } = await simpleQuery;
+          if (simpleError) {
+            throw simpleError;
+          }
+          filteredProductsData = simpleData || [];
+        } else {
+          throw queryError;
+        }
+      } else {
+        // Filtrar productos por atributos de vehículos/motos (filtrado del lado del cliente)
+        filteredProductsData = productsData || [];
       }
-
-      // Filtrar productos por atributos de vehículos/motos (filtrado del lado del cliente)
-      let filteredProductsData = productsData || [];
       
       // Filtrar productos anómalos o inválidos (métricas del dashboard, Firebase, etc.)
       filteredProductsData = filteredProductsData.filter((p: any) => {
@@ -551,10 +611,27 @@ export default function ProductsListClient() {
         }
 
         // Aplicar los productos filtrados (no solo los enriquecidos)
-        const allFilteredProducts = filteredProductsData.map((p: any) => {
+        let allFilteredProducts = filteredProductsData.map((p: any) => {
           const enriched = enrichedProducts.find((ep: any) => ep.id === p.id);
           return enriched || p;
         });
+
+        // Mezclar aleatoriamente si no hay búsqueda activa y es el orden por defecto
+        const hasActiveSearch = filters.search.trim() !== '' || 
+                                 filters.category !== '' || 
+                                 filters.minPrice !== '' || 
+                                 filters.maxPrice !== '' ||
+                                 filters.condition !== '' ||
+                                 filters.saleType !== '' ||
+                                 filters.auctionFilter !== '';
+        
+        if (!hasActiveSearch && filters.sortBy === 'date_desc') {
+          // Algoritmo Fisher-Yates para mezclar aleatoriamente
+          for (let i = allFilteredProducts.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [allFilteredProducts[i], allFilteredProducts[j]] = [allFilteredProducts[j], allFilteredProducts[i]];
+          }
+        }
         
         setProducts(allFilteredProducts);
       } else {
@@ -605,19 +682,36 @@ export default function ProductsListClient() {
 
   return (
     <div className="max-w-7xl mx-auto">
-      {/* Botón para ir a página de tiendas */}
-      <div className="mb-6 sm:mb-8">
-        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-center justify-between mb-4 sm:mb-6">
-          <a
-            href="/stores"
-            className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors text-sm sm:text-base font-medium flex items-center gap-2"
-          >
-            <span>🏪</span>
-            <span>Ver Todas las Tiendas</span>
-          </a>
+      {/* Botones para tiendas y vitrina */}
+      <div className="mb-3 sm:mb-4">
+        <div className="flex flex-col gap-3 mb-3">
+          {/* Botones principales - fila superior */}
+          <div className="flex flex-wrap gap-2 items-center">
+            <a
+              href="/stores"
+              className="flex-1 min-w-[140px] sm:flex-none sm:min-w-0 px-3 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors text-xs sm:text-sm font-medium flex items-center justify-center gap-1.5 sm:gap-2"
+            >
+              <span>🏪</span>
+              <span className="truncate">Ver Tiendas</span>
+            </a>
+            <a
+              href="/vitrina"
+              className="flex-1 min-w-[140px] sm:flex-none sm:min-w-0 px-3 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition-colors text-xs sm:text-sm font-medium flex items-center justify-center gap-1.5 sm:gap-2"
+            >
+              <span>⭐</span>
+              <span className="truncate">Vitrina</span>
+            </a>
+            <a
+              href="/favorites/stores"
+              className="flex-1 min-w-[140px] sm:flex-none sm:min-w-0 px-3 py-2 bg-gradient-to-r from-red-600 to-pink-600 text-white rounded-lg hover:from-red-700 hover:to-pink-700 transition-colors text-xs sm:text-sm font-medium flex items-center justify-center gap-1.5 sm:gap-2"
+            >
+              <span>❤️</span>
+              <span className="truncate">Favoritas</span>
+            </a>
+          </div>
 
-            {/* Ordenamiento */}
-          <div className="sm:w-48">
+          {/* Ordenamiento - fila inferior */}
+          <div className="w-full sm:w-48 sm:ml-auto">
             <select
               value={filters.sortBy}
               onChange={(e) => updateFilter('sortBy', e.target.value)}
@@ -890,7 +984,7 @@ export default function ProductsListClient() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
             {products.map((product) => {
               const isAuction = product.sale_type === 'auction';
               const isActiveAuction = isAuction && product.auction_status === 'active';
@@ -906,7 +1000,7 @@ export default function ProductsListClient() {
                   <img
                     src={product.image_url ?? 'https://placehold.co/400x300?text=Producto'}
                     alt={product.title}
-                    className="w-full h-48 object-cover"
+                    className="w-full h-28 sm:h-40 lg:h-48 object-cover"
                   />
                   {/* Badges de condición y tipo de venta - OCULTOS */}
                   {/* <div className="absolute top-2 left-2 flex flex-col gap-1">
@@ -946,20 +1040,20 @@ export default function ProductsListClient() {
                   </div>
                 </div>
                 
-                <div className="p-4">
-                  <h3 className="font-semibold text-lg mb-2 line-clamp-2">{product.title}</h3>
+                <div className="p-2 sm:p-3 lg:p-4">
+                  <h3 className="font-semibold text-xs sm:text-sm lg:text-base mb-1 line-clamp-2 leading-tight">{product.title}</h3>
                   {product.description && (
-                    <p className="text-gray-600 text-sm mb-3 line-clamp-2">{product.description}</p>
+                    <p className="text-gray-600 text-xs sm:text-sm mb-2 line-clamp-1 hidden sm:block">{product.description}</p>
                   )}
                   
                   {/* Timer para subastas activas */}
                   {isActiveAuction && product.auction_end_at && auctionEndAt > serverNow && (
-                    <div className="mb-3 pb-3 border-b border-gray-200">
+                    <div className="mb-1.5 pb-1.5 border-b border-gray-200">
                       <AuctionTimer
                         endAtMs={auctionEndAt}
                         serverNowMs={serverNow}
                         variant="compact"
-                        size="md"
+                        size="sm"
                         tickMs={1000}
                       />
                     </div>
@@ -967,24 +1061,24 @@ export default function ProductsListClient() {
                   
                   {/* Información del vendedor/tienda */}
                   {(product.store || product.seller) && (
-                    <div className="mb-3 pb-3 border-b">
+                    <div className="mb-1.5 pb-1.5 border-b text-xs">
                       {product.store ? (
                         <Link
                           href={`/store/${product.store.slug}`}
                           onClick={(e) => e.stopPropagation()}
-                          className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline transition-colors cursor-pointer"
+                          className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800 hover:underline transition-colors cursor-pointer"
                         >
-                          <span>🏪</span>
-                          <span>{product.store.name}</span>
+                          <span className="text-xs">🏪</span>
+                          <span className="truncate">{product.store.name}</span>
                         </Link>
                       ) : product.seller ? (
                         <Link
                           href={(product.store as any)?.slug ? `/store/${(product.store as any).slug}` : `/seller/${product.seller?.id}`}
                           onClick={(e) => e.stopPropagation()}
-                          className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-600 hover:text-blue-800 hover:underline transition-colors cursor-pointer"
+                          className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800 hover:underline transition-colors cursor-pointer"
                         >
-                          <span>👤</span>
-                          <span>
+                          <span className="text-xs">👤</span>
+                          <span className="truncate">
                             {(product.seller as any)?.display_name || 
                              ((product.seller as any)?.first_name || (product.seller as any)?.last_name 
                               ? `${(product.seller as any)?.first_name || ''} ${(product.seller as any)?.last_name || ''}`.trim()
@@ -995,33 +1089,33 @@ export default function ProductsListClient() {
                         <Link
                           href={`/seller/${product.seller_id}`}
                           onClick={(e) => e.stopPropagation()}
-                          className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-600 hover:text-blue-800 hover:underline transition-colors cursor-pointer"
+                          className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800 hover:underline transition-colors cursor-pointer"
                         >
-                          <span>👤</span>
-                          <span>{`Vendedor ${product.seller_id.slice(0, 6)}`}</span>
+                          <span className="text-xs">👤</span>
+                          <span className="truncate">{`Vendedor ${product.seller_id.slice(0, 6)}`}</span>
                         </Link>
                       ) : null}
                     </div>
                   )}
                   
-                  <div className="flex flex-col gap-2">
+                  <div className="flex flex-col gap-1.5 sm:gap-2">
                     <div className="flex justify-between items-center">
                       {isAuction && isActiveAuction ? (
                         <div className="flex flex-col">
-                          <span className="text-xs text-gray-500">Puja actual</span>
-                          <p className="text-xl font-bold text-purple-600">
+                          <span className="text-xs text-gray-500 hidden sm:block">Puja actual</span>
+                          <p className="text-base sm:text-lg lg:text-xl font-bold text-purple-600">
                             {(product.current_bid || product.price).toLocaleString('es-PY')} Gs.
                           </p>
                         </div>
                       ) : (
-                        <p className="text-xl font-bold text-green-600">
+                        <p className="text-base sm:text-lg lg:text-xl font-bold text-green-600">
                           {product.price.toLocaleString('es-PY')} Gs.
                         </p>
                       )}
                     </div>
                     <a
                       href={isAuction ? `/auctions/${product.id}` : `/products/${product.id}`}
-                      className="px-3 py-2 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 transition-colors text-center font-medium"
+                      className="px-2 py-1.5 sm:px-3 sm:py-2 bg-blue-500 text-white text-xs sm:text-sm rounded hover:bg-blue-600 transition-colors text-center font-medium"
                     >
                       {isAuction ? 'Ver subasta' : 'Ver detalles'}
                     </a>

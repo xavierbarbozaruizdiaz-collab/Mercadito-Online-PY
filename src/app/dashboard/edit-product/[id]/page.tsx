@@ -23,6 +23,17 @@ export default function EditProduct() {
   const [saleType, setSaleType] = useState<'direct' | 'auction' | 'negotiable'>('direct');
   const [condition, setCondition] = useState<'nuevo' | 'usado' | 'usado_como_nuevo'>('nuevo');
   const [categoryId, setCategoryId] = useState<string | null>(null);
+  const [inShowcase, setInShowcase] = useState(false);
+  
+  // Campos de inventario
+  const [stockQuantity, setStockQuantity] = useState<string>('');
+  const [stockManagementEnabled, setStockManagementEnabled] = useState<boolean>(true);
+  const [lowStockThreshold, setLowStockThreshold] = useState<string>('5');
+  
+  // Campos de precio mayorista
+  const [wholesaleEnabled, setWholesaleEnabled] = useState<boolean>(false);
+  const [wholesaleMinQuantity, setWholesaleMinQuantity] = useState<string>('');
+  const [wholesaleDiscountPercent, setWholesaleDiscountPercent] = useState<string>('');
   
   // Campos específicos para subastas
   const [auctionStartingPrice, setAuctionStartingPrice] = useState<string>('');
@@ -79,6 +90,17 @@ export default function EditProduct() {
         setSaleType(product.sale_type || 'direct');
         setCondition(product.condition || 'nuevo');
         setCategoryId(product.category_id);
+        setInShowcase(product.in_showcase || false);
+        
+        // Cargar datos de inventario
+        setStockQuantity(product.stock_quantity?.toString() || '');
+        setStockManagementEnabled(product.stock_management_enabled !== false);
+        setLowStockThreshold(product.low_stock_threshold?.toString() || '5');
+        
+        // Cargar datos de precio mayorista
+        setWholesaleEnabled(product.wholesale_enabled === true);
+        setWholesaleMinQuantity(product.wholesale_min_quantity?.toString() || '');
+        setWholesaleDiscountPercent(product.wholesale_discount_percent?.toString() || '');
         
         // Cargar datos de subasta si existen (desde campos directos)
         if (product.sale_type === 'auction') {
@@ -378,6 +400,14 @@ export default function EditProduct() {
         sale_type: saleType,
         condition,
         category_id: categoryId,
+        // Campos de inventario (solo para venta directa)
+        stock_quantity: saleType === 'direct' && stockManagementEnabled && stockQuantity ? parseInt(stockQuantity) || 0 : null,
+        stock_management_enabled: saleType === 'direct' ? stockManagementEnabled : false,
+        low_stock_threshold: saleType === 'direct' && stockManagementEnabled && lowStockThreshold ? parseInt(lowStockThreshold) || 5 : null,
+        // Campos de precio mayorista (solo para venta directa)
+        wholesale_enabled: saleType === 'direct' ? wholesaleEnabled : false,
+        wholesale_min_quantity: saleType === 'direct' && wholesaleEnabled && wholesaleMinQuantity ? parseInt(wholesaleMinQuantity) || null : null,
+        wholesale_discount_percent: saleType === 'direct' && wholesaleEnabled && wholesaleDiscountPercent ? parseFloat(wholesaleDiscountPercent) || null : null,
       };
       
       // Si es subasta, agregar campos directos de subasta (igual que new-product)
@@ -419,6 +449,9 @@ export default function EditProduct() {
         updateData.min_bid_increment = null;
         updateData.attributes = null;
       }
+      
+      // Agregar vitrina si está activa
+      updateData.in_showcase = inShowcase;
       
       const { error: updateError } = await (supabase as any)
         .from('products')
@@ -797,6 +830,87 @@ export default function EditProduct() {
           {validationErrors.categoryId && (
             <p className="text-red-500 text-sm mt-1">{validationErrors.categoryId}</p>
           )}
+        </div>
+
+        {/* Campos de inventario - Solo para venta directa */}
+        {saleType === 'direct' && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4 space-y-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-green-900">📦 Gestión de Inventario</h3>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={stockManagementEnabled}
+                  onChange={(e) => setStockManagementEnabled(e.target.checked)}
+                  className="w-4 h-4 rounded"
+                />
+                <span className="text-sm text-green-800">Gestionar inventario</span>
+              </label>
+            </div>
+            
+            {stockManagementEnabled && (
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Cantidad en stock *</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={stockQuantity}
+                    onChange={(e) => setStockQuantity(e.target.value)}
+                    placeholder="Ej: 10"
+                    className="border p-2 w-full rounded"
+                    required={stockManagementEnabled}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Cantidad disponible actual del producto
+                  </p>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-1">Umbral de stock bajo</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={lowStockThreshold}
+                    onChange={(e) => setLowStockThreshold(e.target.value)}
+                    placeholder="Ej: 5"
+                    className="border p-2 w-full rounded"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Recibirás alerta cuando el stock llegue a este número
+                  </p>
+                </div>
+              </div>
+            )}
+            
+            {!stockManagementEnabled && (
+              <p className="text-sm text-green-700">
+                El stock será ilimitado. No se validará la cantidad disponible.
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Vitrina de Ofertas */}
+        <div className="md:col-span-3 bg-gradient-to-br from-purple-50 to-blue-50 border border-purple-200 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <input
+              type="checkbox"
+              id="inShowcase"
+              checked={inShowcase}
+              onChange={(e) => setInShowcase(e.target.checked)}
+              className="mt-1 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+            />
+            <div className="flex-1">
+              <label htmlFor="inShowcase" className="block text-sm font-medium text-gray-900 cursor-pointer">
+                ⭐ Destacar en Vitrina de Ofertas
+              </label>
+              <p className="text-xs text-gray-600 mt-1">
+                Tu producto aparecerá destacado en la página de Vitrina de Ofertas. Cada tienda puede destacar hasta 2 productos. 
+                Solo productos activos pueden estar en la vitrina.
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* Imágenes */}

@@ -185,8 +185,7 @@ export function CartPage() {
         return;
       }
 
-      // Cargar productos - Sin stock_quantity para evitar error 400
-      // Ya que stock_quantity puede no existir en la tabla
+      // Cargar productos - Incluir campos de precio mayorista
       console.log('🛒 Cargando productos del carrito:', { 
         productIds, 
         count: productIds.length,
@@ -195,7 +194,7 @@ export function CartPage() {
       
       const { data: productsDataRaw, error: productsError } = await (supabase as any)
         .from('products')
-        .select('id, title, price, cover_url, status')
+        .select('id, title, price, cover_url, status, wholesale_enabled, wholesale_min_quantity, wholesale_discount_percent')
         .in('id', productIds);
 
       let productsData: any[] | null = null;
@@ -386,6 +385,7 @@ export function CartPage() {
   }
 
   // Calcular totales de forma segura, evitando duplicados y valores inválidos
+  // Usar precios mayoristas si aplican
   const totalItems = cartItems.reduce((sum, item) => {
     const quantity = Number(item.quantity) || 0;
     return sum + quantity;
@@ -393,9 +393,10 @@ export function CartPage() {
   
   const totalPrice = cartItems.reduce((sum, item) => {
     const quantity = Number(item.quantity) || 0;
-    const price = Number(item.product?.price) || 0;
-    const itemTotal = price * quantity;
-    return sum + itemTotal;
+    // Calcular precio considerando descuentos mayoristas
+    const { calculateWholesalePrice } = require('@/lib/utils/wholesalePrice');
+    const priceCalc = calculateWholesalePrice(item.product as any, quantity);
+    return sum + priceCalc.totalPrice;
   }, 0);
 
   if (loading) {
@@ -509,25 +510,53 @@ export function CartPage() {
                         Ver detalles del producto
                       </Link>
                       <div className="mb-3">
-                        <p className="text-gray-600 text-sm">
-                          {item.product.price.toLocaleString('es-PY')} Gs. c/u
-                        </p>
-                        {item.product.stock_quantity !== undefined && (
-                          <p className={`text-xs mt-1 ${
-                            item.quantity >= item.product.stock_quantity
-                              ? 'text-red-600 font-medium'
-                              : item.product.stock_quantity <= 5
-                              ? 'text-orange-600'
-                              : 'text-gray-500'
-                          }`}>
-                            {item.quantity >= item.product.stock_quantity
-                              ? `⚠️ Sin stock disponible`
-                              : item.product.stock_quantity <= 5
-                              ? `⚡ Solo ${item.product.stock_quantity} disponible${item.product.stock_quantity !== 1 ? 's' : ''}`
-                              : `${item.product.stock_quantity} disponible${item.product.stock_quantity !== 1 ? 's' : ''}`
-                            }
-                          </p>
-                        )}
+                        {(() => {
+                          // Calcular precio mayorista si aplica
+                          const { calculateWholesalePrice } = require('@/lib/utils/wholesalePrice');
+                          const priceCalc = calculateWholesalePrice(item.product as any, item.quantity);
+                          return (
+                            <>
+                              <p className="text-gray-600 text-sm">
+                                {priceCalc.isWholesale ? (
+                                  <>
+                                    <span className="line-through text-gray-400">
+                                      {item.product.price.toLocaleString('es-PY')} Gs.
+                                    </span>{' '}
+                                    <span className="text-green-600 font-semibold">
+                                      {priceCalc.unitPrice.toLocaleString('es-PY')} Gs. c/u
+                                    </span>
+                                    <span className="ml-2 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
+                                      Mayorista
+                                    </span>
+                                  </>
+                                ) : (
+                                  `${item.product.price.toLocaleString('es-PY')} Gs. c/u`
+                                )}
+                              </p>
+                              {priceCalc.isWholesale && (
+                                <p className="text-xs text-green-600 mt-1">
+                                  Ahorras {priceCalc.savings.toLocaleString('es-PY')} Gs. en total
+                                </p>
+                              )}
+                              {item.product.stock_quantity !== undefined && (
+                                <p className={`text-xs mt-1 ${
+                                  item.quantity >= item.product.stock_quantity
+                                    ? 'text-red-600 font-medium'
+                                    : item.product.stock_quantity <= 5
+                                    ? 'text-orange-600'
+                                    : 'text-gray-500'
+                                }`}>
+                                  {item.quantity >= item.product.stock_quantity
+                                    ? `⚠️ Sin stock disponible`
+                                    : item.product.stock_quantity <= 5
+                                    ? `⚡ Solo ${item.product.stock_quantity} disponible${item.product.stock_quantity !== 1 ? 's' : ''}`
+                                    : `${item.product.stock_quantity} disponible${item.product.stock_quantity !== 1 ? 's' : ''}`
+                                  }
+                                </p>
+                              )}
+                            </>
+                          );
+                        })()}
                       </div>
                       <div className="flex items-center gap-3">
                         <div className="flex items-center gap-2 border border-gray-300 rounded-lg overflow-hidden bg-gray-50">
@@ -571,10 +600,24 @@ export function CartPage() {
                       </div>
                     </div>
                     <div className="text-right flex-shrink-0">
-                      <p className="text-lg sm:text-xl font-bold text-gray-900 mb-1">
-                        {(item.product.price * item.quantity).toLocaleString('es-PY')} Gs.
-                      </p>
-                      <p className="text-xs text-gray-500">Subtotal</p>
+                      {(() => {
+                        // Calcular precio mayorista si aplica
+                        const { calculateWholesalePrice } = require('@/lib/utils/wholesalePrice');
+                        const priceCalc = calculateWholesalePrice(item.product as any, item.quantity);
+                        return (
+                          <>
+                            <p className="text-lg sm:text-xl font-bold text-gray-900 mb-1">
+                              {priceCalc.totalPrice.toLocaleString('es-PY')} Gs.
+                            </p>
+                            {priceCalc.isWholesale && (
+                              <p className="text-xs text-green-600 mb-1">
+                                Ahorras {priceCalc.savings.toLocaleString('es-PY')} Gs.
+                              </p>
+                            )}
+                            <p className="text-xs text-gray-500">Subtotal</p>
+                          </>
+                        );
+                      })()}
                     </div>
                   </div>
                 </div>

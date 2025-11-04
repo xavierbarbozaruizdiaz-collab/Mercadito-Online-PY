@@ -149,13 +149,13 @@ export default async function Home() {
       
       {/* HERO - componente real sin SSR */}
       {FEATURE_HERO && Array.isArray(slides) && slides.length > 0 && (
-        <div className="mb-8">
+        <div className="mb-2">
           <HeroSliderClient slides={slides} />
         </div>
       )}
 
       {/* Products Section */}
-      <div id="products" className="py-8 sm:py-12 px-4 sm:px-8">
+      <div id="products" className="pt-0 pb-4 sm:pt-2 sm:pb-6 px-4 sm:px-8">
         <Suspense fallback={
           <div className="flex justify-center items-center h-32">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>

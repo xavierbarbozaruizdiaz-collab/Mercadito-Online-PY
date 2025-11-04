@@ -22,50 +22,158 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   useEffect(() => {
     let mounted = true;
     let timeoutId: NodeJS.Timeout;
+    let isVerifying = false;
 
-    // Timeout reducido a 5 segundos para mejor UX
+    // Cache simple en sessionStorage para evitar verificaciones múltiples simultáneas
+    const cacheKey = 'dashboard_permission_check';
+    const cacheExpiry = 5000; // 5 segundos de cache
+    const cached = sessionStorage.getItem(cacheKey);
+    
+    if (cached) {
+      try {
+        const { allowed: cachedAllowed, role: cachedRole, timestamp } = JSON.parse(cached);
+        const now = Date.now();
+        
+        // Si el cache es reciente (menos de 5 segundos), usarlo
+        if (now - timestamp < cacheExpiry && cachedAllowed !== null) {
+          if (mounted) {
+            setAllowed(cachedAllowed);
+            setUserRole(cachedRole);
+            setLoading(false);
+            
+            // Verificar acceso según la ruta con el rol cacheado
+            const isAdminRoute = pathname?.includes('/admin');
+            const isSellerRoute = pathname?.includes('/seller');
+            const isAffiliateRoute = pathname?.includes('/affiliate');
+            const isBuyerRoute = pathname?.includes('/buyer');
+            
+            let hasAccess = false;
+            if (isAdminRoute) {
+              hasAccess = cachedRole === 'admin';
+            } else if (isSellerRoute) {
+              hasAccess = cachedRole === 'seller' || cachedRole === 'admin';
+            } else if (isAffiliateRoute) {
+              hasAccess = cachedRole === 'affiliate' || cachedRole === 'admin';
+            } else if (isBuyerRoute) {
+              hasAccess = cachedRole === 'buyer' || cachedRole === 'admin';
+            } else {
+              hasAccess = true;
+            }
+            
+            if (!hasAccess && cachedAllowed) {
+              // Redirigir según el rol del usuario
+              if (cachedRole === 'seller') {
+                window.location.href = '/dashboard';
+              } else if (cachedRole === 'affiliate') {
+                window.location.href = '/dashboard/affiliate';
+              } else if (cachedRole === 'buyer') {
+                window.location.href = '/dashboard/buyer';
+              } else {
+                window.location.href = '/auth/sign-in';
+              }
+            }
+          }
+          return; // Salir temprano si usamos el cache
+        }
+      } catch (e) {
+        // Si el cache está corrupto, continuar con verificación normal
+        sessionStorage.removeItem(cacheKey);
+      }
+    }
+
+    // Timeout de seguridad aumentado a 10 segundos para múltiples pestañas
     timeoutId = setTimeout(() => {
-      if (mounted && allowed === null) {
-        console.error('Timeout verificando permisos de dashboard');
+      if (mounted && allowed === null && !isVerifying) {
+        console.warn('Timeout verificando permisos de dashboard - redirigiendo a login');
         setAllowed(false);
         setLoading(false);
+        sessionStorage.removeItem(cacheKey);
+        window.location.href = '/auth/sign-in';
       }
-    }, 5000);
+    }, 10000);
 
     (async () => {
+      if (isVerifying) return; // Evitar verificaciones simultáneas
+      isVerifying = true;
+
       try {
-        // Verificar sesión
-        const { data: { session: sessionData }, error: sessionErr } = await supabase.auth.getSession();
+        // Verificar sesión con timeout reducido para múltiples pestañas
+        const sessionPromise = supabase.auth.getSession();
+        const sessionTimeout = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Session timeout')), 2000)
+        );
         
-        if (sessionErr || !sessionData?.user) {
+        let sessionData: any;
+        try {
+          const result = await Promise.race([sessionPromise, sessionTimeout]);
+          sessionData = result as any;
+        } catch (sessionError) {
+          if (mounted) {
+            console.error('Error obteniendo sesión:', sessionError);
+            setAllowed(false);
+            setLoading(false);
+            sessionStorage.removeItem(cacheKey);
+            window.location.href = '/auth/sign-in';
+          }
+          isVerifying = false;
+          return;
+        }
+        
+        const { data: { session }, error: sessionErr } = sessionData;
+        
+        if (sessionErr || !session?.user) {
           if (mounted) {
             setAllowed(false);
             setLoading(false);
+            sessionStorage.removeItem(cacheKey);
             window.location.href = '/auth/sign-in';
           }
+          isVerifying = false;
           return;
         }
 
-        const session = sessionData;
         const user = session.user;
 
-        // Verificar perfil y rol
-        const { data: profileData, error: pErr } = await supabase
+        // Verificar perfil y rol con timeout reducido
+        const profilePromise = supabase
           .from('profiles')
           .select('id, role, email')
           .eq('id', user.id)
           .single();
+        
+        const profileTimeout = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Profile timeout')), 2000)
+        );
 
-        if (pErr || !profileData) {
+        let profileData: any;
+        try {
+          const result = await Promise.race([profilePromise, profileTimeout]);
+          profileData = result as any;
+        } catch (profileError: any) {
           if (mounted) {
+            console.error('Error obteniendo perfil:', profileError);
             setAllowed(false);
             setLoading(false);
+            sessionStorage.removeItem(cacheKey);
             window.location.href = '/auth/sign-in';
           }
+          isVerifying = false;
           return;
         }
 
-        const profile = profileData;
+        const { data: profile, error: pErr } = profileData;
+
+        if (pErr || !profile) {
+          if (mounted) {
+            setAllowed(false);
+            setLoading(false);
+            sessionStorage.removeItem(cacheKey);
+            window.location.href = '/auth/sign-in';
+          }
+          isVerifying = false;
+          return;
+        }
+
         const role = (profile as { role?: string }).role || 'buyer';
 
         if (mounted) {
@@ -96,11 +204,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         if (mounted) {
           setAllowed(hasAccess);
           setLoading(false);
+          clearTimeout(timeoutId);
+          
+          // Guardar en cache para otras pestañas
+          try {
+            sessionStorage.setItem(cacheKey, JSON.stringify({
+              allowed: hasAccess,
+              role,
+              timestamp: Date.now()
+            }));
+          } catch (e) {
+            // Si sessionStorage no está disponible, continuar sin cache
+          }
           
           if (!hasAccess) {
             // Redirigir según el rol del usuario
             if (role === 'seller') {
-              window.location.href = '/dashboard/seller';
+              window.location.href = '/dashboard';
             } else if (role === 'affiliate') {
               window.location.href = '/dashboard/affiliate';
             } else if (role === 'buyer') {
@@ -110,14 +230,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             }
           }
         }
+        isVerifying = false;
       } catch (error) {
         console.error('Error en verificación de dashboard:', error);
         if (mounted) {
           setAllowed(false);
           setLoading(false);
+          clearTimeout(timeoutId);
+          sessionStorage.removeItem(cacheKey);
         }
-      } finally {
-        clearTimeout(timeoutId);
+        isVerifying = false;
       }
     })();
 
@@ -166,9 +288,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {/* Contenido principal con margen para sidebar */}
       <div className="md:ml-64">
-        {/* Profile Ensurer y Admin Role Assigner */}
-        <ProfileEnsurer />
-        {userRole === 'admin' && <AdminRoleAssigner />}
+        {/* Profile Ensurer y Admin Role Assigner - Solo mostrar si NO es admin */}
+        {/* Si ya es admin, no necesita verificar perfil ni asignar rol */}
+        {userRole !== 'admin' && (
+          <>
+            <ProfileEnsurer />
+            <AdminRoleAssigner />
+          </>
+        )}
         
         {/* Contenido del dashboard */}
         {children}

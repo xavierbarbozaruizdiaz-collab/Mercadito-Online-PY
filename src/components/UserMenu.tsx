@@ -1,13 +1,16 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { User, LogIn, LogOut, LayoutDashboard } from 'lucide-react';
 
 export default function UserMenu() {
   const [email, setEmail] = useState<string | null>(null);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -83,71 +86,106 @@ export default function UserMenu() {
     }
   }
 
+  // Cerrar menú al hacer click fuera
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isOpen]);
+
   // Log cuando se montan los botones Header/Login
   useEffect(() => {
     console.log('[BTN] Header/Login buttons mounted');
   }, []);
 
-  // Si no hay sesión → link para entrar
-  if (!email) {
-    return (
-      <Link 
-        className="underline" 
-        href="/auth/sign-in"
-        data-testid="primary-btn"
-      >
-        Entrar
-      </Link>
-    );
-  }
-
-  // Con sesión → email, link al Dashboard y botón Salir
   return (
-    <div className="flex items-center gap-2 sm:gap-3 text-sm">
-      <span className="text-gray-700 hidden sm:inline truncate max-w-[120px]">{email}</span>
-
-      {/* Enlace al panel del vendedor */}
-      <Link 
-        href="/dashboard" 
-        className="text-blue-600 hover:text-blue-800 hover:underline transition-colors font-medium"
-        data-testid="primary-btn"
+    <div className="relative flex-shrink-0" ref={menuRef}>
+      {/* Botón icono de usuario */}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center justify-center p-2 min-h-[44px] min-w-[44px] text-gray-600 hover:text-gray-900 transition-colors flex-shrink-0"
+        aria-label="Menú de usuario"
+        aria-expanded={isOpen}
       >
-        Dashboard
-      </Link>
+        <User className="w-5 h-5 sm:w-6 sm:h-6" />
+      </button>
 
-      {true && (
-        <button 
-          onClick={signOut}
-          disabled={isSigningOut}
-          className={`
-            flex items-center gap-1.5 px-3 py-1.5 rounded-lg
-            transition-all duration-200
-            ${isSigningOut 
-              ? 'bg-gray-400 text-white cursor-not-allowed' 
-              : 'bg-red-500 hover:bg-red-600 text-white hover:shadow-md active:scale-95'
-            }
-            font-medium text-sm
-          `}
-          title={isSigningOut ? 'Cerrando sesión...' : 'Cerrar sesión'}
-          data-testid="primary-btn"
-        >
-        {isSigningOut ? (
-          <>
-            <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            <span className="hidden sm:inline">Saliendo...</span>
-          </>
-        ) : (
-          <>
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-            </svg>
-            <span>Salir</span>
-          </>
-        )}
-        </button>
+      {/* Menú desplegable */}
+      {isOpen && (
+        <>
+          {/* Overlay */}
+          <div
+            className="fixed inset-0 bg-black/20 z-40 md:hidden"
+            onClick={() => setIsOpen(false)}
+            aria-hidden="true"
+          />
+          
+          {/* Dropdown */}
+          <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50 overflow-hidden">
+            {!email ? (
+              // Sin sesión: Solo mostrar "Entrar"
+              <Link
+                href="/auth/sign-in"
+                onClick={() => setIsOpen(false)}
+                className="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                <LogIn className="w-5 h-5" />
+                <span className="font-medium">Entrar</span>
+              </Link>
+            ) : (
+              // Con sesión: Dashboard y Salir
+              <>
+                <div className="px-4 py-2 border-b border-gray-200">
+                  <p className="text-xs text-gray-500">Sesión</p>
+                  <p className="text-sm font-medium text-gray-900 truncate">{email}</p>
+                </div>
+                
+                <Link
+                  href="/dashboard"
+                  onClick={() => setIsOpen(false)}
+                  className="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  <LayoutDashboard className="w-5 h-5" />
+                  <span className="font-medium">Dashboard</span>
+                </Link>
+                
+                <button
+                  onClick={() => {
+                    setIsOpen(false);
+                    signOut();
+                  }}
+                  disabled={isSigningOut}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isSigningOut ? (
+                    <>
+                      <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      <span className="font-medium">Saliendo...</span>
+                    </>
+                  ) : (
+                    <>
+                      <LogOut className="w-5 h-5" />
+                      <span className="font-medium">Salir</span>
+                    </>
+                  )}
+                </button>
+              </>
+            )}
+          </div>
+        </>
       )}
     </div>
   );

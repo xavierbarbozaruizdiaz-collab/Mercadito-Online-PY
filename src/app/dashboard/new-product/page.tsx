@@ -5,6 +5,16 @@ import imageCompression from 'browser-image-compression';
 import { supabase, getSessionWithTimeout } from '@/lib/supabaseClient';
 import Link from 'next/link';
 
+// Helper para formatear moneda
+function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat('es-PY', {
+    style: 'currency',
+    currency: 'PYG',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
+
 const MAX_IMAGES = 5; // Reducido de 10 a 5 para ser más razonable
 
 type Category = { id: string; name: string };
@@ -33,6 +43,16 @@ export default function NewProduct() {
   const [condition, setCondition] = useState<'nuevo' | 'usado' | 'usado_como_nuevo'>('nuevo');
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [storeId, setStoreId] = useState<string | null>(null);
+  
+  // Campos de inventario
+  const [stockQuantity, setStockQuantity] = useState<string>('');
+  const [stockManagementEnabled, setStockManagementEnabled] = useState<boolean>(true);
+  const [lowStockThreshold, setLowStockThreshold] = useState<string>('5');
+  
+  // Campos de precio mayorista
+  const [wholesaleEnabled, setWholesaleEnabled] = useState<boolean>(false);
+  const [wholesaleMinQuantity, setWholesaleMinQuantity] = useState<string>('');
+  const [wholesaleDiscountPercent, setWholesaleDiscountPercent] = useState<string>('');
   
   // Campos específicos para subastas
   const [auctionStartingPrice, setAuctionStartingPrice] = useState<string>('');
@@ -522,6 +542,14 @@ export default function NewProduct() {
         store_id: storeId || null,
         // Guardar atributos específicos de la categoría y subasta
         attributes: Object.keys(cleanAttributes).length > 0 ? cleanAttributes : null,
+        // Campos de inventario (solo para venta directa)
+        stock_quantity: saleType === 'direct' && stockManagementEnabled && stockQuantity ? parseInt(stockQuantity) || 0 : null,
+        stock_management_enabled: saleType === 'direct' ? stockManagementEnabled : false,
+        low_stock_threshold: saleType === 'direct' && stockManagementEnabled && lowStockThreshold ? parseInt(lowStockThreshold) || 5 : null,
+        // Campos de precio mayorista (solo para venta directa)
+        wholesale_enabled: saleType === 'direct' ? wholesaleEnabled : false,
+        wholesale_min_quantity: saleType === 'direct' && wholesaleEnabled && wholesaleMinQuantity ? parseInt(wholesaleMinQuantity) || null : null,
+        wholesale_discount_percent: saleType === 'direct' && wholesaleEnabled && wholesaleDiscountPercent ? parseFloat(wholesaleDiscountPercent) || null : null,
       };
       
       // Agregar campos de subasta si aplica
@@ -646,6 +674,12 @@ export default function NewProduct() {
       setAuctionStartingPrice('');
       setAuctionBuyNowPrice('');
       setAuctionStartDate('');
+      setStockQuantity('');
+      setStockManagementEnabled(true);
+      setLowStockThreshold('5');
+      setWholesaleEnabled(false);
+      setWholesaleMinQuantity('');
+      setWholesaleDiscountPercent('');
       setStoreId(stores.length === 1 ? stores[0].id : null);
       setCategoryFields({});
       imagePreviews.forEach(({ preview }) => URL.revokeObjectURL(preview));
@@ -1028,6 +1062,137 @@ export default function NewProduct() {
             <p className="text-red-500 text-sm mt-1">{validationErrors.categoryId}</p>
           )}
         </div>
+
+        {/* Campos de inventario - Solo para venta directa */}
+        {saleType === 'direct' && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4 space-y-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-green-900">📦 Gestión de Inventario</h3>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={stockManagementEnabled}
+                  onChange={(e) => setStockManagementEnabled(e.target.checked)}
+                  className="w-4 h-4 rounded"
+                />
+                <span className="text-sm text-green-800">Gestionar inventario</span>
+              </label>
+            </div>
+            
+            {stockManagementEnabled && (
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Cantidad en stock *</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={stockQuantity}
+                    onChange={(e) => setStockQuantity(e.target.value)}
+                    placeholder="Ej: 10"
+                    className="border p-2 w-full rounded"
+                    required={stockManagementEnabled}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Cantidad disponible actual del producto
+                  </p>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-1">Umbral de stock bajo</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={lowStockThreshold}
+                    onChange={(e) => setLowStockThreshold(e.target.value)}
+                    placeholder="Ej: 5"
+                    className="border p-2 w-full rounded"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Recibirás alerta cuando el stock llegue a este número
+                  </p>
+                </div>
+              </div>
+            )}
+            
+            {!stockManagementEnabled && (
+              <p className="text-sm text-green-700">
+                El stock será ilimitado. No se validará la cantidad disponible.
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Campos de precio mayorista - Solo para venta directa */}
+        {saleType === 'direct' && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-blue-900">💰 Precio Mayorista</h3>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={wholesaleEnabled}
+                  onChange={(e) => setWholesaleEnabled(e.target.checked)}
+                  className="w-4 h-4 rounded"
+                />
+                <span className="text-sm text-blue-800">Habilitar precio mayorista</span>
+              </label>
+            </div>
+            
+            {wholesaleEnabled && (
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Cantidad mínima *</label>
+                  <input
+                    type="number"
+                    min="2"
+                    value={wholesaleMinQuantity}
+                    onChange={(e) => setWholesaleMinQuantity(e.target.value)}
+                    placeholder="Ej: 10"
+                    className="border p-2 w-full rounded"
+                    required={wholesaleEnabled}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Cantidad mínima para aplicar precio mayorista
+                  </p>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-1">Descuento (%) *</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="50"
+                    step="0.01"
+                    value={wholesaleDiscountPercent}
+                    onChange={(e) => setWholesaleDiscountPercent(e.target.value)}
+                    placeholder="Ej: 15"
+                    className="border p-2 w-full rounded"
+                    required={wholesaleEnabled}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Porcentaje de descuento (máximo 50%)
+                  </p>
+                </div>
+              </div>
+            )}
+            
+            {wholesaleEnabled && wholesaleMinQuantity && wholesaleDiscountPercent && priceNumber > 0 && (
+              <div className="mt-4 bg-blue-100 border border-blue-300 rounded p-3">
+                <p className="text-sm text-blue-900 font-medium mb-1">Ejemplo de precio:</p>
+                <p className="text-xs text-blue-800">
+                  Precio normal: {formatCurrency(priceNumber)}<br/>
+                  A partir de {wholesaleMinQuantity} unidades: {formatCurrency(priceNumber * (1 - (parseFloat(wholesaleDiscountPercent) || 0) / 100))} c/u ({wholesaleDiscountPercent}% descuento)
+                </p>
+              </div>
+            )}
+            
+            {!wholesaleEnabled && (
+              <p className="text-sm text-blue-700">
+                El precio será el mismo sin importar la cantidad.
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Campos específicos por categoría */}
         {selectedCategoryName === 'vehiculos' && (

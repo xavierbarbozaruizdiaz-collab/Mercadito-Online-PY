@@ -113,3 +113,4 @@ ORDER BY version DESC;
 **Siguiente acción:** Verificar variable en Vercel → Redeploy → Revisar Console y Network → Completar reporte
 
 
+

@@ -65,3 +65,4 @@ El workflow `prod.yml` aplicará esta migración (y cualquier otra pendiente) au
 **Estado:** ✅ **TODO SINCRONIZADO**
 
 
+

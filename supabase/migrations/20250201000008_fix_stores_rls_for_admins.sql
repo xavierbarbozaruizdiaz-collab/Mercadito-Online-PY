@@ -25,3 +25,4 @@ COMMENT ON POLICY "Admins can view all stores" ON stores IS 'Permite que adminis
 
 
 
+

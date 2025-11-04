@@ -7,6 +7,9 @@ import ProductQandA from '@/components/ProductQandA';
 import PriceAlertButton from '@/components/PriceAlertButton';
 import PriceHistoryChart from '@/components/PriceHistoryChart';
 import ProductImageGallery from '@/components/ProductImageGallery';
+import ProductQuantitySelector from './ProductQuantitySelector';
+import WholesalePriceBadge from '@/components/WholesalePriceBadge';
+import ProductPageClient from './ProductPageClient';
 import { Metadata } from 'next';
 import { generateProductStructuredData, generateBreadcrumbStructuredData } from '@/lib/structuredData';
 
@@ -21,6 +24,11 @@ type Product = {
   category_id: string | null;
   seller_id: string;
   store_id?: string | null;
+  wholesale_enabled?: boolean;
+  wholesale_min_quantity?: number | null;
+  wholesale_discount_percent?: number | null;
+  stock_quantity?: number | null;
+  stock_management_enabled?: boolean;
   created_at: string;
 };
 
@@ -107,9 +115,21 @@ export default async function ProductPage(
 ) {
   const { id } = await props.params; // 👈 OBLIGATORIO: await
 
+  // Obtener sesión del usuario actual para verificar si es el vendedor
+  // En Server Components, usar cookies() para obtener la sesión
+  let currentUserId: string | null = null;
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    currentUserId = session?.user?.id || null;
+  } catch (err) {
+    // Si falla obtener sesión en servidor, será null (no es crítico)
+    console.warn('No se pudo obtener sesión en servidor:', err);
+    currentUserId = null;
+  }
+
   const { data, error } = await supabase
     .from('products')
-    .select(`
+      .select(`
       id, 
       title, 
       description, 
@@ -120,10 +140,22 @@ export default async function ProductPage(
       category_id,
       seller_id,
       store_id,
+      wholesale_enabled,
+      wholesale_min_quantity,
+      wholesale_discount_percent,
+      stock_quantity,
+      stock_management_enabled,
       created_at,
       categories (
         id,
         name
+      ),
+      stores (
+        id,
+        name,
+        slug,
+        logo_url,
+        description
       )
     `)
     .eq('id', id)
@@ -149,10 +181,64 @@ export default async function ProductPage(
   }
 
   // El tipo correcto es que categories viene como array desde Supabase
-  const p = data as Product & { categories: Category[] };
+  const p = data as Product & { 
+    categories: Category[];
+    stores?: Array<{
+      id: string;
+      name: string;
+      slug: string;
+      logo_url: string | null;
+      description: string | null;
+    }> | null;
+  };
   
   // Obtener la primera categoría (debería ser solo una)
   const category = p.categories && p.categories.length > 0 ? p.categories[0] : null;
+  
+  // Obtener información de la tienda si existe (cargar directamente si no viene en la query)
+  let store: { id: string; name: string; slug: string; logo_url: string | null; description: string | null } | null = null;
+  
+  if (p.stores && p.stores.length > 0) {
+    store = p.stores[0];
+  } else if (p.store_id) {
+    // Si no viene en la relación, cargar directamente
+    try {
+      const { data: storeData } = await supabase
+        .from('stores')
+        .select('id, name, slug, logo_url, description')
+        .eq('id', p.store_id)
+        .single();
+      
+      if (storeData) {
+        store = storeData;
+      }
+    } catch (err) {
+      console.warn('No se pudo cargar información de la tienda:', err);
+    }
+  }
+  
+  // Obtener información del vendedor si no hay tienda
+  let sellerInfo: { name: string; email?: string } | null = null;
+  if (!store && p.seller_id) {
+    try {
+      const { data: sellerProfile } = await supabase
+        .from('profiles')
+        .select('email, first_name, last_name')
+        .eq('id', p.seller_id)
+        .single();
+      
+      if (sellerProfile) {
+        sellerInfo = {
+          name: sellerProfile.first_name && sellerProfile.last_name 
+            ? `${sellerProfile.first_name} ${sellerProfile.last_name}`
+            : sellerProfile.email?.split('@')[0] || 'Vendedor',
+          email: sellerProfile.email
+        };
+      }
+    } catch (err) {
+      console.warn('No se pudo cargar información del vendedor:', err);
+    }
+  }
 
   // Preparar array de imágenes: si hay imágenes en product_images, usarlas; si no, usar cover_url
         const images = (productImages && productImages.length > 0) 
@@ -280,14 +366,8 @@ export default async function ProductPage(
               </div>
             </div>
 
-            <div className="flex space-x-4">
-              <AddToCartButton productId={p.id} />
-              <StartConversationButton 
-                product={p as any}
-                sellerId={p.seller_id}
-                className="flex-1"
-              />
-            </div>
+            {/* Componente cliente para manejar sesión y mostrar botones condicionalmente */}
+            <ProductPageClient product={p} />
 
             {/* Alerta de precio */}
             <div className="mt-4">
@@ -297,12 +377,63 @@ export default async function ProductPage(
               />
             </div>
 
-            {/* Información del vendedor */}
+            {/* Información del vendedor/tienda */}
             <div className="bg-gray-50 rounded-lg p-4">
               <h3 className="font-semibold mb-2">Información del vendedor</h3>
-              <p className="text-sm text-gray-600">
-                Este producto fue publicado por un vendedor verificado de nuestra plataforma.
-              </p>
+              {store ? (
+                <div className="flex items-center gap-3">
+                  {store.logo_url ? (
+                    <img
+                      src={store.logo_url}
+                      alt={store.name}
+                      className="w-12 h-12 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center">
+                      <span className="text-purple-600 font-semibold text-lg">
+                        {store.name.charAt(0).toUpperCase()}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex-1">
+                    <Link
+                      href={`/store/${store.slug}`}
+                      className="text-blue-600 hover:text-blue-800 font-medium hover:underline"
+                    >
+                      {store.name}
+                    </Link>
+                    {store.description && (
+                      <p className="text-xs text-gray-500 mt-1 line-clamp-2">
+                        {store.description}
+                      </p>
+                    )}
+                  </div>
+                  <Link
+                    href={`/store/${store.slug}`}
+                    className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                  >
+                    Ver tienda →
+                  </Link>
+                </div>
+              ) : sellerInfo ? (
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center">
+                    <span className="text-gray-600 font-semibold text-lg">
+                      {sellerInfo.name.charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium text-gray-900">{sellerInfo.name}</p>
+                    {sellerInfo.email && (
+                      <p className="text-xs text-gray-500">{sellerInfo.email}</p>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-gray-600">
+                  Este producto fue publicado por un vendedor verificado de nuestra plataforma.
+                </p>
+              )}
             </div>
           </div>
         </div>

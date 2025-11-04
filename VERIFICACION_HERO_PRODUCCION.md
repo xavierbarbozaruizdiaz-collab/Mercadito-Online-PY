@@ -212,3 +212,4 @@ Copia este template y completa con las capturas:
 **Siguiente paso:** Ejecuta las verificaciones y completa el reporte con las capturas.
 
 
+

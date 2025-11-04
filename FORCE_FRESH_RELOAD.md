@@ -293,3 +293,4 @@ AND column_name IN ('image_url', 'cover_url');
 
 
 
+

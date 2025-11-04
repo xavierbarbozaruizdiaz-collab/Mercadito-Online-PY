@@ -204,3 +204,4 @@ Migraciones pendientes identificadas:
 **Ejecuta el SQL en Supabase y compárteme el resultado** (o número total aplicado) y te diré exactamente cuáles faltan.
 
 
+

@@ -46,6 +46,9 @@ interface Product {
   image_url?: string;
   created_at: string;
   seller_id?: string; // ID del vendedor
+  stock_quantity?: number | null;
+  stock_management_enabled?: boolean;
+  low_stock_threshold?: number | null;
   store: {
     name: string;
     slug: string;
@@ -84,6 +87,16 @@ export default function ProductCard({
   const [isOwnProduct, setIsOwnProduct] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const isLiked = isInWishlist(product.id);
+  
+  // Calcular estado de stock
+  const stockInfo = product.stock_management_enabled && product.stock_quantity !== null && product.stock_quantity !== undefined
+    ? {
+        quantity: product.stock_quantity,
+        isLow: product.low_stock_threshold ? product.stock_quantity <= product.low_stock_threshold : false,
+        isOutOfStock: product.stock_quantity <= 0,
+        threshold: product.low_stock_threshold || 5
+      }
+    : null;
 
   // Log cuando se montan los botones Card CTA
   useEffect(() => {
@@ -410,6 +423,25 @@ export default function ProductCard({
             </Badge>
           )}
 
+          {/* Badge de stock */}
+          {stockInfo && (
+            <div className="absolute bottom-2 left-2">
+              {stockInfo.isOutOfStock ? (
+                <Badge variant="error" size="sm">
+                  Sin stock
+                </Badge>
+              ) : stockInfo.isLow ? (
+                <Badge variant="warning" size="sm">
+                  Últimas {stockInfo.quantity} unidades
+                </Badge>
+              ) : (
+                <Badge variant="info" size="sm" className="bg-blue-500/80 text-white">
+                  Stock: {stockInfo.quantity}
+                </Badge>
+              )}
+            </div>
+          )}
+
           {/* Botón de favoritos */}
           {true && showActions && (
             <Button
@@ -473,20 +505,32 @@ export default function ProductCard({
       {true && showActions && (
         <CardFooter className="p-4 pt-0">
           <div className="flex items-center space-x-2 w-full">
-            {true && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={(e) => handleActionClick(e, handleAddToCart)}
-                disabled={isAddingToCart || isOwnProduct}
-                className="flex-1"
-                title={isOwnProduct ? 'No puedes agregar tus propios productos al carrito' : ''}
-                data-testid="primary-btn"
-              >
-                <ShoppingCart className="w-4 h-4 mr-1" />
-                {isAddingToCart ? 'Agregando...' : isOwnProduct ? 'Tu producto' : 'Agregar'}
-              </Button>
-            )}
+                      {true && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => handleActionClick(e, handleAddToCart)}
+                          disabled={isAddingToCart || isOwnProduct || (stockInfo?.isOutOfStock === true)}
+                          className="flex-1"
+                          title={
+                            isOwnProduct 
+                              ? 'No puedes agregar tus propios productos al carrito'
+                              : stockInfo?.isOutOfStock === true
+                              ? 'Producto sin stock disponible'
+                              : ''
+                          }
+                          data-testid="primary-btn"
+                        >
+                          <ShoppingCart className="w-4 h-4 mr-1" />
+                          {isAddingToCart 
+                            ? 'Agregando...' 
+                            : isOwnProduct 
+                            ? 'Tu producto' 
+                            : stockInfo?.isOutOfStock === true
+                            ? 'Sin stock'
+                            : 'Agregar'}
+                        </Button>
+                      )}
             {true && (
               <Button
                 variant="ghost"

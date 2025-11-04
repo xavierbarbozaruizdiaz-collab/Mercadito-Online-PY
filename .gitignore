@@ -46,6 +46,7 @@ Icon?
 .env.*
 !.env.example
 .env.local
+.supabase-token.local
 
 # Editors / IDEs
 .vscode/*

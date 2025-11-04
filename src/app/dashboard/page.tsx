@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import Image from 'next/image';
 import DashboardSidebar from '@/components/DashboardSidebar';
+import StatsPanel from '@/components/StatsPanel';
 // import AdminRoleAssigner from '@/components/AdminRoleAssigner'; // Temporalmente comentado
 
 type Product = {
@@ -40,6 +41,8 @@ type Product = {
   auction_status?: 'scheduled' | 'active' | 'ended' | 'cancelled';
   auction_end_at?: string;
   status?: string | null; // 'active', 'paused', 'deleted', etc.
+  in_showcase?: boolean;
+  showcase_position?: number | null;
 };
 
 type DashboardStats = {
@@ -97,6 +100,11 @@ export default function Dashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
   const [storeSlug, setStoreSlug] = useState<string | null>(null);
+  const [showcaseProducts, setShowcaseProducts] = useState<Product[]>([]);
+  const [updatingShowcase, setUpdatingShowcase] = useState<string | null>(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [statsPanelOpen, setStatsPanelOpen] = useState(false);
+  const [storeId, setStoreId] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -120,7 +128,7 @@ export default function Dashboard() {
         if (userRole === 'seller') {
           const { data: s } = await supabase
             .from('stores')
-            .select('is_active, settings, slug')
+            .select('id, is_active, settings, slug')
             .eq('seller_id', session.session.user.id)
             .maybeSingle();
           if (s) {
@@ -130,6 +138,10 @@ export default function Dashboard() {
             if ((s as any).slug) {
               setStoreSlug((s as any).slug);
             }
+            // Guardar store_id para el panel de estadísticas
+            if ((s as any).id) {
+              setStoreId((s as any).id);
+            }
           } else {
             setStoreStatus('none');
           }
@@ -138,16 +150,49 @@ export default function Dashboard() {
           await loadSellerStats(session.session.user.id);
         }
 
-        // Cargar productos (incluyendo status para detectar pausados)
-        const { data, error } = await supabase
+        // Cargar productos (incluyendo status para detectar pausados y vitrina)
+        // Intentar primero con campos de vitrina, si falla intentar sin ellos
+        let query = supabase
           .from('products')
           .select('id, title, price, image_url:cover_url, created_at, sale_type, auction_status, auction_end_at, status')
           .eq('seller_id', session.session.user.id)
           .order('created_at', { ascending: false });
 
+        let { data, error } = await query;
+
+        // Si hay error de columna inexistente, intentar agregar campos de vitrina
+        if (error && (error.code === '42703' || error.message?.includes('does not exist'))) {
+          logger.warn('Campos de vitrina no disponibles, intentando sin ellos', error);
+          // Ya intentamos sin in_showcase, así que usamos la query simple
+        } else if (!error) {
+          // Si no hay error, intentar agregar campos de vitrina en una segunda query opcional
+          try {
+            const { data: showcaseData } = await supabase
+              .from('products')
+              .select('id, in_showcase, showcase_position')
+              .eq('seller_id', session.session.user.id);
+            
+            // Combinar datos si existen
+            if (showcaseData && data) {
+              const showcaseMap = new Map(showcaseData.map((p: any) => [p.id, { in_showcase: p.in_showcase, showcase_position: p.showcase_position }]));
+              data = data.map((p: any) => ({
+                ...p,
+                ...(showcaseMap.get(p.id) || {})
+              }));
+            }
+          } catch (showcaseError) {
+            // Si falla, continuar sin campos de vitrina
+            logger.warn('No se pudieron cargar campos de vitrina', showcaseError);
+          }
+        }
+
         if (error) {
           logger.error('Error al cargar productos', error);
-          throw error;
+          // No lanzar error, mostrar dashboard vacío
+          setProducts([]);
+          setAllProducts([]);
+          setLoading(false);
+          return;
         }
         
         const allProductsData = (data || []) as Product[];
@@ -337,10 +382,23 @@ export default function Dashboard() {
         // Los productos activos (sin subastas finalizadas ni pausados)
         setAllProducts(activeProducts);
         setProducts(activeProducts);
-      } catch (err) {
+        
+        // Cargar productos en vitrina
+        if (userRole === 'seller') {
+          const showcaseItems = allProductsData.filter(p => p.in_showcase === true && p.status === 'active');
+          setShowcaseProducts(showcaseItems.sort((a, b) => (a.showcase_position || 0) - (b.showcase_position || 0)));
+        }
+      } catch (err: any) {
         logger.error('Error loading products', err);
+        // Asegurar que siempre se desactive el loading y se muestre algo
+        setProducts([]);
+        setAllProducts([]);
+        setFinishedAuctions([]);
+        setPausedProducts([]);
+        setShowcaseProducts([]);
       } finally {
         setLoading(false);
+        setStatsLoading(false);
       }
     })();
   }, []);
@@ -676,6 +734,29 @@ export default function Dashboard() {
       alert('Error al reactivar producto: ' + err.message);
     } finally {
       setReactivatingId(null);
+    }
+  }
+
+  async function toggleShowcase(productId: string, currentStatus: boolean) {
+    setUpdatingShowcase(productId);
+    try {
+      const { error } = await supabase
+        .from('products')
+        .update({
+          in_showcase: !currentStatus,
+          showcase_position: !currentStatus ? null : undefined,
+        })
+        .eq('id', productId);
+
+      if (error) throw error;
+
+      // Recargar productos
+      window.location.reload();
+    } catch (err: any) {
+      logger.error('Error al actualizar vitrina', err);
+      alert('Error: ' + (err.message || 'No se pudo actualizar la vitrina'));
+    } finally {
+      setUpdatingShowcase(null);
     }
   }
 
@@ -1049,10 +1130,22 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-[#1A1A1A] flex">
       {/* Barra lateral */}
-      <DashboardSidebar />
+      <DashboardSidebar 
+        onCollapseChange={setSidebarCollapsed}
+        onStatsClick={() => setStatsPanelOpen(true)}
+      />
+      
+      {/* Panel de Estadísticas */}
+      <StatsPanel
+        isOpen={statsPanelOpen}
+        onClose={() => setStatsPanelOpen(false)}
+        stats={stats}
+        sellerId={role === 'seller' ? (storeId || '') : ''}
+        storeId={storeId}
+      />
       
       {/* Contenido principal */}
-      <div className="flex-1 ml-64 p-6">
+      <div className={`flex-1 p-6 transition-all duration-300 ${sidebarCollapsed ? 'md:ml-16' : 'md:ml-64'}`}>
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-0 mb-6">
         <h1 className="text-xl sm:text-2xl font-bold text-gray-200">Panel del vendedor</h1>
         <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
@@ -1132,7 +1225,7 @@ export default function Dashboard() {
       </div>
 
       {/* Notificaciones Importantes */}
-      {role === 'seller' && stats && stats.notifications.length > 0 && (
+      {(role === 'seller' || (role === null && loading)) && stats && stats.notifications.length > 0 && (
         <div className="mb-6 space-y-2">
           {stats.notifications.map((notif, idx) => (
             <Link
@@ -1167,7 +1260,7 @@ export default function Dashboard() {
       )}
 
       {/* Acciones Rápidas - Solo para vendedores */}
-      {role === 'seller' && (
+      {(role === 'seller' || (role === null && loading)) && (
         <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <Link
             href="/dashboard/new-product"
@@ -1247,355 +1340,204 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Estadísticas del Dashboard - Solo para vendedores */}
-      {role === 'seller' && stats && (
-        <div className="mb-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-            {/* Total de Productos */}
-            <div className="bg-[#252525] rounded-lg border border-gray-700 p-4 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-400 mb-1">Productos</p>
-                  <p className="text-2xl font-bold text-gray-200">{stats.totalProducts}</p>
-                  <p className="text-xs text-gray-500 mt-1">{stats.activeProducts} activos</p>
-                </div>
-                <div className="w-12 h-12 bg-blue-900/30 rounded-lg flex items-center justify-center">
-                  <Package className="w-6 h-6 text-blue-400" />
-                </div>
+      {/* Vitrina de Ofertas - Solo para vendedores */}
+      {(role === 'seller' || (role === null && loading)) && (
+        <div className="mb-6 bg-gradient-to-br from-purple-900/30 to-blue-900/30 rounded-lg border border-purple-700/50 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-purple-600/20 rounded-lg flex items-center justify-center">
+                <Star className="w-5 h-5 text-purple-400" />
               </div>
-            </div>
-
-            {/* Órdenes */}
-            <div className="bg-[#252525] rounded-lg border border-gray-700 p-4 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-400 mb-1">Órdenes</p>
-                  <p className="text-2xl font-bold text-gray-200">{stats.totalOrders}</p>
-                  {stats.pendingOrders > 0 && (
-                    <p className="text-xs text-yellow-400 mt-1 flex items-center gap-1">
-                      <AlertCircle className="w-3 h-3" />
-                      {stats.pendingOrders} pendientes
-                    </p>
-                  )}
-                </div>
-                <div className="w-12 h-12 bg-green-900/30 rounded-lg flex items-center justify-center">
-                  <ShoppingCart className="w-6 h-6 text-green-400" />
-                </div>
-              </div>
-            </div>
-
-            {/* Ingresos Mensuales */}
-            <div className="bg-[#252525] rounded-lg border border-gray-700 p-4 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-400 mb-1">Este mes</p>
-                  <p className="text-xl font-bold text-gray-200">
-                    {stats.monthlyRevenue.toLocaleString('es-PY')} Gs.
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">Ingresos del mes</p>
-                </div>
-                <div className="w-12 h-12 bg-purple-900/30 rounded-lg flex items-center justify-center">
-                  <TrendingUp className="w-6 h-6 text-purple-400" />
-                </div>
-              </div>
-            </div>
-
-            {/* Ingresos Totales */}
-            <div className="bg-[#252525] rounded-lg border border-gray-700 p-4 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-400 mb-1">Ingresos Total</p>
-                  <p className="text-xl font-bold text-emerald-400">
-                    {stats.totalRevenue.toLocaleString('es-PY')} Gs.
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">{stats.totalCustomers} clientes</p>
-                </div>
-                <div className="w-12 h-12 bg-green-900/30 rounded-lg flex items-center justify-center">
-                  <DollarSign className="w-6 h-6 text-green-400" />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Balances y Ganancias */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-            {/* Balance Pendiente (en escrow) */}
-            <div className="bg-gradient-to-br from-yellow-900/30 to-yellow-800/20 rounded-lg border border-yellow-700 p-4">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-sm font-medium text-yellow-300">Pendiente</p>
-                <Clock className="w-5 h-5 text-yellow-400" />
-              </div>
-              <p className="text-2xl font-bold text-gray-200 mb-1">
-                {stats.pendingBalance.toLocaleString('es-PY')} Gs.
-              </p>
-              <p className="text-xs text-yellow-400">En escolta (esperando entrega)</p>
-            </div>
-
-            {/* Balance Disponible (listo para retiro) */}
-            <div className="bg-gradient-to-br from-green-900/30 to-green-800/20 rounded-lg border border-green-700 p-4">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-sm font-medium text-green-300">Disponible</p>
-                <DollarSign className="w-5 h-5 text-green-400" />
-              </div>
-              <p className="text-2xl font-bold text-green-400 mb-1">
-                {stats.availableBalance.toLocaleString('es-PY')} Gs.
-              </p>
-              <p className="text-xs text-green-400">Listo para retiro</p>
-            </div>
-
-            {/* Ganancias Totales */}
-            <div className="bg-gradient-to-br from-blue-900/30 to-blue-800/20 rounded-lg border border-blue-700 p-4">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-sm font-medium text-blue-300">Ganancias Totales</p>
-                <TrendingUp className="w-5 h-5 text-blue-400" />
-              </div>
-              <p className="text-2xl font-bold text-gray-200 mb-1">
-                {stats.totalEarnings.toLocaleString('es-PY')} Gs.
-              </p>
-              <p className="text-xs text-blue-400">Histórico de ingresos</p>
-            </div>
-
-            {/* Comisiones Pagadas */}
-            <div className="bg-gradient-to-br from-red-900/30 to-red-800/20 rounded-lg border border-red-700 p-4">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-sm font-medium text-red-300">Comisiones Pagadas</p>
-                <Percent className="w-5 h-5 text-red-400" />
-              </div>
-              <p className="text-2xl font-bold text-gray-200 mb-1">
-                {stats.totalCommissionsPaid.toLocaleString('es-PY')} Gs.
-              </p>
-              <p className="text-xs text-red-400">Total de comisiones cobradas</p>
-            </div>
-          </div>
-
-          {/* Métricas de Rendimiento */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-            <div className="bg-gradient-to-br from-blue-900/30 to-blue-800/20 rounded-lg border border-blue-700 p-4">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-sm font-medium text-blue-300">Tasa de Conversión</p>
-                <Target className="w-5 h-5 text-blue-400" />
-              </div>
-              <div className="flex items-baseline gap-2">
-                <p className="text-2xl font-bold text-gray-200">
-                  {stats.conversionRate.toFixed(1)}%
+              <div>
+                <h3 className="text-lg font-semibold text-gray-200">Vitrina de Ofertas</h3>
+                <p className="text-sm text-gray-400">
+                  Destaca hasta 2 productos en la página de vitrina de ofertas
                 </p>
-                <div className={`flex items-center gap-1 text-xs ${
-                  stats.conversionRate > 10 ? 'text-green-400' :
-                  stats.conversionRate > 5 ? 'text-blue-400' :
-                  'text-red-400'
-                }`}>
-                  {stats.conversionRate > 10 ? (
-                    <>
-                      <ArrowUp className="w-3 h-3" />
-                      <span>Excelente</span>
-                    </>
-                  ) : stats.conversionRate > 5 ? (
-                    <>
-                      <TrendingUp className="w-3 h-3" />
-                      <span>Bueno</span>
-                    </>
-                  ) : (
-                    <>
-                      <TrendingDown className="w-3 h-3" />
-                      <span>Mejorar</span>
-                    </>
-                  )}
-                </div>
               </div>
-              <p className="text-xs text-blue-400 mt-1">
-                {stats.totalOrders} ventas / {stats.activeProducts} productos activos
-              </p>
             </div>
-
-            <div className="bg-gradient-to-br from-purple-900/30 to-purple-800/20 rounded-lg border border-purple-700 p-4">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-sm font-medium text-purple-300">Ticket Promedio</p>
-                <BarChart3 className="w-5 h-5 text-purple-400" />
-              </div>
-              <p className="text-2xl font-bold text-gray-200 mb-1">
-                {stats.averageOrderValue.toLocaleString('es-PY')} Gs.
-              </p>
-              <p className="text-xs text-purple-400">
-                Por orden realizada
-              </p>
-            </div>
-
-            <div className="bg-gradient-to-br from-emerald-900/30 to-emerald-800/20 rounded-lg border border-emerald-700 p-4">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-sm font-medium text-emerald-300">Crecimiento Mensual</p>
-                <TrendingUp className="w-5 h-5 text-emerald-400" />
-              </div>
-              <p className="text-2xl font-bold text-gray-200 mb-1">
-                {stats.monthlyRevenue > 0 
-                  ? ((stats.monthlyRevenue / Math.max(stats.totalRevenue - stats.monthlyRevenue, 1)) * 100).toFixed(0)
-                  : '0'}%
-              </p>
-              <p className="text-xs text-emerald-400">
-                {stats.monthlyRevenue.toLocaleString('es-PY')} Gs. este mes
-              </p>
-            </div>
+            <Link
+              href="/vitrina"
+              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium flex items-center gap-2"
+            >
+              <Eye className="w-4 h-4" />
+              Ver Vitrina
+            </Link>
           </div>
 
-          {/* Gráfico de Tendencias de Ventas */}
-          {stats.salesTrend.length > 0 && (
-            <div className="bg-[#252525] rounded-lg border border-gray-700 p-4 shadow-sm mb-4">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-gray-200 flex items-center gap-2">
-                  <BarChart3 className="w-5 h-5 text-gray-400" />
-                  Tendencia de Ventas (Últimos 30 días)
-                </h3>
-              </div>
-              <div className="h-48 flex items-end justify-between gap-1">
-                {stats.salesTrend.slice(-14).map((day, idx) => {
-                  const maxRevenue = Math.max(...stats.salesTrend.map(d => d.revenue), 1);
-                  const height = (day.revenue / maxRevenue) * 100;
-                  return (
-                    <div key={idx} className="flex-1 flex flex-col items-center gap-1">
-                      <div className="relative w-full flex flex-col items-center justify-end" style={{ height: '100%' }}>
-                        <div
-                          className="w-full bg-gradient-to-t from-blue-500 to-blue-400 rounded-t transition-all hover:from-blue-600 hover:to-blue-500 cursor-pointer"
-                          style={{ height: `${Math.max(height, 5)}%` }}
-                          title={`${new Date(day.date).toLocaleDateString('es-PY')}: ${day.revenue.toLocaleString('es-PY')} Gs.`}
-                        />
-                      </div>
-                      <p className="text-xs text-gray-400 transform -rotate-45 origin-top-left whitespace-nowrap mt-2" style={{ writingMode: 'vertical-rl' }}>
-                        {new Date(day.date).getDate()}/{new Date(day.date).getMonth() + 1}
-                      </p>
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="mt-4 flex items-center justify-between text-xs text-gray-400">
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-1">
-                    <div className="w-3 h-3 bg-blue-500 rounded"></div>
-                    <span>Ingresos (Gs.)</span>
-                  </div>
-                </div>
-                <p>Total: {stats.salesTrend.reduce((sum, day) => sum + day.revenue, 0).toLocaleString('es-PY')} Gs.</p>
-              </div>
+          {showcaseProducts.length === 0 ? (
+            <div className="bg-[#1A1A1A]/50 rounded-lg p-6 text-center border border-gray-700">
+              <Star className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+              <p className="text-gray-400 mb-2">No tienes productos en la vitrina</p>
+              <p className="text-sm text-gray-500">
+                Puedes destacar hasta 2 productos. Los productos activos aparecerán disponibles para agregar.
+              </p>
             </div>
-          )}
-
-          {/* Productos Más Vendidos */}
-          {stats.topProducts.length > 0 && (
-            <div className="bg-[#252525] rounded-lg border border-gray-700 p-4 shadow-sm mb-4">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-gray-200 flex items-center gap-2">
-                  <Star className="w-5 h-5 text-yellow-500" />
-                  Productos Más Vendidos
-                </h3>
-                <Link
-                  href="/dashboard"
-                  className="text-sm text-blue-400 hover:text-blue-300 font-medium"
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {showcaseProducts.map((product) => (
+                <div
+                  key={product.id}
+                  className="bg-[#1A1A1A]/50 rounded-lg border border-gray-700 p-4 flex items-center gap-4"
                 >
-                  Ver todos →
-                </Link>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-                {stats.topProducts.map((product, idx) => (
-                  <Link
-                    key={product.id}
-                    href={`/products/${product.id}`}
-                    className="group bg-gray-800 rounded-lg p-3 hover:bg-gray-700 transition-all hover:shadow-md"
-                  >
-                    <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-gray-700 mb-2">
-                      {product.cover_url ? (
-                        <Image
-                          src={product.cover_url}
-                          alt={product.title}
-                          fill
-                          className="object-cover group-hover:scale-110 transition-transform"
-                          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 20vw"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <Package className="w-8 h-8 text-gray-500" />
-                        </div>
-                      )}
-                      <div className="absolute top-2 left-2 bg-yellow-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
-                        #{idx + 1}
+                  <div className="relative w-20 h-20 rounded-lg overflow-hidden bg-gray-700 flex-shrink-0">
+                    {product.cover_url ? (
+                      <Image
+                        src={product.cover_url}
+                        alt={product.title}
+                        fill
+                        className="object-cover"
+                        sizes="80px"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Package className="w-8 h-8 text-gray-500" />
                       </div>
-                    </div>
-                    <h4 className="font-medium text-sm text-gray-200 line-clamp-2 mb-1 group-hover:text-blue-400 transition-colors">
-                      {product.title}
-                    </h4>
-                    <div className="space-y-1">
-                      <p className="text-xs text-gray-400">
-                        <span className="font-semibold">{product.total_sold}</span> vendidos
-                      </p>
-                      <p className="text-xs font-semibold text-emerald-400">
-                        {product.revenue.toLocaleString('es-PY')} Gs.
-                      </p>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Órdenes Recientes */}
-          {stats.recentOrders.length > 0 && (
-            <div className="bg-[#252525] rounded-lg border border-gray-700 p-4 shadow-sm">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-gray-200 flex items-center gap-2">
-                  <Clock className="w-5 h-5 text-gray-400" />
-                  Órdenes Recientes
-                </h3>
-                <Link
-                  href="/dashboard/orders"
-                  className="text-sm text-blue-400 hover:text-blue-300 font-medium"
-                >
-                  Ver todas →
-                </Link>
-              </div>
-              <div className="space-y-2">
-                {stats.recentOrders.slice(0, 3).map((order: any) => (
-                  <Link
-                    key={order.id}
-                    href="/dashboard/orders"
-                    className="flex items-center justify-between p-3 bg-gray-800 rounded-lg hover:bg-gray-700 transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={`w-2 h-2 rounded-full ${
-                        order.status === 'pending' ? 'bg-yellow-500' :
-                        order.status === 'confirmed' ? 'bg-blue-500' :
-                        order.status === 'shipped' ? 'bg-purple-500' :
-                        order.status === 'delivered' ? 'bg-green-500' :
-                        'bg-gray-400'
-                      }`} />
-                      <div>
-                        <p className="text-sm font-medium text-gray-200">
-                          Orden #{order.id.slice(0, 8)}
-                        </p>
-                        <p className="text-xs text-gray-400">
-                          {new Date(order.created_at).toLocaleDateString('es-PY')}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-semibold text-gray-200">
-                        {order.total_amount.toLocaleString('es-PY')} Gs.
-                      </p>
-                      <span className={`text-xs px-2 py-1 rounded ${
-                        order.status === 'pending' ? 'bg-yellow-900/50 text-yellow-300' :
-                        order.status === 'confirmed' ? 'bg-blue-900/50 text-blue-300' :
-                        order.status === 'shipped' ? 'bg-purple-900/50 text-purple-300' :
-                        order.status === 'delivered' ? 'bg-green-900/50 text-green-300' :
-                        'bg-gray-700 text-gray-300'
-                      }`}>
-                        {order.status === 'pending' ? 'Pendiente' :
-                         order.status === 'confirmed' ? 'Confirmado' :
-                         order.status === 'shipped' ? 'Enviado' :
-                         order.status === 'delivered' ? 'Entregado' :
-                         order.status}
+                    )}
+                    <div className="absolute top-1 right-1">
+                      <span className="px-1.5 py-0.5 bg-purple-600 text-white text-xs font-bold rounded">
+                        {product.showcase_position}
                       </span>
                     </div>
-                  </Link>
-                ))}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="font-medium text-gray-200 truncate mb-1">{product.title}</h4>
+                    <p className="text-sm text-purple-400 font-semibold">
+                      {product.price.toLocaleString('es-PY')} Gs.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => toggleShowcase(product.id, true)}
+                    disabled={updatingShowcase === product.id}
+                    className="px-3 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+                  >
+                    {updatingShowcase === product.id ? '⏳' : 'Quitar'}
+                  </button>
+                </div>
+              ))}
+              {showcaseProducts.length < 2 && (
+                <div className="bg-[#1A1A1A]/50 rounded-lg border border-dashed border-gray-600 p-4 flex items-center justify-center">
+                  <p className="text-gray-500 text-sm">
+                    Puedes agregar {2 - showcaseProducts.length} producto{2 - showcaseProducts.length !== 1 ? 's' : ''} más
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Lista de productos disponibles para agregar */}
+          {showcaseProducts.length < 2 && allProducts.length > 0 && (
+            <div className="mt-6">
+              <h4 className="text-sm font-medium text-gray-300 mb-3">
+                Productos disponibles para destacar
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-64 overflow-y-auto">
+                {allProducts
+                  .filter(p => !p.in_showcase && p.status === 'active')
+                  .slice(0, 6)
+                  .map((product) => (
+                    <div
+                      key={product.id}
+                      className="bg-[#1A1A1A]/50 rounded-lg border border-gray-700 p-3 flex items-center gap-3"
+                    >
+                      <div className="relative w-12 h-12 rounded overflow-hidden bg-gray-700 flex-shrink-0">
+                        {product.cover_url ? (
+                          <Image
+                            src={product.cover_url}
+                            alt={product.title}
+                            fill
+                            className="object-cover"
+                            sizes="48px"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <Package className="w-6 h-6 text-gray-500" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h5 className="font-medium text-gray-200 text-sm truncate">{product.title}</h5>
+                        <p className="text-xs text-gray-400">{product.price.toLocaleString('es-PY')} Gs.</p>
+                      </div>
+                      <button
+                        onClick={() => toggleShowcase(product.id, false)}
+                        disabled={updatingShowcase === product.id || showcaseProducts.length >= 2}
+                        className="px-3 py-1.5 bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+                      >
+                        {updatingShowcase === product.id ? '⏳' : '⭐ Agregar'}
+                      </button>
+                    </div>
+                  ))}
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Estadísticas del Dashboard - OCULTAS por defecto, se muestran en el panel */}
+      {/* Las estadísticas ahora se muestran en el StatsPanel cuando se hace clic en el botón del sidebar */}
+
+      {/* Órdenes Recientes */}
+      {(role === 'seller' || (role === null && loading)) && stats && stats.recentOrders && stats.recentOrders.length > 0 && (
+        <div className="mb-6">
+          <div className="bg-[#252525] rounded-lg border border-gray-700 p-4 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-gray-200 flex items-center gap-2">
+                <Clock className="w-5 h-5 text-gray-400" />
+                Órdenes Recientes
+              </h3>
+              <Link
+                href="/dashboard/orders"
+                className="text-sm text-blue-400 hover:text-blue-300 font-medium"
+              >
+                Ver todas →
+              </Link>
+            </div>
+            <div className="space-y-2">
+              {stats.recentOrders.slice(0, 3).map((order: any) => (
+                <Link
+                  key={order.id}
+                  href="/dashboard/orders"
+                  className="flex items-center justify-between p-3 bg-gray-800 rounded-lg hover:bg-gray-700 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-2 h-2 rounded-full ${
+                      order.status === 'pending' ? 'bg-yellow-500' :
+                      order.status === 'confirmed' ? 'bg-blue-500' :
+                      order.status === 'shipped' ? 'bg-purple-500' :
+                      order.status === 'delivered' ? 'bg-green-500' :
+                      'bg-gray-400'
+                    }`} />
+                    <div>
+                      <p className="text-sm font-medium text-gray-200">
+                        Orden #{order.id.slice(0, 8)}
+                      </p>
+                      <p className="text-xs text-gray-400">
+                        {new Date(order.created_at).toLocaleDateString('es-PY')}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-semibold text-gray-200">
+                      {order.total_amount.toLocaleString('es-PY')} Gs.
+                    </p>
+                    <span className={`text-xs px-2 py-1 rounded ${
+                      order.status === 'pending' ? 'bg-yellow-900/50 text-yellow-300' :
+                      order.status === 'confirmed' ? 'bg-blue-900/50 text-blue-300' :
+                      order.status === 'shipped' ? 'bg-purple-900/50 text-purple-300' :
+                      order.status === 'delivered' ? 'bg-green-900/50 text-green-300' :
+                      'bg-gray-700 text-gray-300'
+                    }`}>
+                      {order.status === 'pending' ? 'Pendiente' :
+                       order.status === 'confirmed' ? 'Confirmado' :
+                       order.status === 'shipped' ? 'Enviado' :
+                       order.status === 'delivered' ? 'Entregado' :
+                       order.status}
+                    </span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
@@ -1667,8 +1609,11 @@ export default function Dashboard() {
       </div>
 
       {loading ? (
-        <div className="flex justify-center items-center h-32">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-400"></div>
+        <div className="flex justify-center items-center min-h-[400px]">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-400 mx-auto mb-4"></div>
+            <p className="text-gray-400">Cargando dashboard...</p>
+          </div>
         </div>
       ) : (filterType === 'finished_auctions' ? finishedAuctions.length === 0 : 
            filterType === 'paused' ? pausedProducts.length === 0 :

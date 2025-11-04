@@ -188,3 +188,4 @@ supabase db push --linked
 **Todo está listo. Solo necesitas ejecutar los pasos pendientes.**
 
 
+

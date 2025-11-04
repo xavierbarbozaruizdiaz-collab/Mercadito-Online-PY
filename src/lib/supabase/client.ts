@@ -10,23 +10,53 @@ import { Database } from '@/types/database';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://hqdatzhliaordlsqtjea.supabase.co';
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhxZGF0emhsaWFvcmRsc3F0amVhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE1MTk1NzQsImV4cCI6MjA3NzA5NTU3NH0.u1VFWCN4yHZ_v_bR4MNw5wt7jTPdfpIwjhDRYfQ5qRw';
 
-// Singleton para el cliente principal (evitar múltiples instancias)
+// Singleton global para evitar múltiples instancias de GoTrueClient
+// Usar window para almacenar la instancia globalmente en el navegador
+const GLOBAL_SUPABASE_KEY = '__mercadito_supabase_instance__';
+const GLOBAL_SUPABASE_ADMIN_KEY = '__mercadito_supabase_admin_instance__';
+
+// Singleton para el servidor (fuera de la función para que persista)
 let supabaseInstance: ReturnType<typeof createClient<Database>> | null = null;
 let supabaseAdminInstance: ReturnType<typeof createClient<Database>> | null = null;
 
-// Cliente principal de Supabase (singleton)
+// Cliente principal de Supabase (singleton global)
 function getSupabaseClient() {
+  // En el navegador, usar window para asegurar una única instancia
+  if (typeof window !== 'undefined') {
+    if (!(window as any)[GLOBAL_SUPABASE_KEY]) {
+      (window as any)[GLOBAL_SUPABASE_KEY] = createClient<Database>(supabaseUrl, supabaseKey, {
+        auth: {
+          autoRefreshToken: true,
+          persistSession: true,
+          detectSessionInUrl: true,
+          storageKey: 'mercadito-supabase-auth', // Clave única para evitar conflictos
+          storage: window.localStorage,
+        },
+        realtime: {
+          params: {
+            eventsPerSecond: 10,
+          },
+        },
+        global: {
+          headers: {
+            'x-client-info': 'mercadito-online-py@1.0.0',
+          },
+        },
+      });
+    }
+    return (window as any)[GLOBAL_SUPABASE_KEY];
+  }
+  
+  // En el servidor, usar singleton normal
   if (!supabaseInstance) {
     supabaseInstance = createClient<Database>(supabaseUrl, supabaseKey, {
       auth: {
-        autoRefreshToken: true,
-        persistSession: true,
-        detectSessionInUrl: true,
-        storageKey: 'mercadito-supabase-auth', // Clave única para evitar conflictos
+        autoRefreshToken: false,
+        persistSession: false,
       },
-      realtime: {
-        params: {
-          eventsPerSecond: 10,
+      global: {
+        headers: {
+          'x-client-info': 'mercadito-online-py@1.0.0',
         },
       },
     });
@@ -36,6 +66,24 @@ function getSupabaseClient() {
 
 // Cliente para operaciones del servidor (singleton)
 function getSupabaseAdminClient() {
+  // En el navegador, usar window para asegurar una única instancia
+  if (typeof window !== 'undefined') {
+    if (!(window as any)[GLOBAL_SUPABASE_ADMIN_KEY]) {
+      (window as any)[GLOBAL_SUPABASE_ADMIN_KEY] = createClient<Database>(
+        supabaseUrl,
+        process.env.SUPABASE_SERVICE_ROLE_KEY || supabaseKey,
+        {
+          auth: {
+            autoRefreshToken: false,
+            persistSession: false,
+          },
+        }
+      );
+    }
+    return (window as any)[GLOBAL_SUPABASE_ADMIN_KEY];
+  }
+  
+  // En el servidor, usar singleton normal
   if (!supabaseAdminInstance) {
     supabaseAdminInstance = createClient<Database>(
       supabaseUrl,
@@ -144,17 +192,55 @@ export interface UpdateProfileData {
 // Función para obtener el usuario actual con perfil
 export async function getCurrentUser(): Promise<AuthUser | null> {
   try {
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    // Timeout de 3 segundos para la query de auth
+    const authPromise = supabase.auth.getUser();
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Auth timeout')), 3000)
+    );
+    
+    let authResult;
+    try {
+      authResult = await Promise.race([authPromise, timeoutPromise]) as any;
+    } catch {
+      // Si falla auth, retornar null
+      return null;
+    }
+    
+    const { data: { user }, error: authError } = authResult;
     
     if (authError || !user) {
       return null;
     }
 
-    const { data: profile, error: profileError } = await supabase
+    // Timeout de 3 segundos para la query de profile
+    const profilePromise = supabase
       .from('profiles')
       .select('*')
       .eq('id', user.id)
       .single();
+    
+    const profileTimeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Profile query timeout')), 3000)
+    );
+    
+    let profileResult;
+    try {
+      profileResult = await Promise.race([profilePromise, profileTimeoutPromise]) as any;
+    } catch (timeoutError) {
+      // Si hay timeout, retornar usuario básico
+      console.warn('Profile query timeout, using basic user data');
+      return {
+        id: user.id,
+        email: user.email || '',
+        role: 'buyer' as const,
+        verified: false,
+        membership_level: 'free' as const,
+        created_at: user.created_at || new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+    }
+    
+    const { data: profile, error: profileError } = profileResult;
 
     // Si hay error y no es 404, loguear pero no fallar silenciosamente
     if (profileError) {

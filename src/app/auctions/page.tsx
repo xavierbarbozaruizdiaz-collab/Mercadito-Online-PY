@@ -53,48 +53,62 @@ export default function AuctionsPage() {
       
       console.log('✅ Subastas cargadas:', data.length, data);
       
+      // Detectar si hay búsqueda activa
+      const hasActiveSearch = search.trim() !== '' || category !== '';
+      
       // Ordenar
       let sorted = [...data];
-      switch (sortBy) {
-        case 'all':
-          // Para "TODAS", mostrar por fecha de inicio o creación (más recientes primero)
-          sorted.sort((a, b) => {
-            type AuctionWithDates = { created_at?: string; auction_start_at?: string };
-            const aAuction = a as unknown as AuctionWithDates;
-            const bAuction = b as unknown as AuctionWithDates;
-            // Safe access to optional properties
-            const aDate = (aAuction?.created_at || aAuction?.auction_start_at) 
-              ? new Date(aAuction.created_at || aAuction.auction_start_at || 0).getTime() 
-              : 0;
-            const bDate = (bAuction?.created_at || bAuction?.auction_start_at) 
-              ? new Date(bAuction.created_at || bAuction.auction_start_at || 0).getTime() 
-              : 0;
-            return bDate - aDate; // Más recientes primero
-          });
-          break;
-        case 'ending_soon':
-          sorted.sort((a, b) => {
-            const aEnd = a.auction_end_at ? new Date(a.auction_end_at).getTime() : 0;
-            const bEnd = b.auction_end_at ? new Date(b.auction_end_at).getTime() : 0;
-            return aEnd - bEnd;
-          });
-          break;
-        case 'price_asc':
-          sorted.sort((a, b) => (a.current_bid || a.price) - (b.current_bid || b.price));
-          break;
-        case 'price_desc':
-          sorted.sort((a, b) => (b.current_bid || b.price) - (a.current_bid || a.price));
-          break;
-        case 'recent':
-          sorted.sort((a, b) => {
-            type AuctionWithDates = { created_at?: string; auction_start_at?: string };
-            const aAuction = a as unknown as AuctionWithDates;
-            const bAuction = b as unknown as AuctionWithDates;
-            const aDate = (aAuction.created_at || aAuction.auction_start_at) ? new Date(aAuction.created_at || aAuction.auction_start_at || 0).getTime() : 0;
-            const bDate = (bAuction.created_at || bAuction.auction_start_at) ? new Date(bAuction.created_at || bAuction.auction_start_at || 0).getTime() : 0;
-            return bDate - aDate; // Más recientes primero
-          });
-          break;
+      
+      // Si no hay búsqueda activa y es "all", mezclar aleatoriamente
+      if (!hasActiveSearch && sortBy === 'all') {
+        // Algoritmo Fisher-Yates para mezclar aleatoriamente
+        for (let i = sorted.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [sorted[i], sorted[j]] = [sorted[j], sorted[i]];
+        }
+      } else {
+        // Aplicar ordenamiento normal cuando hay búsqueda o filtros
+        switch (sortBy) {
+          case 'all':
+            // Para "TODAS", mostrar por fecha de inicio o creación (más recientes primero)
+            sorted.sort((a, b) => {
+              type AuctionWithDates = { created_at?: string; auction_start_at?: string };
+              const aAuction = a as unknown as AuctionWithDates;
+              const bAuction = b as unknown as AuctionWithDates;
+              // Safe access to optional properties
+              const aDate = (aAuction?.created_at || aAuction?.auction_start_at) 
+                ? new Date(aAuction.created_at || aAuction.auction_start_at || 0).getTime() 
+                : 0;
+              const bDate = (bAuction?.created_at || bAuction?.auction_start_at) 
+                ? new Date(bAuction.created_at || bAuction.auction_start_at || 0).getTime() 
+                : 0;
+              return bDate - aDate; // Más recientes primero
+            });
+            break;
+          case 'ending_soon':
+            sorted.sort((a, b) => {
+              const aEnd = a.auction_end_at ? new Date(a.auction_end_at).getTime() : 0;
+              const bEnd = b.auction_end_at ? new Date(b.auction_end_at).getTime() : 0;
+              return aEnd - bEnd;
+            });
+            break;
+          case 'price_asc':
+            sorted.sort((a, b) => (a.current_bid || a.price) - (b.current_bid || b.price));
+            break;
+          case 'price_desc':
+            sorted.sort((a, b) => (b.current_bid || b.price) - (a.current_bid || a.price));
+            break;
+          case 'recent':
+            sorted.sort((a, b) => {
+              type AuctionWithDates = { created_at?: string; auction_start_at?: string };
+              const aAuction = a as unknown as AuctionWithDates;
+              const bAuction = b as unknown as AuctionWithDates;
+              const aDate = (aAuction.created_at || aAuction.auction_start_at) ? new Date(aAuction.created_at || aAuction.auction_start_at || 0).getTime() : 0;
+              const bDate = (bAuction.created_at || bAuction.auction_start_at) ? new Date(bAuction.created_at || bAuction.auction_start_at || 0).getTime() : 0;
+              return bDate - aDate; // Más recientes primero
+            });
+            break;
+        }
       }
       
       setAuctions(sorted);

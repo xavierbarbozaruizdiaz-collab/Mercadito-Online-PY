@@ -10,6 +10,7 @@ import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabaseClient';
 import { getStoreBySlug, getStoreProducts } from '@/lib/services/storeService';
+import { isStoreFavorite, toggleStoreFavorite } from '@/lib/services/storeFavoriteService';
 import { 
   Star,
   MapPin,
@@ -98,6 +99,8 @@ export default function StoreProfilePage() {
   const [hasAuctions, setHasAuctions] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
   const [isFavorited, setIsFavorited] = useState(false);
+  const [favoriteLoading, setFavoriteLoading] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [vehicleFields, setVehicleFields] = useState({
     marca: '',
     modelo: '',
@@ -117,6 +120,30 @@ export default function StoreProfilePage() {
       }
     }
   }, [affiliateCode, store]);
+
+  // Cargar usuario actual
+  useEffect(() => {
+    (async () => {
+      const { data: session } = await supabase.auth.getSession();
+      setCurrentUserId(session?.session?.user?.id || null);
+    })();
+  }, []);
+
+  // Cargar estado de favorito cuando se carga la tienda
+  useEffect(() => {
+    if (store && currentUserId) {
+      (async () => {
+        try {
+          const favorite = await isStoreFavorite(store.id, currentUserId);
+          setIsFavorited(favorite);
+        } catch (err) {
+          console.error('Error loading favorite status:', err);
+        }
+      })();
+    } else if (!currentUserId) {
+      setIsFavorited(false);
+    }
+  }, [store, currentUserId]);
 
   // Cargar tienda y productos
   useEffect(() => {
@@ -372,8 +399,24 @@ export default function StoreProfilePage() {
     setIsFollowing(!isFollowing);
   };
 
-  const handleFavorite = () => {
-    setIsFavorited(!isFavorited);
+  const handleFavorite = async () => {
+    if (!currentUserId) {
+      alert('Debes iniciar sesión para agregar tiendas a favoritos');
+      return;
+    }
+
+    if (!store) return;
+
+    setFavoriteLoading(true);
+    try {
+      const newState = await toggleStoreFavorite(store.id, currentUserId, isFavorited);
+      setIsFavorited(newState);
+    } catch (err: any) {
+      console.error('Error toggling favorite:', err);
+      alert('Error al actualizar favoritos: ' + (err.message || 'Error desconocido'));
+    } finally {
+      setFavoriteLoading(false);
+    }
   };
 
   const handleShare = async () => {
@@ -592,14 +635,19 @@ export default function StoreProfilePage() {
               
               <button
                 onClick={handleFavorite}
-                className={`flex items-center justify-center w-10 h-10 rounded-lg transition-colors ${
+                disabled={favoriteLoading || !currentUserId}
+                className={`flex items-center justify-center w-10 h-10 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                   isFavorited 
                     ? 'bg-red-900/30 text-red-400 hover:bg-red-900/40 border border-red-600' 
                     : 'bg-gray-700 dark:bg-gray-600 text-gray-300 hover:bg-gray-600 dark:hover:bg-gray-500'
                 }`}
-                title={isFavorited ? 'Quitar de favoritos' : 'Agregar a favoritos'}
+                title={!currentUserId ? 'Inicia sesión para agregar a favoritos' : isFavorited ? 'Quitar de favoritos' : 'Agregar a favoritos'}
               >
-                <Heart className={`w-5 h-5 ${isFavorited ? 'fill-current' : ''}`} />
+                {favoriteLoading ? (
+                  <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Heart className={`w-5 h-5 ${isFavorited ? 'fill-current' : ''}`} />
+                )}
               </button>
               
               <button

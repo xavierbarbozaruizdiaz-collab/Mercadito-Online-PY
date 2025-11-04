@@ -127,3 +127,4 @@ Estado: ✅ TODO SINCRONIZADO
 3. O usa `supabase db push --linked` para aplicar todas las pendientes automáticamente
 
 
+

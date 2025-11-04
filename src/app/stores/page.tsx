@@ -65,7 +65,7 @@ export default function StoresPage() {
     location: '',
     search: '',
   });
-  const [filtersOpen, setFiltersOpen] = useState(true);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   useEffect(() => {
     loadCategories();
@@ -146,7 +146,16 @@ export default function StoresPage() {
         query = query.contains('category_ids', [filters.category]);
       }
 
-      const { data: storesData, error: queryError } = await query.order('created_at', { ascending: false });
+      // Detectar si hay búsqueda activa
+      const hasActiveSearch = filters.search.trim() !== '' || 
+                               filters.department !== '' || 
+                               filters.location.trim() !== '' ||
+                               filters.category !== '';
+      
+      // Si no hay búsqueda activa, no aplicar orden (se mezclará aleatoriamente después)
+      const { data: storesData, error: queryError } = hasActiveSearch 
+        ? await query.order('created_at', { ascending: false })
+        : await query;
 
       if (queryError) {
         console.error('❌ Error en consulta de tiendas:', queryError);
@@ -180,10 +189,19 @@ export default function StoresPage() {
           }
         }
 
-        const enrichedStores = (storesData as any[]).map((store: any) => ({
+        let enrichedStores = (storesData as any[]).map((store: any) => ({
           ...store,
           seller: store.seller_id ? (sellersMap[store.seller_id] || null) : null,
         }));
+
+        // Mezclar aleatoriamente si no hay búsqueda activa
+        if (!hasActiveSearch) {
+          // Algoritmo Fisher-Yates para mezclar aleatoriamente
+          for (let i = enrichedStores.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [enrichedStores[i], enrichedStores[j]] = [enrichedStores[j], enrichedStores[i]];
+          }
+        }
 
         setStores(enrichedStores as Store[]);
       } else {
@@ -352,65 +370,32 @@ export default function StoresPage() {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-4 sm:gap-6">
               {stores.map((store) => (
                 <Link
                   key={store.id}
                   href={`/store/${store.slug}`}
-                  className="bg-white rounded-lg shadow-sm border overflow-hidden hover:shadow-md transition-shadow"
+                  className="flex flex-col items-center hover:opacity-80 transition-opacity"
                 >
-                  <div className="relative h-40">
-                    {store.cover_image_url ? (
+                  {/* Avatar circular */}
+                  <div className="mb-2 sm:mb-3">
+                    {store.logo_url ? (
                       <img
-                        src={store.cover_image_url}
+                        src={store.logo_url}
                         alt={store.name}
-                        className="w-full h-full object-cover"
+                        className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-full object-cover"
                       />
                     ) : (
-                      <div className="w-full h-full bg-gradient-to-br from-purple-400 to-blue-500 flex items-center justify-center">
-                        <Store className="w-16 h-16 text-white opacity-50" />
+                      <div className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-full bg-purple-100 flex items-center justify-center">
+                        <Store className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 text-purple-600" />
                       </div>
                     )}
                   </div>
 
-                  <div className="p-4">
-                    <div className="flex items-start gap-3 mb-3">
-                      {store.logo_url ? (
-                        <img
-                          src={store.logo_url}
-                          alt={store.name}
-                          className="w-12 h-12 rounded-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center">
-                          <Store className="w-6 h-6 text-purple-600" />
-                        </div>
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-lg text-gray-900 truncate">
-                          {store.name}
-                        </h3>
-                        {store.location && (
-                          <div className="flex items-center text-sm text-gray-600 mt-1">
-                            <MapPin className="w-4 h-4 mr-1" />
-                            <span className="truncate">{store.location}</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {store.description && (
-                      <p className="text-gray-600 text-sm mb-3 line-clamp-2">
-                        {store.description}
-                      </p>
-                    )}
-
-                    <div className="flex items-center justify-between pt-3 border-t">
-                      <span className="text-sm text-gray-500">
-                        Ver tienda →
-                      </span>
-                    </div>
-                  </div>
+                  {/* Nombre de la tienda */}
+                  <h3 className="font-semibold text-xs sm:text-sm text-gray-900 text-center truncate w-full line-clamp-2">
+                    {store.name}
+                  </h3>
                 </Link>
               ))}
             </div>
@@ -420,4 +405,7 @@ export default function StoresPage() {
     </main>
   );
 }
+
+
+
 
