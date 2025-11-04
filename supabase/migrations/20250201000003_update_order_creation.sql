@@ -23,6 +23,9 @@ DECLARE
   v_commission_amount DECIMAL(10,2);
   v_commission_percent DECIMAL(5,2);
   v_store_id UUID;
+  v_wholesale_price DECIMAL(10,2);
+  v_applied_wholesale BOOLEAN := FALSE;
+  v_wholesale_discount DECIMAL(10,2) := 0;
   cart_item RECORD;
 BEGIN
   -- Crear la orden
@@ -42,7 +45,10 @@ BEGIN
       p.store_id,
       p.sale_type,
       p.stock_management_enabled,
-      p.stock_quantity
+      p.stock_quantity,
+      p.wholesale_enabled,
+      p.wholesale_min_quantity,
+      p.wholesale_discount_percent
     FROM public.cart_items ci
     JOIN public.products p ON ci.product_id = p.id
     WHERE ci.user_id = p_buyer_id
@@ -54,8 +60,27 @@ BEGIN
           RAISE EXCEPTION 'La cantidad debe ser mayor a 0 para el producto %', cart_item.product_id;
         END IF;
         
-        v_item_total := cart_item.quantity * cart_item.price;
-        v_base_price := COALESCE(cart_item.base_price, cart_item.price);
+        -- Calcular precio considerando descuentos mayoristas
+        -- Verificar si se aplica precio mayorista
+        IF cart_item.wholesale_enabled = true 
+           AND cart_item.wholesale_min_quantity IS NOT NULL 
+           AND cart_item.wholesale_discount_percent IS NOT NULL
+           AND cart_item.quantity >= cart_item.wholesale_min_quantity THEN
+          -- Calcular precio mayorista
+          v_wholesale_price := cart_item.price * (1.0 - (cart_item.wholesale_discount_percent / 100.0));
+          v_item_total := v_wholesale_price * cart_item.quantity;
+          v_applied_wholesale := TRUE;
+          v_wholesale_discount := (cart_item.price - v_wholesale_price) * cart_item.quantity;
+        ELSE
+          -- Precio normal
+          v_wholesale_price := cart_item.price;
+          v_item_total := cart_item.quantity * cart_item.price;
+          v_applied_wholesale := FALSE;
+          v_wholesale_discount := 0;
+        END IF;
+        
+        -- Usar precio mayorista para cálculos de comisión
+        v_base_price := COALESCE(cart_item.base_price, v_wholesale_price);
         v_commission_percent := COALESCE(cart_item.commission_percent_applied, 0);
         v_commission_amount := v_item_total - (v_base_price * cart_item.quantity);
         
@@ -75,9 +100,27 @@ BEGIN
           );
         END IF;
       
-      -- Insertar item de orden
-      INSERT INTO public.order_items (order_id, product_id, seller_id, quantity, unit_price, total_price)
-      VALUES (v_order_id, cart_item.product_id, cart_item.seller_id, cart_item.quantity, cart_item.price, v_item_total);
+      -- Insertar item de orden con información de precio mayorista
+      INSERT INTO public.order_items (
+        order_id, 
+        product_id, 
+        seller_id, 
+        quantity, 
+        unit_price, 
+        total_price,
+        applied_wholesale,
+        wholesale_discount_amount
+      )
+      VALUES (
+        v_order_id, 
+        cart_item.product_id, 
+        cart_item.seller_id, 
+        cart_item.quantity, 
+        v_wholesale_price,
+        v_item_total,
+        v_applied_wholesale,
+        v_wholesale_discount
+      );
       
       -- Insertar comisión (productos directos)
       INSERT INTO public.platform_fees (
@@ -138,6 +181,24 @@ BEGIN
   
   -- Limpiar reservas de carrito
   DELETE FROM public.cart_reservations WHERE user_id = p_buyer_id;
+
+  -- Generar tickets de sorteos automáticamente (si el sistema está habilitado)
+  BEGIN
+    -- Verificar si el sistema de sorteos está habilitado
+    IF EXISTS (
+      SELECT 1 FROM public.raffle_settings 
+      WHERE key = 'global_enabled' 
+      AND (value->>'enabled')::BOOLEAN = true
+    ) THEN
+      -- Generar tickets para sorteos activos
+      PERFORM public.generate_raffle_tickets_from_order(v_order_id);
+    END IF;
+  EXCEPTION
+    WHEN OTHERS THEN
+      -- Si hay error generando tickets, no fallar la creación de la orden
+      -- Solo loguear el error (podría usar un sistema de logging)
+      RAISE WARNING 'Error generando tickets de sorteo para orden %: %', v_order_id, SQLERRM;
+  END;
 
   RETURN v_order_id;
 END;

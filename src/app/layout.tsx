@@ -5,8 +5,10 @@ import Link from "next/link";
 import CartButton from "@/components/CartButton";
 import UserMenu from "@/components/UserMenu";
 import AuctionsNavLink from "@/components/AuctionsNavLink";
+import RafflesNavLink from "@/components/RafflesNavLink";
 import MobileMenu from "@/components/MobileMenu";
 import { ThemeProvider } from "@/contexts/ThemeContext";
+import { Gavel, Ticket } from "lucide-react";
 
 export const metadata: Metadata = {
   title: {
@@ -97,13 +99,15 @@ export default function RootLayout({
         <ThemeProvider>
           <header className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center justify-between h-16 gap-4">
+            <div className="flex items-center justify-between h-16 gap-2 sm:gap-4">
               {/* Menú móvil y Logo */}
-              <div className="flex items-center gap-3 flex-shrink-0">
+              <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0 min-w-0">
                 <MobileMenu />
-                <Link href="/" className="flex items-center gap-2">
-                  <span className="text-xl sm:text-2xl font-bold text-blue-600 hover:text-blue-700 transition-colors">
-                    🛒 Mercadito Online PY
+                <Link href="/" className="flex items-center gap-1 sm:gap-2 min-w-0">
+                  <span className="text-base sm:text-xl md:text-2xl font-bold text-blue-600 hover:text-blue-700 transition-colors truncate">
+                    <span className="hidden md:inline">🛒 </span>
+                    <span className="hidden sm:inline">Mercadito Online PY</span>
+                    <span className="sm:hidden">Mercadito PY</span>
                   </span>
                 </Link>
               </div>
@@ -111,12 +115,34 @@ export default function RootLayout({
               {/* Espacio central - Opciones disponibles (solo desktop) */}
               <div className="hidden md:flex flex-1 justify-center items-center gap-4">
                 <AuctionsNavLink />
+                <RafflesNavLink />
               </div>
               
-              {/* Acciones derecha */}
-              <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-                <CartButton />
-                <UserMenu />
+              {/* Iconos de subastas/sorteos y acciones derecha juntos */}
+              <div className="flex items-center gap-0.5 sm:gap-1 md:gap-2 flex-shrink-0">
+                {/* Iconos en móvil */}
+                <div className="md:hidden flex items-center gap-1">
+                  <Link
+                    href="/auctions"
+                    className="flex items-center justify-center p-2 min-h-[44px] min-w-[44px] text-gray-600 hover:text-gray-900 transition-colors"
+                    aria-label="Subastas"
+                  >
+                    <Gavel className="w-5 h-5 sm:w-6 sm:h-6" />
+                  </Link>
+                  <Link
+                    href="/raffles"
+                    className="flex items-center justify-center p-2 min-h-[44px] min-w-[44px] text-gray-600 hover:text-gray-900 transition-colors"
+                    aria-label="Sorteos"
+                  >
+                    <Ticket className="w-5 h-5 sm:w-6 sm:h-6" />
+                  </Link>
+                </div>
+                
+                {/* Acciones derecha */}
+                <div className="flex items-center gap-0.5 sm:gap-1 md:gap-2">
+                  <CartButton />
+                  <UserMenu />
+                </div>
               </div>
             </div>
           </div>
