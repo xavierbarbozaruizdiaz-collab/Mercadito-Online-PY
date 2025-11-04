@@ -4,8 +4,11 @@
 // ============================================
 
 import { redirect } from 'next/navigation';
-import { supabase } from '@/lib/supabase/server';
+import { createServerClient } from '@/lib/supabase/server';
 import MarketingForm from './_components/MarketingForm';
+import { Database } from '@/types/database';
+
+type StoreRow = Database['public']['Tables']['stores']['Row'];
 
 // Feature flag check
 const featureEnabled = process.env.NEXT_PUBLIC_FEATURE_MARKETING === '1';
@@ -15,6 +18,8 @@ export default async function SellerMarketingPage() {
   if (!featureEnabled) {
     redirect('/dashboard');
   }
+
+  const supabase = await createServerClient();
 
   // Obtener usuario actual
   const { data: session } = await supabase.auth.getSession();
@@ -30,7 +35,7 @@ export default async function SellerMarketingPage() {
     .select('id, name, slug, fb_pixel_id, ga_measurement_id, gtm_id')
     .eq('seller_id', userId)
     .eq('is_active', true)
-    .single();
+    .single<Pick<StoreRow, 'id' | 'name' | 'slug' | 'fb_pixel_id' | 'ga_measurement_id' | 'gtm_id'>>();
 
   if (error || !store) {
     return (

@@ -4,9 +4,12 @@
 // Mergea con los IDs globales (globals como fallback)
 // ============================================
 
-import { supabase } from '@/lib/supabase/server';
+import { createServerClient } from '@/lib/supabase/server';
 import { cache } from 'react';
 import { logger } from '@/lib/utils/logger';
+import { Database } from '@/types/database';
+
+type StoreRow = Database['public']['Tables']['stores']['Row'];
 
 interface TrackingIds {
   gaId?: string;
@@ -23,13 +26,15 @@ interface TrackingIds {
  */
 export const getTrackingIdsForStore = cache(async (slug: string): Promise<TrackingIds> => {
   try {
+    const supabase = await createServerClient();
+    
     // Obtener IDs de la tienda
     const { data: store, error } = await supabase
       .from('stores')
       .select('fb_pixel_id, ga_measurement_id, gtm_id')
       .eq('slug', slug)
       .eq('is_active', true)
-      .single();
+      .single<Pick<StoreRow, 'fb_pixel_id' | 'ga_measurement_id' | 'gtm_id'>>();
 
     if (error || !store) {
       logger.warn('Store not found for tracking IDs', { slug, error });

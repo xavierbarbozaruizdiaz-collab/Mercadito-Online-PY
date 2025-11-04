@@ -9,7 +9,7 @@ import { getTrackingIdsForStore } from '@/lib/marketing/getTrackingIdsForStore';
 
 interface StoreLayoutProps {
   children: React.ReactNode;
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }
 
 export async function generateMetadata({ params }: StoreLayoutProps): Promise<Metadata> {
@@ -27,8 +27,11 @@ export default async function StoreLayout({ children, params }: StoreLayoutProps
     return <>{children}</>;
   }
 
+  // Obtener params
+  const { slug } = await params;
+  
   // Obtener IDs de tracking para esta tienda
-  const trackingIds = await getTrackingIdsForStore(params.slug);
+  const trackingIds = await getTrackingIdsForStore(slug);
 
   // Determinar qué scripts cargar
   const hasGA = !!trackingIds.gaId;

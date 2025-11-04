@@ -30,6 +30,7 @@ function SearchBarContent({
     if (urlQuery !== query) {
       setQuery(urlQuery);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
   const handleSearch = useCallback((searchQuery: string) => {

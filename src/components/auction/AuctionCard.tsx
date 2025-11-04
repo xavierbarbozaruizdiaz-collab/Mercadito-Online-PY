@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardFooter } from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
 import { formatCurrency } from '@/lib/utils';
@@ -28,10 +29,14 @@ export default function AuctionCard({ auction, variant = 'default' }: AuctionCar
   
   const currentBid = auction.current_bid || auction.price;
   
-  // Calcular tiempo restante
-  let endAtMs = 0;
-  let serverNowMs = Date.now();
+  // Calcular tiempo restante - usar estado para evitar impureza durante render
+  const [serverNowMs, setServerNowMs] = useState<number | null>(null);
   
+  useEffect(() => {
+    setServerNowMs(Date.now());
+  }, []);
+  
+  let endAtMs = 0;
   if (auction.auction_end_at && !isEnded) {
     const endDate = new Date(auction.auction_end_at);
     endAtMs = endDate.getTime();
@@ -74,7 +79,7 @@ export default function AuctionCard({ auction, variant = 'default' }: AuctionCar
                   </Badge>
                 )}
               </div>
-              {isActive && endAtMs > 0 && (
+              {isActive && endAtMs > 0 && serverNowMs !== null && (
                 <div className="text-xs text-muted-foreground flex items-center gap-1">
                   <Clock className="h-3 w-3" />
                   <AuctionTimer
@@ -136,7 +141,7 @@ export default function AuctionCard({ auction, variant = 'default' }: AuctionCar
           </h3>
 
           {/* Timer (solo si está activa) */}
-          {isActive && endAtMs > 0 && (
+          {isActive && endAtMs > 0 && serverNowMs !== null && (
             <div className="mb-3">
               <AuctionTimer
                 endAtMs={endAtMs}

@@ -31,11 +31,8 @@ function LocationMarker({
   const [markerPosition, setMarkerPosition] = useState<[number, number] | null>(position);
 
   useEffect(() => {
-    if (position) {
-      setMarkerPosition(position);
-    } else if (!position) {
-      setMarkerPosition(null);
-    }
+    setMarkerPosition(position);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [position]);
 
   useMapEvents({
@@ -74,6 +71,7 @@ export default function LocationPicker({
 
   useEffect(() => {
     setIsClient(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Coordenadas por defecto (Paraguay - Asunción)

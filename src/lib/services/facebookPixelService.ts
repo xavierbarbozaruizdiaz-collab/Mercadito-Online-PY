@@ -8,7 +8,8 @@ declare global {
     fbq?: (
       action: string,
       eventName: string,
-      eventData?: Record<string, any>
+      eventData?: Record<string, any>,
+      namespace?: string
     ) => void;
     _fbq?: any;
   }

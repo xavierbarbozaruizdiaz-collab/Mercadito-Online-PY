@@ -4,16 +4,24 @@
 // ============================================
 
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase/server';
+import { createServerClient } from '@/lib/supabase/server';
 import { MarketingIntegrationsSchema } from '@/lib/marketing/schema';
 import { logger } from '@/lib/utils/logger';
+import { Database } from '@/types/database';
+
+type StoreRow = Database['public']['Tables']['stores']['Row'];
+type StoreUpdate = Database['public']['Tables']['stores']['Update'];
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const storeId = params.id;
+    const { id } = await params;
+    const storeId = id;
+
+    // Crear cliente de Supabase para esta request
+    const supabase = await createServerClient();
 
     // Verificar autenticación
     const { data: session, error: sessionError } = await supabase.auth.getSession();
@@ -31,7 +39,7 @@ export async function PATCH(
       .from('stores')
       .select('id, seller_id')
       .eq('id', storeId)
-      .single();
+      .single<Pick<StoreRow, 'id' | 'seller_id'>>();
 
     if (storeError || !store) {
       logger.error('Store not found', { storeId, error: storeError });
@@ -55,16 +63,24 @@ export async function PATCH(
     const validatedData = MarketingIntegrationsSchema.parse(body);
 
     // Actualizar solo los campos de marketing
-    const { data: updatedStore, error: updateError } = await supabase
-      .from('stores')
-      .update({
-        fb_pixel_id: validatedData.fb_pixel_id,
-        ga_measurement_id: validatedData.ga_measurement_id,
-        gtm_id: validatedData.gtm_id,
-      })
+    const updateData = {
+      fb_pixel_id: validatedData.fb_pixel_id ?? null,
+      ga_measurement_id: validatedData.ga_measurement_id ?? null,
+      gtm_id: validatedData.gtm_id ?? null,
+    };
+
+    // Type assertion para evitar problemas de inferencia de tipos en Supabase
+    const queryResult = await (supabase
+      .from('stores') as any)
+      .update(updateData)
       .eq('id', storeId)
       .select('fb_pixel_id, ga_measurement_id, gtm_id')
       .single();
+    
+    const { data: updatedStore, error: updateError } = queryResult as {
+      data: Pick<StoreRow, 'fb_pixel_id' | 'ga_measurement_id' | 'gtm_id'> | null;
+      error: any;
+    };
 
     if (updateError) {
       logger.error('Error updating store marketing', { storeId, error: updateError });

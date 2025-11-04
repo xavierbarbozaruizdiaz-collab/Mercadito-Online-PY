@@ -51,7 +51,7 @@ export default function Pagination({
       // Calcular el rango de páginas a mostrar
       const half = Math.floor(maxVisiblePages / 2);
       let start = Math.max(1, currentPage - half);
-      let end = Math.min(totalPages, start + maxVisiblePages - 1);
+      const end = Math.min(totalPages, start + maxVisiblePages - 1);
       
       // Ajustar el inicio si estamos cerca del final
       if (end - start + 1 < maxVisiblePages) {
