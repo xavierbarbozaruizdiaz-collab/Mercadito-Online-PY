@@ -1,5 +1,4 @@
 import type { NextConfig } from "next";
-import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
   /* config options here */
@@ -95,5 +94,9 @@ const nextConfig: NextConfig = {
 };
 
 // Sentry está opcional - solo wrappear si está completamente configurado
-// Para habilitarlo, agrega NEXT_PUBLIC_SENTRY_DSN, SENTRY_ORG, y SENTRY_PROJECT
+// Para habilitarlo, descomenta las siguientes líneas y agrega NEXT_PUBLIC_SENTRY_DSN, SENTRY_ORG, y SENTRY_PROJECT
+// import { withSentryConfig } from "@sentry/nextjs";
+// export default withSentryConfig(nextConfig, {
+//   // Configuración de Sentry aquí
+// });
 export default nextConfig;
