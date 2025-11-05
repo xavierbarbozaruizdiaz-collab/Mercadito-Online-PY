@@ -42,9 +42,9 @@ REWRITES:
   - source: "/api/health"
     destination: "/api/health/check"
 
-# Cron Jobs
-CRON_JOBS:
-  - path: "/api/cron/backup"
-    schedule: "0 2 * * *"
-  - path: "/api/cron/analytics"
-    schedule: "0 */6 * * *"
+# Cron Jobs (NOTA: Estos están en vercel.json, este archivo es solo documentación)
+# CRON_JOBS:
+#   - path: "/api/cron/backup-database"
+#     schedule: "0 2 * * *"
+#   - path: "/api/cron/close-auctions"
+#     schedule: "*/5 * * * *"

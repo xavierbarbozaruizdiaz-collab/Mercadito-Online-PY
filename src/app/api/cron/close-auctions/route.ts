@@ -8,7 +8,7 @@ import { createClient } from '@supabase/supabase-js';
  * Configurar en vercel.json
  */
 
-export const runtime = 'edge';
+export const runtime = 'nodejs';
 export const maxDuration = 30;
 
 export async function GET(request: NextRequest) {
