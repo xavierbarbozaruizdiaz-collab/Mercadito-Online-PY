@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
@@ -23,7 +23,7 @@ type Order = {
   }[];
 };
 
-export default function CheckoutSuccessPage() {
+function CheckoutSuccessContent() {
   const searchParams = useSearchParams();
   const orderId = searchParams.get('orderId');
   const [order, setOrder] = useState<Order | null>(null);
@@ -184,5 +184,21 @@ export default function CheckoutSuccessPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function CheckoutSuccessPage() {
+  return (
+    <Suspense fallback={
+      <main className="min-h-screen bg-gray-50 p-8">
+        <div className="max-w-2xl mx-auto">
+          <div className="flex justify-center items-center h-64">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-black"></div>
+          </div>
+        </div>
+      </main>
+    }>
+      <CheckoutSuccessContent />
+    </Suspense>
   );
 }
