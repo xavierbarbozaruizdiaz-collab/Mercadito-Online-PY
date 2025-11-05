@@ -23,27 +23,32 @@ let supabaseAdminInstance: ReturnType<typeof createClient<Database>> | null = nu
 function getSupabaseClient() {
   // En el navegador, usar window para asegurar una única instancia
   if (typeof window !== 'undefined') {
-    if (!(window as any)[GLOBAL_SUPABASE_KEY]) {
-      (window as any)[GLOBAL_SUPABASE_KEY] = createClient<Database>(supabaseUrl, supabaseKey, {
-        auth: {
-          autoRefreshToken: true,
-          persistSession: true,
-          detectSessionInUrl: true,
-          storageKey: 'mercadito-supabase-auth', // Clave única para evitar conflictos
-          storage: window.localStorage,
-        },
-        realtime: {
-          params: {
-            eventsPerSecond: 10,
-          },
-        },
-        global: {
-          headers: {
-            'x-client-info': 'mercadito-online-py@1.0.0',
-          },
-        },
-      });
+    // Verificar si ya existe una instancia global
+    if ((window as any)[GLOBAL_SUPABASE_KEY]) {
+      return (window as any)[GLOBAL_SUPABASE_KEY];
     }
+    
+    // Crear nueva instancia solo si no existe
+    (window as any)[GLOBAL_SUPABASE_KEY] = createClient<Database>(supabaseUrl, supabaseKey, {
+      auth: {
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: true,
+        storageKey: 'mercadito-supabase-auth', // Clave única para evitar conflictos
+        storage: window.localStorage,
+      },
+      realtime: {
+        params: {
+          eventsPerSecond: 10,
+        },
+      },
+      global: {
+        headers: {
+          'x-client-info': 'mercadito-online-py@1.0.0',
+        },
+      },
+    });
+    
     return (window as any)[GLOBAL_SUPABASE_KEY];
   }
   

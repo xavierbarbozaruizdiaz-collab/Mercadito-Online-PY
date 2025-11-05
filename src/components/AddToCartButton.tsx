@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useToast } from '@/lib/hooks/useToast';
+import { trackAddToCart } from '@/lib/analytics';
 
 interface AddToCartButtonProps {
   productId: string;
@@ -56,7 +57,7 @@ export default function AddToCartButton({ productId, quantity = 1 }: AddToCartBu
       
       const productQueryPromise = (supabase as any)
         .from('products')
-        .select('id, stock_quantity, title, status, seller_id')
+        .select('id, stock_quantity, title, status, seller_id, price')
         .eq('id', productId)
         .single();
       
@@ -72,7 +73,7 @@ export default function AddToCartButton({ productId, quantity = 1 }: AddToCartBu
         console.warn('⚠️ Timeout en query completa, intentando query simple');
         const simpleQueryPromise = (supabase as any)
           .from('products')
-          .select('id, title, status, seller_id, stock_quantity, stock_management_enabled')
+          .select('id, title, status, seller_id, stock_quantity, stock_management_enabled, price')
           .eq('id', productId)
           .single();
         
@@ -94,7 +95,7 @@ export default function AddToCartButton({ productId, quantity = 1 }: AddToCartBu
         console.warn('⚠️ stock_quantity no existe aún, asumiendo inventario ilimitado');
         const tryWithoutStock = await (supabase as any)
           .from('products')
-          .select('id, title, status, seller_id')
+          .select('id, title, status, seller_id, price')
           .eq('id', productId)
           .single();
         
@@ -272,6 +273,17 @@ export default function AddToCartButton({ productId, quantity = 1 }: AddToCartBu
       setLoading(false);
       setAdded(true);
       toast.success(`✅ ${qtyToAdd} ${qtyToAdd === 1 ? 'unidad agregada' : 'unidades agregadas'} al carrito`);
+      
+      // Track add_to_cart event
+      if (product && product.title) {
+        trackAddToCart({
+          item_id: productId,
+          item_name: product.title,
+          price: product.price || 0,
+          quantity: qtyToAdd,
+        });
+      }
+      
       // Recargar el carrito en el componente CartButton si está montado
       setTimeout(() => setAdded(false), 2000);
 

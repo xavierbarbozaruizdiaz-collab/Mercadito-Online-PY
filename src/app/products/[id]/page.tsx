@@ -314,14 +314,14 @@ export default async function ProductPage(
             />
             
             {/* Información adicional */}
-            <div className="grid grid-cols-2 gap-4 text-sm">
+            <div className="grid grid-cols-2 gap-4 text-sm sm:text-base">
               <div className="bg-gray-50 p-3 rounded-lg">
-                <span className="font-medium text-gray-600">Condición:</span>
-                <p className="capitalize">{p.condition.replace('_', ' ')}</p>
+                <span className="font-bold text-gray-700 sm:text-gray-600">Condición:</span>
+                <p className="capitalize font-medium text-gray-900 sm:text-gray-700">{p.condition.replace('_', ' ')}</p>
               </div>
               <div className="bg-gray-50 p-3 rounded-lg">
-                <span className="font-medium text-gray-600">Tipo:</span>
-                <p className="capitalize">{p.sale_type === 'auction' ? 'Subasta' : 'Venta directa'}</p>
+                <span className="font-bold text-gray-700 sm:text-gray-600">Tipo:</span>
+                <p className="capitalize font-medium text-gray-900 sm:text-gray-700">{p.sale_type === 'auction' ? 'Subasta' : 'Venta directa'}</p>
               </div>
             </div>
           </div>
@@ -329,9 +329,9 @@ export default async function ProductPage(
           {/* Información del producto */}
           <div className="space-y-6">
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold mb-2">{p.title}</h1>
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-bold mb-2 text-gray-900">{p.title}</h1>
               {category && (
-                <span className="inline-block bg-blue-100 text-blue-800 text-sm px-3 py-1 rounded-full">
+                <span className="inline-block bg-blue-100 text-blue-800 text-sm sm:text-base px-3 py-1 rounded-full font-medium">
                   {category.name}
                 </span>
               )}
@@ -339,8 +339,8 @@ export default async function ProductPage(
 
             {p.description && (
               <div>
-                <h2 className="text-lg font-semibold mb-2">Descripción</h2>
-                <p className="text-gray-600 leading-relaxed">{p.description}</p>
+                <h2 className="text-base sm:text-lg font-bold mb-2 text-gray-900">Descripción</h2>
+                <p className="text-sm sm:text-base text-gray-700 sm:text-gray-600 leading-relaxed font-medium">{p.description}</p>
               </div>
             )}
 
@@ -350,24 +350,24 @@ export default async function ProductPage(
                   {p.sale_type === 'auction' && (
                     <div className="flex items-center gap-2 mb-2">
                       <span className="text-lg">🔨</span>
-                      <span className="text-xs bg-yellow-500 text-white px-2 py-1 rounded-full font-bold">SUBASTA</span>
+                      <span className="text-xs sm:text-sm bg-yellow-500 text-white px-2 py-1 rounded-full font-bold">SUBASTA</span>
                     </div>
                   )}
-                  <p className={`text-sm ${p.sale_type === 'auction' ? 'text-yellow-600' : 'text-green-600'} font-medium`}>
+                  <p className={`text-sm sm:text-base ${p.sale_type === 'auction' ? 'text-yellow-600' : 'text-green-600'} font-bold`}>
                     {p.sale_type === 'auction' ? 'Precio base' : 'Precio'}
                   </p>
-                  <p className={`text-3xl font-bold ${p.sale_type === 'auction' ? 'text-yellow-700' : 'text-green-700'}`}>
+                  <p className={`text-2xl sm:text-3xl md:text-4xl font-bold ${p.sale_type === 'auction' ? 'text-yellow-700' : 'text-green-700'}`}>
                     {Number(p.price).toLocaleString('es-PY')} Gs.
                   </p>
                   {p.sale_type === 'auction' && (
-                    <p className="text-xs text-yellow-600 mt-1">
+                    <p className="text-xs sm:text-sm text-yellow-600 mt-1 font-medium">
                       Los compradores pueden ofertar. El mejor precio gana.
                     </p>
                   )}
                 </div>
                 <div className="text-right">
-                  <p className="text-sm text-gray-500">Publicado</p>
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm sm:text-base text-gray-600 sm:text-gray-500 font-medium">Publicado</p>
+                  <p className="text-sm sm:text-base text-gray-700 sm:text-gray-600 font-bold">
                     {new Date(p.created_at).toLocaleDateString('es-PY')}
                   </p>
                 </div>
@@ -375,7 +375,13 @@ export default async function ProductPage(
             </div>
 
             {/* Componente cliente para manejar sesión y mostrar botones condicionalmente */}
-            <ProductPageClient product={p} />
+            <ProductPageClient 
+              product={{
+                ...p,
+                title: p.title,
+                price: Number(p.price),
+              }} 
+            />
 
             {/* Alerta de precio */}
             <div className="mt-4">
@@ -387,18 +393,18 @@ export default async function ProductPage(
 
             {/* Información del vendedor/tienda */}
             <div className="bg-gray-50 rounded-lg p-4">
-              <h3 className="font-semibold mb-2">Información del vendedor</h3>
+              <h3 className="font-bold text-base sm:text-lg mb-2 text-gray-900">Información del vendedor</h3>
               {store ? (
                 <div className="flex items-center gap-3">
                   {store.logo_url ? (
                     <img
                       src={store.logo_url}
                       alt={store.name}
-                      className="w-12 h-12 rounded-full object-cover"
+                      className="w-12 h-12 rounded-full object-cover border-2 border-white"
                     />
                   ) : (
-                    <div className="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center">
-                      <span className="text-purple-600 font-semibold text-lg">
+                    <div className="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center border-2 border-white">
+                      <span className="text-purple-600 font-bold text-lg">
                         {store.name.charAt(0).toUpperCase()}
                       </span>
                     </div>
@@ -406,39 +412,39 @@ export default async function ProductPage(
                   <div className="flex-1">
                     <Link
                       href={`/store/${store.slug}`}
-                      className="text-blue-600 hover:text-blue-800 font-medium hover:underline"
+                      className="text-blue-600 hover:text-blue-800 font-bold text-base sm:text-lg hover:underline"
                     >
                       {store.name}
                     </Link>
                     {store.description && (
-                      <p className="text-xs text-gray-500 mt-1 line-clamp-2">
+                      <p className="text-xs sm:text-sm text-gray-700 sm:text-gray-500 mt-1 line-clamp-2 font-medium">
                         {store.description}
                       </p>
                     )}
                   </div>
                   <Link
                     href={`/store/${store.slug}`}
-                    className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                    className="text-sm sm:text-base text-blue-600 hover:text-blue-800 font-bold"
                   >
                     Ver tienda →
                   </Link>
                 </div>
               ) : sellerInfo ? (
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center">
-                    <span className="text-gray-600 font-semibold text-lg">
+                  <div className="w-12 h-12 rounded-full bg-gray-300 sm:bg-gray-200 flex items-center justify-center border-2 border-gray-600 sm:border-gray-300">
+                    <span className="text-gray-700 sm:text-gray-600 font-bold text-lg">
                       {sellerInfo.name.charAt(0).toUpperCase()}
                     </span>
                   </div>
                   <div className="flex-1">
-                    <p className="font-medium text-gray-900">{sellerInfo.name}</p>
+                    <p className="font-bold text-base sm:text-lg text-gray-900">{sellerInfo.name}</p>
                     {sellerInfo.email && (
-                      <p className="text-xs text-gray-500">{sellerInfo.email}</p>
+                      <p className="text-xs sm:text-sm text-gray-700 sm:text-gray-500 font-medium">{sellerInfo.email}</p>
                     )}
                   </div>
                 </div>
               ) : (
-                <p className="text-sm text-gray-600">
+                <p className="text-sm sm:text-base text-gray-700 sm:text-gray-600 font-medium">
                   Este producto fue publicado por un vendedor verificado de nuestra plataforma.
                 </p>
               )}

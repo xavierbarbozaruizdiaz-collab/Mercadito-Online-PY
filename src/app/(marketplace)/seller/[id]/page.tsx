@@ -83,6 +83,7 @@ export default function SellerProfilePage() {
   const [totalReviews, setTotalReviews] = useState(0);
   const [totalProducts, setTotalProducts] = useState(0);
   const [followers, setFollowers] = useState(0);
+  const [hasStore, setHasStore] = useState(false);
 
 
   // Cargar perfil del vendedor
@@ -158,6 +159,15 @@ export default function SellerProfilePage() {
         .or('status.is.null,status.eq.active');
       
       setTotalProducts(count || 0);
+
+      // Verificar si tiene tienda asociada
+      const { data: storeData } = await supabase
+        .from('stores')
+        .select('id')
+        .eq('seller_id', sellerId)
+        .maybeSingle();
+      
+      setHasStore(!!storeData);
     } catch (err: unknown) {
       console.error('Error loading profile:', err);
       setError(err instanceof Error ? err.message : 'Error al cargar el perfil del vendedor');
@@ -395,7 +405,9 @@ export default function SellerProfilePage() {
             <img
               src={profile.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(sellerName)}&background=6366f1&color=fff`}
               alt={sellerName}
-              className="w-24 h-24 sm:w-32 sm:h-32 rounded-full border-4 border-white shadow-lg object-cover bg-white"
+              className={`w-24 h-24 sm:w-32 sm:h-32 rounded-full border-4 shadow-lg object-cover bg-white ${
+                hasStore ? 'border-white' : 'border-gray-600 sm:border-white'
+              }`}
             />
             {profile.verified && (
               <div className="absolute -bottom-1 -right-1 bg-blue-600 text-white rounded-full p-1.5 shadow-lg">
@@ -411,7 +423,7 @@ export default function SellerProfilePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 flex items-center gap-2">
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 flex items-center gap-2">
                 {sellerName}
                 {profile.verified && (
                   <span className="text-xs bg-blue-600 text-white px-2 py-1 rounded-full flex items-center gap-1">
@@ -422,7 +434,7 @@ export default function SellerProfilePage() {
               </h1>
               
               {/* Información adicional */}
-              <div className="flex flex-wrap items-center gap-4 mt-2 text-sm text-gray-600">
+              <div className="flex flex-wrap items-center gap-4 mt-2 text-sm sm:text-base text-gray-700 sm:text-gray-600">
                 {profile.location && (
                   <div className="flex items-center">
                     <MapPin className="w-4 h-4 mr-1" />
@@ -431,11 +443,11 @@ export default function SellerProfilePage() {
                 )}
                 <div className="flex items-center">
                   <Package className="w-4 h-4 mr-1" />
-                  <span>{totalProducts}+ publicaciones activas</span>
+                  <span className="font-medium">{totalProducts}+ publicaciones activas</span>
                 </div>
                 {followers > 0 && (
                   <div className="flex items-center">
-                    <span>{followers} seguidores</span>
+                    <span className="font-medium">{followers} seguidores</span>
                   </div>
                 )}
               </div>
@@ -445,10 +457,10 @@ export default function SellerProfilePage() {
                 <div className="flex items-center gap-2 mt-2">
                   <div className="flex items-center">
                     <Star className="w-5 h-5 text-yellow-400 fill-yellow-400" />
-                    <span className="font-semibold ml-1">{rating.toFixed(1)}</span>
+                    <span className="font-bold text-base sm:text-lg ml-1 text-gray-900">{rating.toFixed(1)}</span>
                   </div>
                   {totalReviews > 0 && (
-                    <span className="text-sm text-gray-600">({totalReviews} reseñas)</span>
+                    <span className="text-sm sm:text-base text-gray-700 sm:text-gray-600 font-medium">({totalReviews} reseñas)</span>
                   )}
                 </div>
               )}
@@ -643,11 +655,11 @@ export default function SellerProfilePage() {
                 </div>
 
                 <div className="p-1.5 sm:p-2">
-                  <p className="text-xs font-semibold text-gray-900 mb-0.5">
+                  <p className="text-sm sm:text-xs font-bold text-gray-900 mb-0.5">
                     {product.price.toLocaleString('es-PY')} G
                   </p>
                   {profile.location && (
-                    <p className="text-[10px] text-gray-500 line-clamp-1">{profile.location}</p>
+                    <p className="text-xs sm:text-[10px] text-gray-700 sm:text-gray-500 line-clamp-1 font-medium">{profile.location}</p>
                   )}
                 </div>
               </Link>

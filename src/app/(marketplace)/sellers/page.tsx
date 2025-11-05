@@ -343,7 +343,7 @@ export default function SellersListPage() {
 
           {/* Información */}
           <div className="space-y-2">
-            <h3 className="text-lg font-semibold text-gray-900 flex items-center justify-center">
+            <h3 className="text-base sm:text-lg font-bold text-gray-900 flex items-center justify-center">
               {seller.full_name}
               {seller.is_verified && (
                 <Badge variant="success" size="sm" className="ml-2">
@@ -353,35 +353,35 @@ export default function SellersListPage() {
             </h3>
             
             {seller.location && (
-              <div className="flex items-center justify-center text-gray-600">
+              <div className="flex items-center justify-center text-gray-700 sm:text-gray-600">
                 <MapPin className="w-4 h-4 mr-1" />
-                <span className="text-sm">{seller.location}</span>
+                <span className="text-sm sm:text-base font-medium">{seller.location}</span>
               </div>
             )}
 
             <div className="flex items-center justify-center">
               <Star className="w-4 h-4 text-yellow-500 mr-1" />
-              <span className="font-medium">{seller.rating.toFixed(1)}</span>
-              <span className="text-sm text-gray-600 ml-1">({seller.total_reviews})</span>
+              <span className="font-bold text-base sm:text-lg text-gray-900">{seller.rating.toFixed(1)}</span>
+              <span className="text-sm sm:text-base text-gray-700 sm:text-gray-600 ml-1 font-medium">({seller.total_reviews})</span>
             </div>
 
             {seller.bio && (
-              <p className="text-sm text-gray-600 line-clamp-2">{seller.bio}</p>
+              <p className="text-sm sm:text-base text-gray-700 sm:text-gray-600 line-clamp-2 font-medium">{seller.bio}</p>
             )}
 
             {/* Estadísticas */}
             <div className="grid grid-cols-3 gap-2 text-center">
               <div>
-                <div className="text-lg font-semibold text-gray-900">{seller.total_products}</div>
-                <div className="text-xs text-gray-600">Productos</div>
+                <div className="text-base sm:text-lg font-bold text-gray-900">{seller.total_products}</div>
+                <div className="text-xs sm:text-sm text-gray-700 sm:text-gray-600 font-medium">Productos</div>
               </div>
               <div>
-                <div className="text-lg font-semibold text-gray-900">{seller.total_sales}</div>
-                <div className="text-xs text-gray-600">Ventas</div>
+                <div className="text-base sm:text-lg font-bold text-gray-900">{seller.total_sales}</div>
+                <div className="text-xs sm:text-sm text-gray-700 sm:text-gray-600 font-medium">Ventas</div>
               </div>
               <div>
-                <div className="text-lg font-semibold text-gray-900">{seller.response_rate}%</div>
-                <div className="text-xs text-gray-600">Respuesta</div>
+                <div className="text-base sm:text-lg font-bold text-gray-900">{seller.response_rate}%</div>
+                <div className="text-xs sm:text-sm text-gray-700 sm:text-gray-600 font-medium">Respuesta</div>
               </div>
             </div>
           </div>
@@ -417,7 +417,7 @@ export default function SellersListPage() {
           {/* Información principal */}
           <div className="flex-1 min-w-0">
             <div className="flex items-center space-x-2 mb-1">
-              <h3 className="text-lg font-semibold text-gray-900 truncate">
+              <h3 className="text-base sm:text-lg font-bold text-gray-900 truncate">
                 {seller.full_name}
               </h3>
               {seller.is_verified && (
@@ -428,27 +428,27 @@ export default function SellersListPage() {
             </div>
             
             {seller.location && (
-              <div className="flex items-center text-gray-600 mb-2">
+              <div className="flex items-center text-gray-700 sm:text-gray-600 mb-2">
                 <MapPin className="w-4 h-4 mr-1" />
-                <span className="text-sm">{seller.location}</span>
+                <span className="text-sm sm:text-base font-medium">{seller.location}</span>
               </div>
             )}
 
             {seller.bio && (
-              <p className="text-sm text-gray-600 line-clamp-2 mb-2">{seller.bio}</p>
+              <p className="text-sm sm:text-base text-gray-700 sm:text-gray-600 line-clamp-2 mb-2 font-medium">{seller.bio}</p>
             )}
 
-            <div className="flex items-center space-x-4 text-sm text-gray-600">
+            <div className="flex items-center space-x-4 text-sm sm:text-base text-gray-700 sm:text-gray-600">
               <div className="flex items-center">
                 <Star className="w-4 h-4 text-yellow-500 mr-1" />
-                <span className="font-medium">{seller.rating.toFixed(1)}</span>
-                <span className="ml-1">({seller.total_reviews} reseñas)</span>
+                <span className="font-bold text-gray-900">{seller.rating.toFixed(1)}</span>
+                <span className="ml-1 font-medium">({seller.total_reviews} reseñas)</span>
               </div>
-              <div>{seller.total_products} productos</div>
-              <div>{seller.total_sales} ventas</div>
+              <div className="font-medium">{seller.total_products} productos</div>
+              <div className="font-medium">{seller.total_sales} ventas</div>
               <div className="flex items-center">
                 <Calendar className="w-4 h-4 mr-1" />
-                {new Date(seller.member_since).getFullYear()}
+                <span className="font-medium">{new Date(seller.member_since).getFullYear()}</span>
               </div>
             </div>
           </div>

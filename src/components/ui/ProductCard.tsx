@@ -325,7 +325,7 @@ export default function ProductCard({
             <div className="flex-1 min-w-0">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-gray-900 truncate">
+                  <h3 className="text-base sm:text-lg font-bold text-gray-900 truncate">
                     {product.title}
                   </h3>
                   
@@ -346,13 +346,13 @@ export default function ProductCard({
                   </div> */}
 
                   {showCategory && product.category && (
-                    <p className="text-sm text-gray-600 mt-1">
+                    <p className="text-sm sm:text-base text-gray-700 sm:text-gray-600 mt-1 font-medium">
                       {product.category.name}
                     </p>
                   )}
 
                   {showStore && (
-                    <div className="flex items-center text-sm text-gray-600 mt-1">
+                    <div className="flex items-center text-sm sm:text-base text-gray-700 sm:text-gray-600 mt-1 font-medium">
                       <User className="w-4 h-4 mr-1" />
                       <Link 
                         href={`/store/${product.store.slug}`}
@@ -376,16 +376,16 @@ export default function ProductCard({
                 <div className="text-right ml-4">
                   <div className="flex items-center space-x-2">
                     {product.compare_price && (
-                      <span className="text-sm text-gray-500 line-through">
+                      <span className="text-sm sm:text-base text-gray-500 line-through">
                         {formatCurrency(product.compare_price)}
                       </span>
                     )}
-                    <span className="text-xl font-bold text-gray-900">
+                    <span className="text-xl sm:text-2xl font-bold text-gray-900">
                       {formatCurrency(product.price)}
                     </span>
                   </div>
                   
-                  <div className="flex items-center text-sm text-gray-500 mt-1">
+                  <div className="flex items-center text-sm sm:text-base text-gray-600 sm:text-gray-500 mt-1 font-medium">
                     <Clock className="w-4 h-4 mr-1" />
                     {formatDate(product.created_at)}
                   </div>
@@ -516,18 +516,18 @@ export default function ProductCard({
       </CardHeader>
 
       <CardContent className="p-4">
-        <CardTitle className="text-lg font-semibold text-gray-900 line-clamp-2 mb-2">
+        <CardTitle className="text-base sm:text-lg font-bold text-gray-900 line-clamp-2 mb-2">
           {product.title}
         </CardTitle>
 
         {showCategory && product.category && (
-          <p className="text-sm text-gray-600 mb-2">
+          <p className="text-sm sm:text-base text-gray-700 sm:text-gray-600 mb-2 font-medium">
             {product.category.name}
           </p>
         )}
 
         {showStore && (
-          <div className="flex items-center text-sm text-gray-600 mb-2">
+          <div className="flex items-center text-sm sm:text-base text-gray-700 sm:text-gray-600 mb-2 font-medium">
             <User className="w-4 h-4 mr-1" />
             <Link 
               href={`/store/${product.store.slug}`}
@@ -542,17 +542,17 @@ export default function ProductCard({
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center space-x-2">
             {product.compare_price && (
-              <span className="text-sm text-gray-500 line-through">
+              <span className="text-sm sm:text-base text-gray-500 line-through">
                 {formatCurrency(product.compare_price)}
               </span>
             )}
-            <span className="text-xl font-bold text-gray-900">
+            <span className="text-xl sm:text-2xl font-bold text-gray-900">
               {formatCurrency(product.price)}
             </span>
           </div>
         </div>
 
-        <div className="flex items-center text-sm text-gray-500">
+        <div className="flex items-center text-sm sm:text-base text-gray-600 sm:text-gray-500 font-medium">
           <Clock className="w-4 h-4 mr-1" />
           {formatDate(product.created_at)}
         </div>

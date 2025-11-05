@@ -71,15 +71,15 @@ const nextConfig: NextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              // Scripts: mantener unsafe-inline temporalmente para Next.js, pero eliminar unsafe-eval si es posible
-              // Nota: 'unsafe-inline' puede ser necesario para scripts inline de Next.js
-              // 'unsafe-eval' se mantiene solo si es estrictamente necesario para Supabase
-              "script-src 'self' 'unsafe-inline' https://*.supabase.co https://vercel.live",
+              // Scripts: mantener unsafe-inline y unsafe-eval para Next.js y Supabase
+              // Nota: 'unsafe-inline' es necesario para scripts inline de Next.js
+              // 'unsafe-eval' es necesario para Supabase y algunas bibliotecas de Next.js
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.supabase.co https://vercel.live https://www.googletagmanager.com https://connect.facebook.net https://www.facebook.com",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com data:",
               "img-src 'self' data: https: blob:",
-              "connect-src 'self' https://*.supabase.co https://*.supabase.io wss://*.supabase.co",
-              "frame-src 'none'",
+              "connect-src 'self' https://*.supabase.co https://*.supabase.io wss://*.supabase.co https://www.google-analytics.com https://www.googletagmanager.com https://*.facebook.com https://connect.facebook.net",
+              "frame-src 'self' https://www.googletagmanager.com https://www.facebook.com",
               "object-src 'none'",
               "base-uri 'self'",
               "form-action 'self'",

@@ -1,5 +1,6 @@
 
 import type { Metadata } from "next";
+import Script from "next/script";
 import "./globals.css";
 import Link from "next/link";
 import CartButton from "@/components/CartButton";
@@ -88,6 +89,18 @@ export const metadata: Metadata = {
     yandex: 'your-yandex-verification-code',
     yahoo: 'your-yahoo-verification-code',
   },
+  icons: {
+    icon: [
+      { url: '/icons/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
+      { url: '/icons/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
+      { url: '/icons/icon-192x192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icons/icon-512x512.png', sizes: '512x512', type: 'image/png' },
+    ],
+    apple: [
+      { url: '/icons/apple-touch-icon-180x180.png', sizes: '180x180', type: 'image/png' },
+      { url: '/icons/apple-touch-icon-152x152.png', sizes: '152x152', type: 'image/png' },
+    ],
+  },
 };
 
 export default function RootLayout({
@@ -96,36 +109,25 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   const gaId = process.env.NEXT_PUBLIC_GA_ID;
-  const gtmId = process.env.NEXT_PUBLIC_GTM_ID;
   const fbPixelId = process.env.NEXT_PUBLIC_FACEBOOK_PIXEL_ID;
 
   return (
     <html lang="es">
       <head>
         {/* Google Tag Manager */}
-        {gtmId && (
-          <>
-            <script
-              dangerouslySetInnerHTML={{
-                __html: `
-                  (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
-                  new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
-                  j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
-                  'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-                  })(window,document,'script','dataLayer','${gtmId}');
-                `,
-              }}
-            />
-            <noscript>
-              <iframe
-                src={`https://www.googletagmanager.com/ns.html?id=${gtmId}`}
-                height="0"
-                width="0"
-                style={{ display: 'none', visibility: 'hidden' }}
-              />
-            </noscript>
-          </>
-        )}
+        <Script
+          id="gtm-script"
+          strategy="afterInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+              new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+              j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+              'https://www.googletagmanager.com/gtm.js?id=GTM-PQ8Q6JGW'+dl;f.parentNode.insertBefore(j,f);
+              })(window,document,'script','dataLayer','GTM-PQ8Q6JGW');
+            `,
+          }}
+        />
 
         {/* Google Analytics 4 */}
         {gaId && (
@@ -182,6 +184,15 @@ export default function RootLayout({
         )}
       </head>
       <body className="antialiased">
+        {/* Google Tag Manager (noscript) */}
+        <noscript>
+          <iframe
+            src="https://www.googletagmanager.com/ns.html?id=GTM-PQ8Q6JGW"
+            height="0"
+            width="0"
+            style={{ display: 'none', visibility: 'hidden' }}
+          ></iframe>
+        </noscript>
         <ErrorBoundary>
           <ThemeProvider>
             <header className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm">
@@ -191,8 +202,12 @@ export default function RootLayout({
               <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0 min-w-0">
                 <MobileMenu />
                 <Link href="/" className="flex items-center gap-1 sm:gap-2 min-w-0">
+                  <img 
+                    src="/icons/icon-96x96.png" 
+                    alt="Mercadito Online PY" 
+                    className="w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10 object-contain flex-shrink-0"
+                  />
                   <span className="text-base sm:text-xl md:text-2xl font-bold text-blue-600 hover:text-blue-700 transition-colors truncate">
-                    <span className="hidden md:inline">🛒 </span>
                     <span className="hidden sm:inline">Mercadito Online PY</span>
                     <span className="sm:hidden">Mercadito PY</span>
                   </span>

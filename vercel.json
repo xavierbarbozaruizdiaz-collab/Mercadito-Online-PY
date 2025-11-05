@@ -24,7 +24,7 @@
   "regions": ["iad1"],
   "framework": "nextjs",
   "outputDirectory": ".next",
-  "installCommand": "npm ci",
+  "installCommand": "rm -rf node_modules package-lock.json && npm install",
   "buildCommand": "npm run build",
   "devCommand": "npm run dev",
   "crons": [

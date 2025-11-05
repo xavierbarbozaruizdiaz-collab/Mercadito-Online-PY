@@ -1552,7 +1552,9 @@ export default function Dashboard() {
                 className="bg-[#252525] rounded-lg border border-gray-700 p-4 hover:shadow-md transition-shadow"
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-full bg-purple-900/30 flex items-center justify-center text-2xl">
+                  <div className={`w-12 h-12 rounded-full bg-purple-900/30 flex items-center justify-center text-2xl ${
+                    storeStatus === 'none' ? 'border-2 border-gray-600 sm:border-gray-700' : 'border-2 border-gray-700'
+                  }`}>
                     👤
                   </div>
                   <div>

@@ -7,10 +7,13 @@ import StartConversationButton from '@/components/StartConversationButton';
 import ProductQuantitySelector from './ProductQuantitySelector';
 import WholesalePriceBadge from '@/components/WholesalePriceBadge';
 import Link from 'next/link';
+import { trackViewItem } from '@/lib/analytics';
 
 interface ProductPageClientProps {
   product: {
     id: string;
+    title?: string;
+    price?: number;
     seller_id: string;
     sale_type: string;
     wholesale_enabled?: boolean;
@@ -39,6 +42,18 @@ export default function ProductPageClient({ product }: ProductPageClientProps) {
 
     getCurrentUser();
   }, []);
+
+  // Track view_item cuando se monta el componente
+  useEffect(() => {
+    if (product.id && product.title && product.price !== undefined) {
+      trackViewItem({
+        item_id: product.id,
+        item_name: product.title,
+        price: product.price,
+        quantity: 1,
+      });
+    }
+  }, [product.id, product.title, product.price]);
 
   // Si está cargando, mostrar botón por defecto (se ocultará cuando cargue)
   if (loading) {

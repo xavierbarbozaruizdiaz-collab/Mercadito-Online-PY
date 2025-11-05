@@ -1,0 +1,857 @@
+{
+  "exportFormatVersion": 2,
+  "exportTime": "2025-01-27T19:24:55.387Z",
+  "containerVersion": {
+    "path": "accounts/123456789/containers/987654321/versions/0",
+    "accountId": "123456789",
+    "containerId": "987654321",
+    "container": {
+      "path": "accounts/123456789/containers/987654321",
+      "accountId": "123456789",
+      "containerId": "987654321",
+      "name": "MOPY – Ecommerce v4 (Etiqueta de Google Estable GA4)",
+      "publicId": "GTM-PQ8Q6JGW",
+      "usageContext": ["WEB"],
+      "fingerprint": "0"
+    },
+    "tag": [
+      {
+        "accountId": "123456789",
+        "containerId": "987654321",
+        "tagId": "1",
+        "name": "GA4 – Configuration",
+        "type": "gaawc",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "measurementId",
+            "value": "G-52EMX80KW5"
+          },
+          {
+            "type": "BOOLEAN",
+            "key": "sendPageView",
+            "value": "true"
+          },
+          {
+            "type": "LIST",
+            "key": "fieldsToSet",
+            "list": []
+          }
+        ],
+        "firingTriggerId": ["2147479553"]
+      },
+      {
+        "accountId": "123456789",
+        "containerId": "987654321",
+        "tagId": "2",
+        "name": "GA4 – view_item",
+        "type": "gaawe",
+        "parameter": [
+          {
+            "type": "TAG_REFERENCE",
+            "key": "configurationTag",
+            "value": "1"
+          },
+          {
+            "type": "TEMPLATE",
+            "key": "eventName",
+            "value": "view_item"
+          },
+          {
+            "type": "LIST",
+            "key": "eventParameters",
+            "list": [
+              {
+                "type": "MAP",
+                "map": [
+                  {
+                    "type": "TEMPLATE",
+                    "key": "name",
+                    "value": "items"
+                  },
+                  {
+                    "type": "TEMPLATE",
+                    "key": "value",
+                    "value": "{{items}}"
+                  }
+                ]
+              },
+              {
+                "type": "MAP",
+                "map": [
+                  {
+                    "type": "TEMPLATE",
+                    "key": "name",
+                    "value": "value"
+                  },
+                  {
+                    "type": "TEMPLATE",
+                    "key": "value",
+                    "value": "{{JS – valueSafe}}"
+                  }
+                ]
+              },
+              {
+                "type": "MAP",
+                "map": [
+                  {
+                    "type": "TEMPLATE",
+                    "key": "name",
+                    "value": "currency"
+                  },
+                  {
+                    "type": "TEMPLATE",
+                    "key": "value",
+                    "value": "{{JS – currencySafe}}"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "firingTriggerId": ["2147479554"]
+      },
+      {
+        "accountId": "123456789",
+        "containerId": "987654321",
+        "tagId": "3",
+        "name": "GA4 – add_to_cart",
+        "type": "gaawe",
+        "parameter": [
+          {
+            "type": "TAG_REFERENCE",
+            "key": "configurationTag",
+            "value": "1"
+          },
+          {
+            "type": "TEMPLATE",
+            "key": "eventName",
+            "value": "add_to_cart"
+          },
+          {
+            "type": "LIST",
+            "key": "eventParameters",
+            "list": [
+              {
+                "type": "MAP",
+                "map": [
+                  {
+                    "type": "TEMPLATE",
+                    "key": "name",
+                    "value": "items"
+                  },
+                  {
+                    "type": "TEMPLATE",
+                    "key": "value",
+                    "value": "{{items}}"
+                  }
+                ]
+              },
+              {
+                "type": "MAP",
+                "map": [
+                  {
+                    "type": "TEMPLATE",
+                    "key": "name",
+                    "value": "value"
+                  },
+                  {
+                    "type": "TEMPLATE",
+                    "key": "value",
+                    "value": "{{JS – valueSafe}}"
+                  }
+                ]
+              },
+              {
+                "type": "MAP",
+                "map": [
+                  {
+                    "type": "TEMPLATE",
+                    "key": "name",
+                    "value": "currency"
+                  },
+                  {
+                    "type": "TEMPLATE",
+                    "key": "value",
+                    "value": "{{JS – currencySafe}}"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "firingTriggerId": ["2147479555"]
+      },
+      {
+        "accountId": "123456789",
+        "containerId": "987654321",
+        "tagId": "4",
+        "name": "GA4 – begin_checkout",
+        "type": "gaawe",
+        "parameter": [
+          {
+            "type": "TAG_REFERENCE",
+            "key": "configurationTag",
+            "value": "1"
+          },
+          {
+            "type": "TEMPLATE",
+            "key": "eventName",
+            "value": "begin_checkout"
+          },
+          {
+            "type": "LIST",
+            "key": "eventParameters",
+            "list": [
+              {
+                "type": "MAP",
+                "map": [
+                  {
+                    "type": "TEMPLATE",
+                    "key": "name",
+                    "value": "items"
+                  },
+                  {
+                    "type": "TEMPLATE",
+                    "key": "value",
+                    "value": "{{items}}"
+                  }
+                ]
+              },
+              {
+                "type": "MAP",
+                "map": [
+                  {
+                    "type": "TEMPLATE",
+                    "key": "name",
+                    "value": "value"
+                  },
+                  {
+                    "type": "TEMPLATE",
+                    "key": "value",
+                    "value": "{{JS – valueSafe}}"
+                  }
+                ]
+              },
+              {
+                "type": "MAP",
+                "map": [
+                  {
+                    "type": "TEMPLATE",
+                    "key": "name",
+                    "value": "currency"
+                  },
+                  {
+                    "type": "TEMPLATE",
+                    "key": "value",
+                    "value": "{{JS – currencySafe}}"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "firingTriggerId": ["2147479556"]
+      },
+      {
+        "accountId": "123456789",
+        "containerId": "987654321",
+        "tagId": "5",
+        "name": "GA4 – purchase",
+        "type": "gaawe",
+        "parameter": [
+          {
+            "type": "TAG_REFERENCE",
+            "key": "configurationTag",
+            "value": "1"
+          },
+          {
+            "type": "TEMPLATE",
+            "key": "eventName",
+            "value": "purchase"
+          },
+          {
+            "type": "LIST",
+            "key": "eventParameters",
+            "list": [
+              {
+                "type": "MAP",
+                "map": [
+                  {
+                    "type": "TEMPLATE",
+                    "key": "name",
+                    "value": "transaction_id"
+                  },
+                  {
+                    "type": "TEMPLATE",
+                    "key": "value",
+                    "value": "{{transaction_id}}"
+                  }
+                ]
+              },
+              {
+                "type": "MAP",
+                "map": [
+                  {
+                    "type": "TEMPLATE",
+                    "key": "name",
+                    "value": "items"
+                  },
+                  {
+                    "type": "TEMPLATE",
+                    "key": "value",
+                    "value": "{{items}}"
+                  }
+                ]
+              },
+              {
+                "type": "MAP",
+                "map": [
+                  {
+                    "type": "TEMPLATE",
+                    "key": "name",
+                    "value": "value"
+                  },
+                  {
+                    "type": "TEMPLATE",
+                    "key": "value",
+                    "value": "{{JS – valueSafe}}"
+                  }
+                ]
+              },
+              {
+                "type": "MAP",
+                "map": [
+                  {
+                    "type": "TEMPLATE",
+                    "key": "name",
+                    "value": "currency"
+                  },
+                  {
+                    "type": "TEMPLATE",
+                    "key": "value",
+                    "value": "{{JS – currencySafe}}"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "firingTriggerId": ["2147479557"]
+      },
+      {
+        "accountId": "123456789",
+        "containerId": "987654321",
+        "tagId": "6",
+        "name": "Consent – Default Granted",
+        "type": "consent_initialization",
+        "parameter": [
+          {
+            "type": "LIST",
+            "key": "consentTypes",
+            "list": [
+              {
+                "type": "MAP",
+                "map": [
+                  {
+                    "type": "TEMPLATE",
+                    "key": "consentType",
+                    "value": "ad_storage"
+                  },
+                  {
+                    "type": "TEMPLATE",
+                    "key": "state",
+                    "value": "granted"
+                  }
+                ]
+              },
+              {
+                "type": "MAP",
+                "map": [
+                  {
+                    "type": "TEMPLATE",
+                    "key": "consentType",
+                    "value": "analytics_storage"
+                  },
+                  {
+                    "type": "TEMPLATE",
+                    "key": "state",
+                    "value": "granted"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "firingTriggerId": ["2147479553"],
+        "tagFiringOption": "ONCE_PER_LOAD"
+      },
+      {
+        "accountId": "123456789",
+        "containerId": "987654321",
+        "tagId": "7",
+        "name": "FB – Base (PageView)",
+        "type": "html",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "html",
+            "value": "<!-- Facebook Pixel Base -->\n<script>\n  (function(p,i,x,e,l){p.FacebookPixelObject=l;p[l]=p[l]||function(){\n  (p[l].q=p[l].q||[]).push(arguments)};p[l].l=+new Date;var s=i.createElement(x);\n  s.async=1;s.src='https://connect.facebook.net/en_US/fbevents.js';\n  var y=i.getElementsByTagName(x)[0];y.parentNode.insertBefore(s,y);\n  })(window, document, 'script', 'fbq');\n  if (\"{{FB Pixel ID}}\") {\n    fbq('init', '{{FB Pixel ID}}');\n    fbq('track', 'PageView');\n  }\n</script>\n<noscript><img height=\"1\" width=\"1\" style=\"display:none\"\n  src=\"https://www.facebook.com/tr?id={{FB Pixel ID}}&ev=PageView&noscript=1\"\n/></noscript>"
+          }
+        ],
+        "firingTriggerId": ["2147479553"],
+        "blockingTriggerId": [],
+        "tagFiringOption": "ONCE_PER_EVENT"
+      },
+      {
+        "accountId": "123456789",
+        "containerId": "987654321",
+        "tagId": "8",
+        "name": "FB – ViewContent",
+        "type": "html",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "html",
+            "value": "<script>\n  if (\"{{FB Pixel ID}}\") {\n    fbq('track', 'ViewContent', {\n      content_ids: ({{JS – contents}} || []).map(c => c.id),\n      contents: {{JS – contents}},\n      content_type: '{{JS – content_type}}',\n      value: {{JS – valueSafe}},\n      currency: '{{JS – currencySafe}}'\n    });\n  }\n</script>"
+          }
+        ],
+        "firingTriggerId": ["2147479554"],
+        "blockingTriggerId": [],
+        "tagFiringOption": "ONCE_PER_EVENT"
+      },
+      {
+        "accountId": "123456789",
+        "containerId": "987654321",
+        "tagId": "9",
+        "name": "FB – AddToCart",
+        "type": "html",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "html",
+            "value": "<script>\n  if (\"{{FB Pixel ID}}\") {\n    fbq('track', 'AddToCart', {\n      content_ids: ({{JS – contents}} || []).map(c => c.id),\n      contents: {{JS – contents}},\n      content_type: '{{JS – content_type}}',\n      value: {{JS – valueSafe}},\n      currency: '{{JS – currencySafe}}'\n    });\n  }\n</script>"
+          }
+        ],
+        "firingTriggerId": ["2147479555"],
+        "blockingTriggerId": [],
+        "tagFiringOption": "ONCE_PER_EVENT"
+      },
+      {
+        "accountId": "123456789",
+        "containerId": "987654321",
+        "tagId": "10",
+        "name": "FB – InitiateCheckout",
+        "type": "html",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "html",
+            "value": "<script>\n  if (\"{{FB Pixel ID}}\") {\n    fbq('track', 'InitiateCheckout', {\n      content_ids: ({{JS – contents}} || []).map(c => c.id),\n      contents: {{JS – contents}},\n      num_items: {{JS – num_items}},\n      value: {{JS – valueSafe}},\n      currency: '{{JS – currencySafe}}'\n    });\n  }\n</script>"
+          }
+        ],
+        "firingTriggerId": ["2147479556"],
+        "blockingTriggerId": [],
+        "tagFiringOption": "ONCE_PER_EVENT"
+      },
+      {
+        "accountId": "123456789",
+        "containerId": "987654321",
+        "tagId": "11",
+        "name": "FB – Purchase",
+        "type": "html",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "html",
+            "value": "<script>\n  if (\"{{FB Pixel ID}}\") {\n    fbq('track', 'Purchase', {\n      content_ids: ({{JS – contents}} || []).map(c => c.id),\n      contents: {{JS – contents}},\n      value: {{JS – valueSafe}},\n      currency: '{{JS – currencySafe}}'\n    });\n  }\n</script>"
+          }
+        ],
+        "firingTriggerId": ["2147479557"],
+        "blockingTriggerId": [],
+        "tagFiringOption": "ONCE_PER_EVENT"
+      }
+    ],
+    "trigger": [
+      {
+        "accountId": "123456789",
+        "containerId": "987654321",
+        "triggerId": "2147479553",
+        "name": "EV – All Pages",
+        "type": "PAGEVIEW",
+        "filter": []
+      },
+      {
+        "accountId": "123456789",
+        "containerId": "987654321",
+        "triggerId": "2147479554",
+        "name": "EV – view_item",
+        "type": "CUSTOM_EVENT",
+        "customEventFilter": [
+          {
+            "type": "EQUALS",
+            "parameter": [
+              {
+                "type": "TEMPLATE",
+                "key": "arg0",
+                "value": "{{_event}}"
+              },
+              {
+                "type": "TEMPLATE",
+                "key": "arg1",
+                "value": "view_item"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "accountId": "123456789",
+        "containerId": "987654321",
+        "triggerId": "2147479555",
+        "name": "EV – add_to_cart",
+        "type": "CUSTOM_EVENT",
+        "customEventFilter": [
+          {
+            "type": "EQUALS",
+            "parameter": [
+              {
+                "type": "TEMPLATE",
+                "key": "arg0",
+                "value": "{{_event}}"
+              },
+              {
+                "type": "TEMPLATE",
+                "key": "arg1",
+                "value": "add_to_cart"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "accountId": "123456789",
+        "containerId": "987654321",
+        "triggerId": "2147479556",
+        "name": "EV – begin_checkout",
+        "type": "CUSTOM_EVENT",
+        "customEventFilter": [
+          {
+            "type": "EQUALS",
+            "parameter": [
+              {
+                "type": "TEMPLATE",
+                "key": "arg0",
+                "value": "{{_event}}"
+              },
+              {
+                "type": "TEMPLATE",
+                "key": "arg1",
+                "value": "begin_checkout"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "accountId": "123456789",
+        "containerId": "987654321",
+        "triggerId": "2147479557",
+        "name": "EV – purchase",
+        "type": "CUSTOM_EVENT",
+        "customEventFilter": [
+          {
+            "type": "EQUALS",
+            "parameter": [
+              {
+                "type": "TEMPLATE",
+                "key": "arg0",
+                "value": "{{_event}}"
+              },
+              {
+                "type": "TEMPLATE",
+                "key": "arg1",
+                "value": "purchase"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "variable": [
+      {
+        "accountId": "123456789",
+        "containerId": "987654321",
+        "variableId": "1",
+        "name": "event",
+        "type": "v",
+        "parameter": [
+          {
+            "type": "INTEGER",
+            "key": "dataLayerVersion",
+            "value": "2"
+          },
+          {
+            "type": "BOOLEAN",
+            "key": "readDataLayer",
+            "value": "true"
+          },
+          {
+            "type": "TEMPLATE",
+            "key": "name",
+            "value": "event"
+          }
+        ]
+      },
+      {
+        "accountId": "123456789",
+        "containerId": "987654321",
+        "variableId": "2",
+        "name": "ecommerce",
+        "type": "v",
+        "parameter": [
+          {
+            "type": "INTEGER",
+            "key": "dataLayerVersion",
+            "value": "2"
+          },
+          {
+            "type": "BOOLEAN",
+            "key": "readDataLayer",
+            "value": "true"
+          },
+          {
+            "type": "TEMPLATE",
+            "key": "name",
+            "value": "ecommerce"
+          }
+        ]
+      },
+      {
+        "accountId": "123456789",
+        "containerId": "987654321",
+        "variableId": "3",
+        "name": "currency",
+        "type": "v",
+        "parameter": [
+          {
+            "type": "INTEGER",
+            "key": "dataLayerVersion",
+            "value": "2"
+          },
+          {
+            "type": "BOOLEAN",
+            "key": "readDataLayer",
+            "value": "true"
+          },
+          {
+            "type": "TEMPLATE",
+            "key": "name",
+            "value": "ecommerce.currency"
+          }
+        ]
+      },
+      {
+        "accountId": "123456789",
+        "containerId": "987654321",
+        "variableId": "4",
+        "name": "value",
+        "type": "v",
+        "parameter": [
+          {
+            "type": "INTEGER",
+            "key": "dataLayerVersion",
+            "value": "2"
+          },
+          {
+            "type": "BOOLEAN",
+            "key": "readDataLayer",
+            "value": "true"
+          },
+          {
+            "type": "TEMPLATE",
+            "key": "name",
+            "value": "ecommerce.value"
+          }
+        ]
+      },
+      {
+        "accountId": "123456789",
+        "containerId": "987654321",
+        "variableId": "5",
+        "name": "transaction_id",
+        "type": "v",
+        "parameter": [
+          {
+            "type": "INTEGER",
+            "key": "dataLayerVersion",
+            "value": "2"
+          },
+          {
+            "type": "BOOLEAN",
+            "key": "readDataLayer",
+            "value": "true"
+          },
+          {
+            "type": "TEMPLATE",
+            "key": "name",
+            "value": "ecommerce.transaction_id"
+          }
+        ]
+      },
+      {
+        "accountId": "123456789",
+        "containerId": "987654321",
+        "variableId": "6",
+        "name": "items",
+        "type": "v",
+        "parameter": [
+          {
+            "type": "INTEGER",
+            "key": "dataLayerVersion",
+            "value": "2"
+          },
+          {
+            "type": "BOOLEAN",
+            "key": "readDataLayer",
+            "value": "true"
+          },
+          {
+            "type": "TEMPLATE",
+            "key": "name",
+            "value": "ecommerce.items"
+          }
+        ]
+      },
+      {
+        "accountId": "123456789",
+        "containerId": "987654321",
+        "variableId": "7",
+        "name": "first_item_id",
+        "type": "jsm",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "javascript",
+            "value": "try {\n  var items = {{items}};\n  return (items && Array.isArray(items) && items.length > 0) ? String(items[0].item_id || '') : '';\n} catch(e) {\n  return '';\n}"
+          }
+        ]
+      },
+      {
+        "accountId": "123456789",
+        "containerId": "987654321",
+        "variableId": "8",
+        "name": "first_item_name",
+        "type": "jsm",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "javascript",
+            "value": "try {\n  var items = {{items}};\n  return (items && Array.isArray(items) && items.length > 0) ? String(items[0].item_name || '') : '';\n} catch(e) {\n  return '';\n}"
+          }
+        ]
+      },
+      {
+        "accountId": "123456789",
+        "containerId": "987654321",
+        "variableId": "12",
+        "name": "JS – items_ids",
+        "type": "jsm",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "javascript",
+            "value": "try {\n  var items = {{items}} || [];\n  if (!Array.isArray(items)) return [];\n  return items.map(function(i) {\n    return String(i.item_id || '');\n  });\n} catch(e) {\n  return [];\n}"
+          }
+        ]
+      },
+      {
+        "accountId": "123456789",
+        "containerId": "987654321",
+        "variableId": "13",
+        "name": "JS – valueSafe",
+        "type": "jsm",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "javascript",
+            "value": "try {\n  return Number({{value}} || 0);\n} catch(e) {\n  return 0;\n}"
+          }
+        ]
+      },
+      {
+        "accountId": "123456789",
+        "containerId": "987654321",
+        "variableId": "14",
+        "name": "JS – currencySafe",
+        "type": "jsm",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "javascript",
+            "value": "try {\n  return String({{currency}} || 'PYG');\n} catch(e) {\n  return 'PYG';\n}"
+          }
+        ]
+      },
+      {
+        "accountId": "123456789",
+        "containerId": "987654321",
+        "variableId": "15",
+        "name": "JS – contents",
+        "type": "jsm",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "javascript",
+            "value": "try {\n  var items = {{items}} || [];\n  if (!Array.isArray(items)) return [];\n  return items.map(function(i) {\n    return {\n      id: String(i.item_id || ''),\n      quantity: Number(i.quantity || 1),\n      item_price: Number(i.price || 0)\n    };\n  });\n} catch(e) {\n  return [];\n}"
+          }
+        ]
+      },
+      {
+        "accountId": "123456789",
+        "containerId": "987654321",
+        "variableId": "16",
+        "name": "JS – content_type",
+        "type": "jsm",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "javascript",
+            "value": "try {\n  var items = {{items}};\n  return (Array.isArray(items) && items.length === 1) ? 'product' : 'product_group';\n} catch(e) {\n  return 'product_group';\n}"
+          }
+        ]
+      },
+      {
+        "accountId": "123456789",
+        "containerId": "987654321",
+        "variableId": "17",
+        "name": "JS – num_items",
+        "type": "jsm",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "javascript",
+            "value": "try {\n  var items = {{items}};\n  return Array.isArray(items) ? items.length : 0;\n} catch(e) {\n  return 0;\n}"
+          }
+        ]
+      },
+      {
+        "accountId": "123456789",
+        "containerId": "987654321",
+        "variableId": "18",
+        "name": "FB Pixel ID",
+        "type": "c",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "value",
+            "value": ""
+          }
+        ]
+      }
+    ],
+    "folder": []
+  },
+  "fingerprint": "0"
+}
+

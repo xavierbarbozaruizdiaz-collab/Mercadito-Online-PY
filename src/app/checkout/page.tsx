@@ -11,6 +11,7 @@ import { logger } from '@/lib/utils/logger';
 import toast from 'react-hot-toast';
 import { useFacebookPixel } from '@/lib/services/facebookPixelService';
 import { useGoogleAnalytics } from '@/lib/services/googleAnalyticsService';
+import { trackBeginCheckout } from '@/lib/analytics';
 
 type CartItem = {
   id: string;
@@ -310,6 +311,21 @@ function CheckoutContent() {
       );
     }
   }, [cartItems, loading, facebookPixel, googleAnalytics]);
+
+  // Track begin_checkout con GTM cuando se cargan los items del carrito
+  useEffect(() => {
+    if (cartItems.length > 0 && !loading && !auctionProductId && checkoutType !== 'membership') {
+      const total = cartItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
+      const items = cartItems.map(item => ({
+        item_id: item.product.id,
+        item_name: item.product.title,
+        price: item.product.price,
+        quantity: item.quantity,
+      }));
+      
+      trackBeginCheckout(items, total);
+    }
+  }, [cartItems, loading, auctionProductId, checkoutType]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

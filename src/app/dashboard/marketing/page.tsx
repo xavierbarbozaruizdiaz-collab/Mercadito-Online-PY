@@ -74,7 +74,7 @@ interface Store {
 // ============================================
 
 export default function MarketingPage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [campaigns, setCampaigns] = useState<MarketingCampaign[]>([]);
   const [stores, setStores] = useState<Store[]>([]);
   const [selectedStore, setSelectedStore] = useState<string | null>(null);
@@ -82,23 +82,43 @@ export default function MarketingPage() {
   const [metrics, setMetrics] = useState<Record<string, CampaignMetrics[]>>({});
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [syncingCatalog, setSyncingCatalog] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Verificar autenticación
+  useEffect(() => {
+    if (!authLoading && !user) {
+      // Si no hay usuario después de cargar, redirigir
+      window.location.href = '/auth/sign-in';
+    }
+  }, [authLoading, user]);
 
   // Cargar tiendas del usuario
   useEffect(() => {
-    loadStores();
-  }, [user]);
+    if (user && !authLoading) {
+      loadStores();
+    }
+  }, [user, authLoading]);
 
   // Cargar campañas
   useEffect(() => {
-    if (user) {
+    if (user && !authLoading) {
       loadCampaigns();
     }
-  }, [user, selectedStore]);
+  }, [user, authLoading, selectedStore]);
 
   async function loadStores() {
     try {
-      const { data: session } = await supabase.auth.getSession();
-      if (!session?.session?.user?.id) return;
+      const { data: session, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        logger.error('Error getting session in loadStores', sessionError);
+        return;
+      }
+      
+      if (!session?.session?.user?.id) {
+        logger.warn('No session in loadStores');
+        return;
+      }
 
       const { data, error } = await supabase
         .from('stores')
@@ -106,7 +126,12 @@ export default function MarketingPage() {
         .eq('seller_id', session.session.user.id)
         .eq('is_active', true);
 
-      if (error) throw error;
+      if (error) {
+        logger.error('Error loading stores', error);
+        setStores([]);
+        return;
+      }
+      
       setStores(data || []);
       
       // Seleccionar la primera tienda por defecto
@@ -115,14 +140,25 @@ export default function MarketingPage() {
       }
     } catch (err) {
       logger.error('Error loading stores', err);
+      setStores([]);
     }
   }
 
   async function loadCampaigns() {
     try {
       setLoading(true);
-      const { data: session } = await supabase.auth.getSession();
-      if (!session?.session?.user?.id) return;
+      const { data: session, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        logger.error('Error getting session', sessionError);
+        return;
+      }
+      
+      if (!session?.session?.user?.id) {
+        logger.warn('No session found, redirecting...');
+        window.location.href = '/auth/sign-in';
+        return;
+      }
 
       let query = supabase
         .from('marketing_campaigns')
@@ -136,15 +172,35 @@ export default function MarketingPage() {
 
       const { data, error } = await query;
 
-      if (error) throw error;
+      // Si la tabla no existe o hay error de permisos, simplemente mostrar lista vacía
+      if (error) {
+        // Si es error de tabla no existe o permisos, no lanzar error
+        if (error.code === '42P01' || error.code === 'PGRST301' || error.message?.includes('does not exist')) {
+          logger.warn('Marketing campaigns table does not exist or no access', error);
+          setCampaigns([]);
+          return;
+        }
+        // Para otros errores, solo loguear pero no fallar
+        logger.error('Error loading campaigns', error);
+        setCampaigns([]);
+        return;
+      }
+      
       setCampaigns(data || []);
 
-      // Cargar métricas para cada campaña
+      // Cargar métricas para cada campaña (solo si hay campañas y la tabla existe)
       if (data && data.length > 0) {
-        loadMetrics(data.map(c => c.id));
+        try {
+          await loadMetrics(data.map(c => c.id));
+        } catch (metricsError) {
+          // Si la tabla de métricas no existe, continuar sin métricas
+          logger.warn('Error loading metrics (table may not exist)', metricsError);
+        }
       }
     } catch (err) {
       logger.error('Error loading campaigns', err);
+      // No lanzar error, simplemente mostrar lista vacía
+      setCampaigns([]);
     } finally {
       setLoading(false);
     }
@@ -158,7 +214,15 @@ export default function MarketingPage() {
         .in('campaign_id', campaignIds)
         .order('date', { ascending: false });
 
-      if (error) throw error;
+      // Si la tabla no existe, simplemente retornar sin métricas
+      if (error) {
+        if (error.code === '42P01' || error.code === 'PGRST301' || error.message?.includes('does not exist')) {
+          logger.warn('Campaign metrics table does not exist', error);
+          setMetrics({});
+          return;
+        }
+        throw error;
+      }
 
       // Agrupar métricas por campaign_id
       const grouped: Record<string, CampaignMetrics[]> = {};
@@ -172,6 +236,8 @@ export default function MarketingPage() {
       setMetrics(grouped);
     } catch (err) {
       logger.error('Error loading metrics', err);
+      // No fallar, simplemente no mostrar métricas
+      setMetrics({});
     }
   }
 
@@ -184,6 +250,12 @@ export default function MarketingPage() {
         body: JSON.stringify({ platforms: ['meta', 'tiktok', 'google'] }),
       });
 
+      // Si la ruta no existe (404), mostrar mensaje amigable
+      if (response.status === 404) {
+        alert('La funcionalidad de sincronización de catálogo aún no está disponible.');
+        return;
+      }
+
       const result = await response.json();
 
       if (!response.ok) {
@@ -193,7 +265,12 @@ export default function MarketingPage() {
       alert('Sincronización de catálogo iniciada. Esto puede tardar unos minutos.');
     } catch (err) {
       logger.error('Error syncing catalog', err);
-      alert('Error al sincronizar catálogo: ' + (err as Error).message);
+      // Si es un error de red o 404, mostrar mensaje más amigable
+      if (err instanceof TypeError || (err as any).message?.includes('fetch')) {
+        alert('No se pudo conectar con el servidor. Verifica tu conexión.');
+      } else {
+        alert('Error al sincronizar catálogo: ' + (err as Error).message);
+      }
     } finally {
       setSyncingCatalog(false);
     }
@@ -233,12 +310,24 @@ export default function MarketingPage() {
     };
   }
 
-  if (loading && campaigns.length === 0) {
+  // Mostrar loading mientras se carga la autenticación o los datos
+  if (authLoading || (loading && campaigns.length === 0 && !error)) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Cargando campañas...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Si no hay usuario después de cargar, mostrar mensaje
+  if (!authLoading && !user) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-gray-600 mb-4">Redirigiendo al inicio de sesión...</p>
         </div>
       </div>
     );

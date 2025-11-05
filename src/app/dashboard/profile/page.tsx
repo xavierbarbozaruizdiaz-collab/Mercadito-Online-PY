@@ -408,7 +408,9 @@ export default function ProfileEditPage() {
           <div className="mb-6">
             <label className="block text-sm font-medium mb-2">Foto de perfil</label>
             <div className="flex items-center gap-6">
-              <div className="relative w-32 h-32 rounded-full bg-gray-100 overflow-hidden flex-shrink-0 border-4 border-gray-200 shadow-md">
+              <div className={`relative w-32 h-32 rounded-full bg-gray-100 overflow-hidden flex-shrink-0 border-4 shadow-md ${
+                hasActiveStore ? 'border-gray-200' : 'border-gray-600 sm:border-gray-200'
+              }`}>
                 {(avatarPreview || currentAvatar) ? (
                   <div className="relative w-full h-full">
                     <img

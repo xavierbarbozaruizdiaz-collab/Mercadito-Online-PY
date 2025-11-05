@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useFacebookPixel } from '@/lib/services/facebookPixelService';
 import { useGoogleAnalytics } from '@/lib/services/googleAnalyticsService';
+import { trackPurchase } from '@/lib/analytics';
 
 type Order = {
   id: string;
@@ -95,6 +96,18 @@ function CheckoutSuccessContent() {
           total: orderData.total_amount,
           currency: 'PYG',
         });
+
+        // Track purchase con GTM
+        trackPurchase(
+          orderData.id,
+          orderData.order_items.map(item => ({
+            item_id: item.product.id,
+            item_name: item.product.title,
+            price: item.unit_price,
+            quantity: item.quantity,
+          })),
+          orderData.total_amount
+        );
       }
     } catch (err) {
       console.error('Error loading order:', err);

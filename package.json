@@ -3,10 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "engines": {
-    "node": "20.x"
+    "node": "22.x"
   },
   "packageManager": "npm@10",
   "scripts": {
+    "postinstall": "npm rebuild lightningcss --no-save || true",
     "dev": "next dev --webpack",
     "build": "next build --webpack",
     "start": "next start",
@@ -25,6 +26,7 @@
     "verify:env": "node scripts/verificar-env-vars.js",
     "verify:migrations": "node scripts/comparar-migraciones.js",
     "compare:migrations": "node scripts/comparar-migraciones-produccion.js",
+    "generate:icons": "node scripts/generate-icons.js",
     "diagnostico:visual": "node scripts/diagnostico-diferencias-visuales.js",
     "extraer:clases-dinamicas": "node scripts/extraer-clases-dinamicas.js",
     "verificar:build-css": "node scripts/verificar-build-css.js",
@@ -67,6 +69,7 @@
     "framer-motion": "^12.23.24",
     "json2csv": "^6.0.0-alpha.2",
     "leaflet": "^1.9.4",
+    "lightningcss": "^1.27.0",
     "lucide-react": "^0.548.0",
     "next": "16.0.0",
     "nodemailer": "^7.0.10",
@@ -105,5 +108,8 @@
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^4.0.4"
+  },
+  "optionalDependencies": {
+    "lightningcss-linux-x64-gnu": "^1.30.2"
   }
 }
