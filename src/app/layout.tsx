@@ -112,25 +112,25 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   const fbPixelId = process.env.NEXT_PUBLIC_FACEBOOK_PIXEL_ID;
-  const gtmId = process.env.NEXT_PUBLIC_GTM_ID || 'GTM-PQ8Q6JGW';
+  const gtmId = process.env.NEXT_PUBLIC_GTM_ID ?? 'GTM-PQ8Q6JGW';
+  const gtmScriptSrc = `https://www.googletagmanager.com/gtm.js?id=${gtmId}`;
 
   return (
     <html lang="es" suppressHydrationWarning>
       <head>
-        {/* Google Tag Manager */}
-        <Script
-          id="gtm-init"
-          strategy="afterInteractive"
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
-              new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
-              j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
-              'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-              })(window,document,'script','dataLayer','${gtmId}');
-            `,
-          }}
-        />
+        {/* A) Inicializa dataLayer ANTES de GTM */}
+        <Script id="gtm-dl" strategy="beforeInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            window.dataLayer.push({ 'gtm.start': new Date().getTime(), event: 'gtm.js' });
+          `}
+        </Script>
+
+        {/* B) Carga de GTM ÚNICO */}
+        <Script id="gtm-src" strategy="afterInteractive" src={gtmScriptSrc} />
+
+        <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16x16.png" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png" />
 
         {/* Facebook Pixel */}
         {fbPixelId && (
@@ -164,12 +164,15 @@ export default function RootLayout({
         )}
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        {/* Google Tag Manager (noscript) */}
-        <noscript
-          dangerouslySetInnerHTML={{
-            __html: `<iframe src="https://www.googletagmanager.com/ns.html?id=${gtmId}" height="0" width="0" style="display:none;visibility:hidden"></iframe>`,
-          }}
-        />
+        {/* C) Noscript */}
+        <noscript>
+          <iframe
+            src={gtmScriptSrc.replace('gtm.js', 'ns.html')}
+            height="0"
+            width="0"
+            style={{ display: 'none', visibility: 'hidden' }}
+          />
+        </noscript>
         
         <ErrorBoundary>
           <ThemeProvider>

@@ -110,8 +110,10 @@ export function middleware(request: NextRequest) {
   return response;
 }
 
-// Aplicar middleware solo a rutas API
+// Aplicar middleware excluyendo rutas estáticas/PWA
 export const config = {
-  matcher: '/api/:path*',
+  matcher: [
+    '/((?!api|_next/|icons/|favicon.ico|manifest.webmanifest|robots.txt|sitemap.xml|images/).*)',
+  ],
 };
 

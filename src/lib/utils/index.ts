@@ -89,32 +89,38 @@ export function isValidPhone(phone: string): boolean {
  * Convierte números locales (098...) a formato internacional (59598...).
  * 
  * @param phone - Número de teléfono en cualquier formato (0981234567, +595981234567, etc.)
- * @returns Número formateado para WhatsApp (595981234567) o null si es inválido
+ * @returns URL completa de WhatsApp (https://wa.me/595981234567) o null si es inválido
  * 
  * @example
- * formatPhoneForWhatsApp('0981988714') // '595981988714'
- * formatPhoneForWhatsApp('+595981988714') // '595981988714'
- * formatPhoneForWhatsApp('595981988714') // '595981988714'
+ * formatPhoneForWhatsApp('0981988714') // 'https://wa.me/595981988714'
+ * formatPhoneForWhatsApp('+595981988714') // 'https://wa.me/595981988714'
+ * formatPhoneForWhatsApp('595981988714') // 'https://wa.me/595981988714'
  */
-export function formatPhoneForWhatsApp(phone: string | null | undefined): string | null {
-  if (!phone) return null;
-  
-  // Remover todos los caracteres no numéricos
-  let cleaned = phone.replace(/\D/g, '');
-  
-  // Si empieza con 0 (formato local), remover el 0
-  if (cleaned.startsWith('0')) {
-    cleaned = cleaned.substring(1);
+export function formatPhoneForWhatsApp(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+
+  const digits = raw.replace(/\D+/g, '');
+
+  // Ya incluye prefijo país
+  if (digits.startsWith('595')) {
+    const local = digits.slice(3);
+    if (local.length < 9) return null;
+    return `https://wa.me/${digits}`;
   }
-  
-  // Si no empieza con código de país 595, agregarlo
-  if (!cleaned.startsWith('595')) {
-    cleaned = '595' + cleaned;
+
+  // Número local con cero inicial
+  if (digits.startsWith('0')) {
+    const local = digits.slice(1);
+    if (local.length < 9) return null;
+    return `https://wa.me/595${local}`;
   }
-  
-  // Validar que tenga al menos 11 dígitos (595 + 9 dígitos mínimo)
-  // Retornar null si es inválido, de lo contrario retornar el número formateado
-  return cleaned.length >= 11 ? cleaned : null;
+
+  // Número local sin cero inicial
+  if (digits.length >= 9) {
+    return `https://wa.me/595${digits}`;
+  }
+
+  return null;
 }
 
 export function isValidUrl(url: string): boolean {

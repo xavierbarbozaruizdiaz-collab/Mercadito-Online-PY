@@ -70,60 +70,7 @@ export default function manifest(): MetadataRoute.Manifest {
       },
     ],
     
-    shortcuts: [
-      {
-        name: 'Buscar productos',
-        short_name: 'Buscar',
-        description: 'Buscar productos en el marketplace',
-        url: '/search',
-        icons: [
-          {
-            src: '/icons/search-96x96.png',
-            sizes: '96x96',
-            type: 'image/png',
-          },
-        ],
-      },
-      {
-        name: 'Mi carrito',
-        short_name: 'Carrito',
-        description: 'Ver productos en mi carrito',
-        url: '/cart',
-        icons: [
-          {
-            src: '/icons/cart-96x96.png',
-            sizes: '96x96',
-            type: 'image/png',
-          },
-        ],
-      },
-      {
-        name: 'Mi perfil',
-        short_name: 'Perfil',
-        description: 'Ver mi perfil de usuario',
-        url: '/dashboard',
-        icons: [
-          {
-            src: '/icons/profile-96x96.png',
-            sizes: '96x96',
-            type: 'image/png',
-          },
-        ],
-      },
-      {
-        name: 'Tiendas',
-        short_name: 'Tiendas',
-        description: 'Explorar tiendas',
-        url: '/stores',
-        icons: [
-          {
-            src: '/icons/store-96x96.png',
-            sizes: '96x96',
-            type: 'image/png',
-          },
-        ],
-      },
-    ],
+    shortcuts: [],
     
     related_applications: [
       {
