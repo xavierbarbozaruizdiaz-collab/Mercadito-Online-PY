@@ -22,7 +22,7 @@ export type Item = {
 // Tipo para dataLayer
 declare global {
   interface Window {
-    dataLayer: any[];
+    dataLayer?: any[];
   }
 }
 
