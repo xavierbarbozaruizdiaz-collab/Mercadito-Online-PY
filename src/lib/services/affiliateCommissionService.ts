@@ -194,7 +194,7 @@ export async function getAffiliateCommissionSummary(
 
     // Calcular próxima fecha de pago (estimada)
     let nextPaymentDate: string | null = null;
-    let nextPaymentAmount = availableBalance;
+    const nextPaymentAmount = availableBalance;
 
     if (affiliateData?.payment_schedule) {
       const now = new Date();

@@ -1,0 +1,40 @@
+--- a/src/app/layout.tsx
++++ b/src/app/layout.tsx
+@@ -111,7 +111,6 @@ export default function RootLayout({
+   children: React.ReactNode;
+ }>) {
+-  const gaId = process.env.NEXT_PUBLIC_GA_ID;
+   const fbPixelId = process.env.NEXT_PUBLIC_FACEBOOK_PIXEL_ID;
+ 
+   return (
+@@ -132,28 +131,6 @@ export default function RootLayout({
+           }}
+         />
+ 
+-        {/* Google Analytics 4 */}
+-        {gaId && (
+-          <>
+-            <script
+-              async
+-              src={`https://www.googletagmanager.com/gtag/js?id=${gaId}`}
+-            />
+-            <script
+-              dangerouslySetInnerHTML={{
+-                __html: `
+-                  window.dataLayer = window.dataLayer || [];
+-                  function gtag(){dataLayer.push(arguments);}
+-                  gtag('js', new Date());
+-                  gtag('config', '${gaId}', {
+-                    page_path: window.location.pathname,
+-                    send_page_view: true
+-                  });
+-                `,
+-              }}
+-            />
+-          </>
+-        )}
+-
+         {/* Facebook Pixel */}
+         {fbPixelId && (
+           <>
+

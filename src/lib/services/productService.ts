@@ -431,7 +431,7 @@ class ProductServiceImpl implements ProductService {
       // Aplicar paginación
       query = query.range(offset, offset + limit - 1);
 
-      let { data, error, count } = await query;
+      const { data, error, count } = await query;
 
       // Si hay error relacionado con stock_quantity, continuar sin esa columna
       if (error && error.message?.includes('stock_quantity')) {

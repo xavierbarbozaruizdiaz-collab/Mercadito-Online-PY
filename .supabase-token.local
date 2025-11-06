@@ -1,0 +1,17 @@
+# ============================================
+# SUPABASE ACCESS TOKEN (LOCAL - NO SUBIR AL REPO)
+# ============================================
+# 
+# Este archivo contiene tu token de acceso a Supabase
+# NO lo subas al repositorio, está en .gitignore
+#
+# Para usar:
+# 1. Pega tu token aquí (sin comillas)
+# 2. Ejecuta: node scripts/verificar-produccion-db.js
+#
+# Obtén tu token en: https://supabase.com/dashboard/account/tokens
+# ============================================
+
+SUPABASE_ACCESS_TOKEN=sbp_ec7e1af041557ee27fa64a600206dd51a782acc8
+
+

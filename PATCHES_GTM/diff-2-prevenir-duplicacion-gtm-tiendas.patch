@@ -1,0 +1,16 @@
+--- a/src/app/(marketplace)/store/[slug]/layout.tsx
++++ b/src/app/(marketplace)/store/[slug]/layout.tsx
+@@ -35,8 +35,12 @@ export default async function StoreLayout({ children, params }: StoreLayoutProp
+   // Obtener IDs de tracking para esta tienda
+   const trackingIds = await getTrackingIdsForStore(slug);
+ 
++  // IDs globales para comparación
++  const mainGTMId = 'GTM-PQ8Q6JGW';
++
+   // Determinar qué scripts cargar
+   const hasGA = !!trackingIds.gaId;
+   const hasPixel = !!trackingIds.pixelId;
+-  const hasGTM = !!trackingIds.gtmId;
++  // Solo cargar GTM de tienda si es diferente del principal
++  const hasGTM = !!trackingIds.gtmId && trackingIds.gtmId !== mainGTMId;
+

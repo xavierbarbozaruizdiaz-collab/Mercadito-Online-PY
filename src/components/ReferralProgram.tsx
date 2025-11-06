@@ -8,7 +8,7 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { ReferralService, UserReferralCode, Referral } from '@/lib/services/referralService';
 import { Card, CardHeader, CardTitle, CardContent, Input, Badge } from './ui';
 import Button from './ui/Button';
-import { Gift, Users, DollarSign, Copy, Check, Share2 } from 'lucide-react';
+import { Gift, Users, DollarSign, Copy, Check } from 'lucide-react';
 import LoadingSpinner from './ui/LoadingSpinner';
 import ShareButton from './ShareButton';
 
@@ -23,6 +23,7 @@ export default function ReferralProgram() {
     if (user) {
       loadReferralData();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   const loadReferralData = async () => {
@@ -54,6 +55,8 @@ export default function ReferralProgram() {
     }
   };
 
+  // Función para copiar link de referido (no usado actualmente, pero puede ser útil en el futuro)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleCopyLink = () => {
     if (!stats?.referral_code) return;
 

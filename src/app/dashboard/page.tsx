@@ -154,7 +154,7 @@ export default function Dashboard() {
 
         // Cargar productos (incluyendo status para detectar pausados y vitrina)
         // Intentar primero con campos de vitrina, si falla intentar sin ellos
-        let query = supabase
+        const query = supabase
           .from('products')
           .select('id, title, price, image_url:cover_url, created_at, sale_type, auction_status, auction_end_at, status')
           .eq('seller_id', session.session.user.id)

@@ -5,7 +5,7 @@ import { vi } from 'vitest';
 // Mock next/image to behave like a normal img in tests
 vi.mock('next/image', () => ({
   default: (props: any) => {
-    // eslint-disable-next-line jsx-a11y/alt-text
+     
     return React.createElement('img', props);
   },
 }));

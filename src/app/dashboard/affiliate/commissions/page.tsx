@@ -62,7 +62,7 @@ function AffiliateCommissionsContent() {
       // Calcular fechas según período
       const now = new Date();
       let startDate: string | undefined;
-      let endDate: string | undefined = now.toISOString();
+      const endDate: string | undefined = now.toISOString();
 
       if (filterPeriod === 'this_month') {
         startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
