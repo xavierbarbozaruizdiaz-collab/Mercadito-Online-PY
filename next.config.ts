@@ -72,14 +72,16 @@ const nextConfig: NextConfig = {
             value: [
               "default-src 'self'",
               // Scripts: unsafe-inline y unsafe-eval necesarios para Next.js (HMR, hot reload, etc.)
-              // Nota: 'unsafe-eval' es requerido por Next.js en desarrollo y puede ser necesario en producción
-              // dependiendo de la configuración de webpack y optimizaciones
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.supabase.co https://vercel.live",
+              // Permitir GTM, Google Analytics y Facebook Pixel
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.supabase.co https://vercel.live https://www.googletagmanager.com https://www.google-analytics.com https://connect.facebook.net",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com data:",
-              "img-src 'self' data: https: blob:",
-              "connect-src 'self' https://*.supabase.co https://*.supabase.io wss://*.supabase.co",
-              "frame-src 'none'",
+              // Imágenes: permitir GTM, GA y Facebook Pixel para tracking pixels
+              "img-src 'self' data: https: blob: https://www.googletagmanager.com https://www.google-analytics.com https://connect.facebook.net",
+              // Conexiones: permitir Google Analytics y mantener Supabase
+              "connect-src 'self' https://*.supabase.co https://*.supabase.io wss://*.supabase.co https://www.google-analytics.com https://region1.google-analytics.com",
+              // Frames: permitir GTM y Facebook Pixel
+              "frame-src 'self' https://www.googletagmanager.com https://connect.facebook.net",
               "object-src 'none'",
               "base-uri 'self'",
               "form-action 'self'",

@@ -100,59 +100,21 @@ export function formatPhoneForWhatsApp(phone: string | null | undefined): string
   if (!phone) return null;
   
   // Remover todos los caracteres no numéricos
-  const digitsOnly = phone.replace(/\D/g, '');
+  let cleaned = phone.replace(/\D/g, '');
   
-  // Si está vacío, es inválido
-  if (!digitsOnly) {
-    return null;
+  // Si empieza con 0 (formato local), remover el 0
+  if (cleaned.startsWith('0')) {
+    cleaned = cleaned.substring(1);
   }
   
-  // Si empieza con 0 (formato local: 0981234567), reemplazar por código de país
-  if (digitsOnly.startsWith('0')) {
-    // Remover el 0 inicial y agregar código de país 595
-    const numberWithoutZero = digitsOnly.substring(1);
-    // Validar que tenga exactamente 9 dígitos después del 0 (formato estándar de Paraguay)
-    if (numberWithoutZero.length === 9) {
-      return `595${numberWithoutZero}`;
-    }
-    // Si tiene más de 9 dígitos, tomar solo los primeros 9
-    if (numberWithoutZero.length > 9) {
-      return `595${numberWithoutZero.substring(0, 9)}`;
-    }
-    // Si tiene menos de 9 dígitos, es inválido
-    return null;
+  // Si no empieza con código de país 595, agregarlo
+  if (!cleaned.startsWith('595')) {
+    cleaned = '595' + cleaned;
   }
   
-  // Si ya tiene código de país 595, validar formato
-  if (digitsOnly.startsWith('595')) {
-    // Debe tener 12 dígitos totales (595 + 9 dígitos)
-    if (digitsOnly.length === 12) {
-      return digitsOnly;
-    }
-    // Si tiene más de 12 dígitos, tomar solo los primeros 12
-    if (digitsOnly.length > 12) {
-      return digitsOnly.substring(0, 12);
-    }
-    // Si tiene menos de 12 pero más de 3, puede ser que falten dígitos
-    // Si tiene 11 dígitos (595 + 8 dígitos), es inválido
-    if (digitsOnly.length < 12) {
-      return null;
-    }
-  }
-  
-  // Si tiene exactamente 9 dígitos (sin código de país ni 0 inicial), agregar código de país
-  if (digitsOnly.length === 9) {
-    return `595${digitsOnly}`;
-  }
-  
-  // Si tiene 10 dígitos y no empieza con 0 ni 595, puede ser un número con formato incorrecto
-  // Intentar asumir que el primer dígito es el código de operador y los siguientes 9 son el número
-  if (digitsOnly.length === 10) {
-    return `595${digitsOnly.substring(1)}`;
-  }
-  
-  // Cualquier otro caso (menos de 9 o más de 12 dígitos sin formato reconocido), retornar null
-  return null;
+  // Validar que tenga al menos 11 dígitos (595 + 9 dígitos mínimo)
+  // Retornar null si es inválido, de lo contrario retornar el número formateado
+  return cleaned.length >= 11 ? cleaned : null;
 }
 
 export function isValidUrl(url: string): boolean {
