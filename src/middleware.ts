@@ -113,7 +113,7 @@ export function middleware(request: NextRequest) {
 // Aplicar middleware excluyendo rutas estáticas/PWA
 export const config = {
   matcher: [
-    '/((?!api|_next/|icons/|favicon.ico|manifest.webmanifest|robots.txt|sitemap.xml|images/).*)',
+    '/((?!_next/|icons/|favicon.ico|manifest.webmanifest|robots.txt|sitemap.xml|images/|api/).*)',
   ],
 };
 

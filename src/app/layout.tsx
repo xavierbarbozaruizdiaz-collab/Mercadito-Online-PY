@@ -112,22 +112,23 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   const fbPixelId = process.env.NEXT_PUBLIC_FACEBOOK_PIXEL_ID;
-  const gtmId = process.env.NEXT_PUBLIC_GTM_ID ?? 'GTM-PQ8Q6JGW';
-  const gtmScriptSrc = `https://www.googletagmanager.com/gtm.js?id=${gtmId}`;
 
   return (
     <html lang="es" suppressHydrationWarning>
       <head>
-        {/* A) Inicializa dataLayer ANTES de GTM */}
+        {/* Google Tag Manager minimal snippet */}
         <Script id="gtm-dl" strategy="beforeInteractive">
           {`
             window.dataLayer = window.dataLayer || [];
-            window.dataLayer.push({ 'gtm.start': new Date().getTime(), event: 'gtm.js' });
+            window.dataLayer.push({'gtm.start': new Date().getTime(), event: 'gtm.js'});
           `}
         </Script>
 
-        {/* B) Carga de GTM ÚNICO */}
-        <Script id="gtm-src" strategy="afterInteractive" src={gtmScriptSrc} />
+        <Script
+          id="gtm-src"
+          strategy="afterInteractive"
+          src={`https://www.googletagmanager.com/gtm.js?id=${process.env.NEXT_PUBLIC_GTM_ID ?? 'GTM-PQ8Q6JGW'}`}
+        />
 
         <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16x16.png" />
         <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png" />
@@ -167,7 +168,7 @@ export default function RootLayout({
         {/* C) Noscript */}
         <noscript>
           <iframe
-            src={gtmScriptSrc.replace('gtm.js', 'ns.html')}
+            src={`https://www.googletagmanager.com/ns.html?id=${process.env.NEXT_PUBLIC_GTM_ID ?? 'GTM-PQ8Q6JGW'}`}
             height="0"
             width="0"
             style={{ display: 'none', visibility: 'hidden' }}
