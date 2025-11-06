@@ -122,7 +122,10 @@ export default function RootLayout({
           id="gtm-datalayer"
           strategy="beforeInteractive"
           dangerouslySetInnerHTML={{
-            __html: `window.dataLayer = window.dataLayer || [];`,
+            __html: `
+              window.dataLayer = window.dataLayer || [];
+              window.dataLayer.push({ 'gtm.start': new Date().getTime(), event: 'gtm.js' });
+            `,
           }}
         />
 

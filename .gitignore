@@ -40,6 +40,7 @@ dist/
 Thumbs.db
 ehthumbs.db
 Icon?
+!/public/icons/
 
 # Env files (keep only example in repo)
 .env
