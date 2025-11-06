@@ -32,12 +32,14 @@ export default async function StoreLayout({ children, params }: StoreLayoutProps
   
   // Obtener IDs de tracking para esta tienda
   const trackingIds = await getTrackingIdsForStore(slug);
+  const globalGTMId = process.env.NEXT_PUBLIC_GTM_ID || 'GTM-PQ8Q6JGW';
 
   // Determinar qué scripts cargar
   const hasPixel = !!trackingIds.pixelId;
   // Tracking centralizado en layout raíz (GTM global). No cargar GTM/GA aquí para evitar duplicados.
+  // Si la tienda tiene gtmId y coincide con el global, NO inyectar nada nuevo (ya está en layout raíz)
   // const hasGA = !!trackingIds.gaId; // Deshabilitado: GA debe cargarse vía GTM en layout raíz
-  // const hasGTM = !!trackingIds.gtmId; // Deshabilitado: GTM único en layout raíz
+  // const hasGTM = !!trackingIds.gtmId && trackingIds.gtmId !== globalGTMId; // Solo si es diferente del global (pero NO inyectar)
 
   // IDs globales (para multi-pixel)
   const globalPixelId = process.env.NEXT_PUBLIC_FACEBOOK_PIXEL_ID;

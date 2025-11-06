@@ -102,26 +102,37 @@ export function formatPhoneForWhatsApp(input: unknown): string | null {
     if (!raw) return null;
 
     // Mantener solo dígitos
-    let digits = raw.replace(/\D+/g, '');
+    let clean = raw.replace(/\D/g, '');
 
-    // Quitar 00 o +595 -> dejar 595… | o + -> nada
-    if (digits.startsWith('00')) digits = digits.slice(2);
-    if (digits.startsWith('595')) {
-      // ya está con país
-    } else if (digits.startsWith('0')) {
-      // Tel paraguayo típico: quitar 0 y anteponer 595
-      digits = '595' + digits.slice(1);
-    } else if (digits.length >= 8 && digits.length <= 12) {
-      // No tiene prefijo ni 0 inicial: asumimos nacional sin 0 -> anteponer 595
-      digits = '595' + digits;
+    // Si empieza con 595 → usa tal cual
+    if (clean.startsWith('595')) {
+      // Validar que la parte local (sin 595) tenga >= 9 dígitos
+      const localPart = clean.slice(3);
+      if (localPart.length < 9) {
+        console.warn('[WA] telefono invalido:', raw, clean, 'parte local:', localPart.length, 'dígitos');
+        return null;
+      }
+      return clean;
     }
 
-    // Validar rango razonable (ej: 595 + 8..10 dígitos)
-    if (!/^595\d{8,10}$/.test(digits)) {
-      console.warn('[WA] Número fuera de rango:', digits);
+    // Si empieza con 0 → remove sólo el primer 0 y NO recortes más
+    if (clean.startsWith('0')) {
+      clean = clean.slice(1);
+      // Validar que tenga >= 9 dígitos después de quitar el 0
+      if (clean.length < 9) {
+        console.warn('[WA] telefono invalido:', raw, clean, 'solo', clean.length, 'dígitos después de quitar 0');
+        return null;
+      }
+      return '595' + clean;
+    }
+
+    // Si no empieza con 595 → prefix 595
+    // Validar que tenga >= 9 dígitos antes de agregar 595
+    if (clean.length < 9) {
+      console.warn('[WA] telefono invalido:', raw, clean, 'solo', clean.length, 'dígitos');
       return null;
     }
-    return digits;
+    return '595' + clean;
   } catch (e) {
     console.error('[WA] Error formateando número:', e);
     return null;

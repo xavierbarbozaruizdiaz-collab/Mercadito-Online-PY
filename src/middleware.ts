@@ -113,6 +113,7 @@ export function middleware(request: NextRequest) {
 // Aplicar middleware solo a rutas API, excluyendo archivos estáticos y PWA
 export const config = {
   matcher: [
+    // Excluir: API, archivos estáticos de Next.js, íconos PWA, manifest, robots, sitemap, imágenes
     '/((?!api|_next/|icons/|favicon.ico|manifest.webmanifest|robots.txt|sitemap.xml|images/).*)',
   ],
 };

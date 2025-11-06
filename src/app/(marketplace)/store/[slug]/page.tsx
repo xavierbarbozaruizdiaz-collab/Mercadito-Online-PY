@@ -403,7 +403,7 @@ export default function StoreProfilePage() {
     setSortBy('date_desc');
   }
 
-  function getWhatsAppLink() {
+  function getWhatsAppLink(): string | undefined {
     const phone = String(store?.contact_phone ?? '').trim();
     const waDigits = formatPhoneForWhatsApp(phone);
     
@@ -412,11 +412,13 @@ export default function StoreProfilePage() {
       console.debug('[WA] fuente:', store?.contact_phone, 'normalizado:', waDigits);
     }
     
-    // Optional: mensaje prellenado
-    // const msg = encodeURIComponent(`Hola ${store?.name}, vi tus productos en MercaditoPY`);
-    // const waHref = waDigits ? `https://wa.me/${waDigits}?text=${msg}` : undefined;
+    // Si devuelve null, deshabilitar botón
+    if (!waDigits) {
+      console.warn('[WA] Número inválido, deshabilitando botón:', phone);
+      return undefined;
+    }
     
-    return waDigits ? `https://wa.me/${waDigits}` : undefined;
+    return `https://wa.me/${waDigits}`;
   }
 
   function getLocationDisplay() {
