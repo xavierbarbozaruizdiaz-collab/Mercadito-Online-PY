@@ -324,55 +324,61 @@ export default function ProductsListClient() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
             {products.map((product) => (
-              <div key={product.id} className="bg-white rounded-lg shadow-sm border overflow-hidden hover:shadow-md transition-shadow">
-                <div className="relative">
+              <div 
+                key={product.id} 
+                className="group bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
+              >
+                <div className="relative overflow-hidden">
                   <img
                     src={product.cover_url ?? 'https://placehold.co/400x300?text=Producto'}
                     alt={product.title}
-                    className="w-full h-48 object-cover"
+                    className="w-full h-48 object-cover group-hover:scale-110 transition-transform duration-300"
                   />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                   <div className="absolute top-2 left-2">
-                    <span className={`px-2 py-1 text-xs rounded-full ${
+                    <span className={`px-2 py-1 text-xs font-semibold rounded-full shadow-sm ${
                       product.condition === 'nuevo' 
-                        ? 'bg-green-100 text-green-800' 
+                        ? 'bg-green-500 text-white' 
                         : product.condition === 'usado_como_nuevo'
-                        ? 'bg-yellow-100 text-yellow-800'
-                        : 'bg-gray-100 text-gray-800'
+                        ? 'bg-yellow-500 text-white'
+                        : 'bg-gray-600 text-white'
                     }`}>
                       {product.condition === 'nuevo' ? 'Nuevo' : 
                        product.condition === 'usado_como_nuevo' ? 'Usado como nuevo' : 'Usado'}
                     </span>
                   </div>
                   <div className="absolute top-2 right-2">
-                    <span className={`px-2 py-1 text-xs rounded-full ${
+                    <span className={`px-2 py-1 text-xs font-semibold rounded-full shadow-sm ${
                       product.sale_type === 'auction' 
-                        ? 'bg-purple-100 text-purple-800' 
-                        : 'bg-blue-100 text-blue-800'
+                        ? 'bg-purple-500 text-white' 
+                        : 'bg-blue-500 text-white'
                     }`}>
-                      {product.sale_type === 'auction' ? 'Subasta' : 'Directa'}
+                      {product.sale_type === 'auction' ? '⚡ Subasta' : '💰 Directa'}
                     </span>
                   </div>
                 </div>
                 
                 <div className="p-4">
-                  <h3 className="font-semibold text-lg mb-2 line-clamp-2">{product.title}</h3>
+                  <h3 className="font-bold text-lg mb-2 line-clamp-2 text-gray-900 group-hover:text-blue-600 transition-colors">
+                    {product.title}
+                  </h3>
                   {product.description && (
                     <p className="text-gray-600 text-sm mb-3 line-clamp-2">{product.description}</p>
                   )}
-                  <div className="flex justify-between items-center">
+                  <div className="flex justify-between items-center pt-2 border-t border-gray-100">
                     <p className="text-xl font-bold text-green-600">
-                      {product.price.toLocaleString('es-PY')} Gs.
+                      {product.price.toLocaleString('es-PY')} <span className="text-sm font-normal text-gray-500">Gs.</span>
                     </p>
                     <a
                       href={`/products/${product.id}`}
-                      className="px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 transition-colors"
+                      className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-sm hover:shadow-md"
                     >
                       Ver detalles
                     </a>
                   </div>
                 </div>
-        </div>
-      ))}
+              </div>
+            ))}
           </div>
         </>
       )}

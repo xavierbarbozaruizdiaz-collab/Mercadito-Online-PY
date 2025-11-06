@@ -7,14 +7,29 @@
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
-    "db:push": "npx supabase db push"
+    "db:push": "npx supabase db push",
+    "sync:visual": "node scripts/sync-git.js",
+    "sync:git-from-prod": "node scripts/sync-git.js",
+    "sync:export": "echo ⚠️ Script deshabilitado - Solo para código visual. Use: npm run sync:visual",
+    "sync:export-prod": "echo ⚠️ Script deshabilitado - No toca datos de producción",
+    "sync:import": "echo ⚠️ Script deshabilitado - Solo para código visual. Use: npm run sync:visual",
+    "sync:import-prod": "echo ⚠️ Script deshabilitado - NO toca datos de producción",
+    "sync:prod-to-local": "echo ⚠️ Script deshabilitado - NO toca datos. Use: npm run sync:visual"
   },
   "dependencies": {
+    "@opentelemetry/api": "^1.9.0",
     "@supabase/supabase-js": "^2.76.1",
     "browser-image-compression": "^2.0.2",
+    "clsx": "^2.1.1",
+    "date-fns": "^4.1.0",
+    "dotenv": "^16.6.1",
+    "embla-carousel-autoplay": "^8.6.0",
+    "embla-carousel-react": "^8.6.0",
+    "lucide-react": "^0.552.0",
     "next": "16.0.0",
     "react": "19.2.0",
-    "react-dom": "19.2.0"
+    "react-dom": "19.2.0",
+    "tailwind-merge": "^3.3.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
