@@ -117,7 +117,16 @@ export default function RootLayout({
   return (
     <html lang="es" suppressHydrationWarning>
       <head>
-        {/* Google Tag Manager */}
+        {/* A) Inicializa dataLayer ANTES de GTM */}
+        <Script
+          id="gtm-datalayer"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `window.dataLayer = window.dataLayer || [];`,
+          }}
+        />
+
+        {/* B) Carga de GTM ÚNICO */}
         <Script
           id="gtm-init"
           strategy="afterInteractive"
@@ -164,12 +173,15 @@ export default function RootLayout({
         )}
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        {/* Google Tag Manager (noscript) */}
-        <noscript
-          dangerouslySetInnerHTML={{
-            __html: `<iframe src="https://www.googletagmanager.com/ns.html?id=${gtmId}" height="0" width="0" style="display:none;visibility:hidden"></iframe>`,
-          }}
-        />
+        {/* C) Noscript */}
+        <noscript>
+          <iframe
+            src={`https://www.googletagmanager.com/ns.html?id=${gtmId}`}
+            height="0"
+            width="0"
+            style={{ display: 'none', visibility: 'hidden' }}
+          />
+        </noscript>
         
         <ErrorBoundary>
           <ThemeProvider>
