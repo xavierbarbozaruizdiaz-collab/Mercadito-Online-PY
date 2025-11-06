@@ -404,10 +404,19 @@ export default function StoreProfilePage() {
   }
 
   function getWhatsAppLink() {
-    if (!store?.contact_phone) return '#';
-    const formattedPhone = formatPhoneForWhatsApp(store.contact_phone);
-    if (!formattedPhone) return '#';
-    return `https://wa.me/${formattedPhone}`;
+    const phone = String(store?.contact_phone ?? '').trim();
+    const waDigits = formatPhoneForWhatsApp(phone);
+    
+    // Log temporal para depuración (solo en desarrollo)
+    if (process.env.NODE_ENV === 'development') {
+      console.debug('[WA] fuente:', store?.contact_phone, 'normalizado:', waDigits);
+    }
+    
+    // Optional: mensaje prellenado
+    // const msg = encodeURIComponent(`Hola ${store?.name}, vi tus productos en MercaditoPY`);
+    // const waHref = waDigits ? `https://wa.me/${waDigits}?text=${msg}` : undefined;
+    
+    return waDigits ? `https://wa.me/${waDigits}` : undefined;
   }
 
   function getLocationDisplay() {
@@ -579,17 +588,28 @@ export default function StoreProfilePage() {
 
             {/* Botones de acción - Siempre los mismos (solo iconos) para sincronizar vistas */}
             <div className="flex items-center gap-2 flex-wrap">
-              {store.contact_phone && (
-                <a
-                  href={getWhatsAppLink()}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center w-10 h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-                  title="Enviar mensaje"
-                >
-                  <MessageCircle className="w-5 h-5" />
-                </a>
-              )}
+              {store.contact_phone && (() => {
+                const waHref = getWhatsAppLink();
+                return waHref ? (
+                  <a
+                    href={waHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center w-10 h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                    title="Enviar mensaje por WhatsApp"
+                  >
+                    <MessageCircle className="w-5 h-5" />
+                  </a>
+                ) : (
+                  <button
+                    disabled
+                    className="flex items-center justify-center w-10 h-10 bg-gray-400 text-white rounded-lg cursor-not-allowed"
+                    title="Número inválido"
+                  >
+                    <MessageCircle className="w-5 h-5" />
+                  </button>
+                );
+              })()}
               
               {store.contact_phone && (
                 <a

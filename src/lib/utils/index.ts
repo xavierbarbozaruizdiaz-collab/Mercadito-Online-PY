@@ -96,25 +96,36 @@ export function isValidPhone(phone: string): boolean {
  * formatPhoneForWhatsApp('+595981988714') // '595981988714'
  * formatPhoneForWhatsApp('595981988714') // '595981988714'
  */
-export function formatPhoneForWhatsApp(phone: string | null | undefined): string | null {
-  if (!phone) return null;
-  
-  // Remover todos los caracteres no numéricos
-  let cleaned = phone.replace(/\D/g, '');
-  
-  // Si empieza con 0 (formato local), remover el 0
-  if (cleaned.startsWith('0')) {
-    cleaned = cleaned.substring(1);
+export function formatPhoneForWhatsApp(input: unknown): string | null {
+  try {
+    const raw = String(input ?? '').trim();
+    if (!raw) return null;
+
+    // Mantener solo dígitos
+    let digits = raw.replace(/\D+/g, '');
+
+    // Quitar 00 o +595 -> dejar 595… | o + -> nada
+    if (digits.startsWith('00')) digits = digits.slice(2);
+    if (digits.startsWith('595')) {
+      // ya está con país
+    } else if (digits.startsWith('0')) {
+      // Tel paraguayo típico: quitar 0 y anteponer 595
+      digits = '595' + digits.slice(1);
+    } else if (digits.length >= 8 && digits.length <= 12) {
+      // No tiene prefijo ni 0 inicial: asumimos nacional sin 0 -> anteponer 595
+      digits = '595' + digits;
+    }
+
+    // Validar rango razonable (ej: 595 + 8..10 dígitos)
+    if (!/^595\d{8,10}$/.test(digits)) {
+      console.warn('[WA] Número fuera de rango:', digits);
+      return null;
+    }
+    return digits;
+  } catch (e) {
+    console.error('[WA] Error formateando número:', e);
+    return null;
   }
-  
-  // Si no empieza con código de país 595, agregarlo
-  if (!cleaned.startsWith('595')) {
-    cleaned = '595' + cleaned;
-  }
-  
-  // Validar que tenga al menos 11 dígitos (595 + 9 dígitos mínimo)
-  // Retornar null si es inválido, de lo contrario retornar el número formateado
-  return cleaned.length >= 11 ? cleaned : null;
 }
 
 export function isValidUrl(url: string): boolean {

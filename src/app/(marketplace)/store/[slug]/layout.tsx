@@ -34,9 +34,10 @@ export default async function StoreLayout({ children, params }: StoreLayoutProps
   const trackingIds = await getTrackingIdsForStore(slug);
 
   // Determinar qué scripts cargar
-  const hasGA = !!trackingIds.gaId;
   const hasPixel = !!trackingIds.pixelId;
-  const hasGTM = !!trackingIds.gtmId;
+  // Tracking centralizado en layout raíz (GTM global). No cargar GTM/GA aquí para evitar duplicados.
+  // const hasGA = !!trackingIds.gaId; // Deshabilitado: GA debe cargarse vía GTM en layout raíz
+  // const hasGTM = !!trackingIds.gtmId; // Deshabilitado: GTM único en layout raíz
 
   // IDs globales (para multi-pixel)
   const globalPixelId = process.env.NEXT_PUBLIC_FACEBOOK_PIXEL_ID;
@@ -44,31 +45,6 @@ export default async function StoreLayout({ children, params }: StoreLayoutProps
 
   return (
     <>
-      {/* Google Analytics 4 */}
-      {hasGA && (
-        <>
-          <Script
-            id={`ga-${trackingIds.gaId}`}
-            src={`https://www.googletagmanager.com/gtag/js?id=${trackingIds.gaId}`}
-            strategy="afterInteractive"
-          />
-          <Script
-            id={`ga-init-${trackingIds.gaId}`}
-            strategy="afterInteractive"
-            dangerouslySetInnerHTML={{
-              __html: `
-                window.dataLayer = window.dataLayer || [];
-                function gtag(){dataLayer.push(arguments);}
-                gtag('js', new Date());
-                gtag('config', '${trackingIds.gaId}', {
-                  page_path: window.location.pathname,
-                  send_page_view: true
-                });
-              `,
-            }}
-          />
-        </>
-      )}
 
       {/* Facebook Pixel - Global (si existe) */}
       {hasGlobalPixel && (
@@ -136,33 +112,6 @@ export default async function StoreLayout({ children, params }: StoreLayoutProps
               style={{ display: 'none' }}
               src={`https://www.facebook.com/tr?id=${trackingIds.pixelId}&ev=PageView&noscript=1`}
               alt=""
-            />
-          </noscript>
-        </>
-      )}
-
-      {/* Google Tag Manager */}
-      {hasGTM && (
-        <>
-          <Script
-            id={`gtm-${trackingIds.gtmId}`}
-            strategy="afterInteractive"
-            dangerouslySetInnerHTML={{
-              __html: `
-                (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
-                new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
-                j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
-                'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-                })(window,document,'script','dataLayer','${trackingIds.gtmId}');
-              `,
-            }}
-          />
-          <noscript>
-            <iframe
-              src={`https://www.googletagmanager.com/ns.html?id=${trackingIds.gtmId}`}
-              height="0"
-              width="0"
-              style={{ display: 'none', visibility: 'hidden' }}
             />
           </noscript>
         </>
