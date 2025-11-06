@@ -62,3 +62,16 @@ supabase/.env
 # Scripts de sincronización - archivos exportados
 scripts/data-export/
 
+# Build & caches adicionales
+build/
+.turbo/
+
+# Package managers adicionales
+pnpm-lock.yaml
+
+# Archivos locales adicionales
+*.local
+
+# Editor swap files
+*.swp
+*.swo
