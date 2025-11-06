@@ -538,7 +538,7 @@ export default function ProductsListClient() {
         ]);
 
         // Procesar resultados de profiles
-        let sellersMap: Record<string, any> = {};
+        const sellersMap: Record<string, any> = {};
         if (profilesResult.status === 'fulfilled' && !profilesResult.value.error && profilesResult.value.data) {
           profilesResult.value.data.forEach((profile: any) => {
             sellersMap[profile.id] = {
@@ -561,7 +561,7 @@ export default function ProductsListClient() {
         });
 
         // Procesar resultados de stores
-        let storesMap: Record<string, any> = {};
+        const storesMap: Record<string, any> = {};
         if (storesResult.status === 'fulfilled' && !storesResult.value.error && storesResult.value.data) {
           storesResult.value.data.forEach((store: any) => {
             storesMap[store.id] = store;
@@ -621,7 +621,7 @@ export default function ProductsListClient() {
         }
 
         // Aplicar los productos filtrados (no solo los enriquecidos)
-        let allFilteredProducts = filteredProductsData.map((p: any) => {
+        const allFilteredProducts = filteredProductsData.map((p: any) => {
           const enriched = enrichedProducts.find((ep: any) => ep.id === p.id);
           return enriched || p;
         });

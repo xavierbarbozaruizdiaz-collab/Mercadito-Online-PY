@@ -32,6 +32,8 @@ export default function AuctionCard({ auction, variant = 'default' }: AuctionCar
   // Calcular tiempo restante - usar estado para evitar impureza durante render
   const [serverNowMs, setServerNowMs] = useState<number | null>(null);
   
+  // Efecto intencional: inicializar tiempo del servidor para evitar problemas de hidratación
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     setServerNowMs(Date.now());
   }, []);

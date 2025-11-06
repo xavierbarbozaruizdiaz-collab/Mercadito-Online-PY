@@ -57,7 +57,7 @@ export default function AuctionsPage() {
       const hasActiveSearch = search.trim() !== '' || category !== '';
       
       // Ordenar
-      let sorted = [...data];
+      const sorted = [...data];
       
       // Si no hay búsqueda activa y es "all", mezclar aleatoriamente
       if (!hasActiveSearch && sortBy === 'all') {

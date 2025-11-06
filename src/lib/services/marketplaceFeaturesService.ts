@@ -143,7 +143,7 @@ export class MarketplaceFeaturesService {
       
       // Obtener información de askers (profiles) por separado
       const userIds = [...new Set((data || []).map((q: any) => q.user_id).filter(Boolean))];
-      let askersMap: Record<string, any> = {};
+      const askersMap: Record<string, any> = {};
       
       if (userIds.length > 0) {
         try {

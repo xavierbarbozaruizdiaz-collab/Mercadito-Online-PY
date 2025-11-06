@@ -36,7 +36,7 @@ export default function ProfileEnsurer() {
         setMessage(data || 'Error desconocido');
         setProfileExists(false);
       }
-    } catch (err) {
+    } catch (_err) {
       setMessage('Error inesperado creando perfil');
       setProfileExists(false);
     } finally {

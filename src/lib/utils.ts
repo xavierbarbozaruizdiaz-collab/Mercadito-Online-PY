@@ -9,3 +9,5 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+// Re-exportar todas las utilidades desde utils/index.ts
+export * from './utils/index';

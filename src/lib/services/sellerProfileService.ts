@@ -166,7 +166,7 @@ export async function getSellerProducts(
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1);
 
-  let { data, error, count } = await query;
+  const { data, error, count } = await query;
 
   // Si hay error relacionado con stock_quantity y usamos select('*'), 
   // Supabase debería manejarlo, pero si hay un problema, ignorarlo
