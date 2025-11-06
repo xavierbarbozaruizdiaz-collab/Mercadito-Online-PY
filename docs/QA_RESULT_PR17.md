@@ -27,9 +27,12 @@ src/app/layout.tsx:123:            window.dataLayer.push({'gtm.start': new Date(
 ```
 ```
 $ git grep -n "formatPhoneForWhatsApp" src
-src/app/(marketplace)/seller/[id]/page.tsx:329:    const formattedPhone = formatPhoneForWhatsApp(profile.phone);
+src/app/(marketplace)/seller/[id]/page.tsx:12:import { formatPhoneForWhatsApp } from '@/lib/utils';
+src/app/(marketplace)/seller/[id]/page.tsx:364:  const whatsappLink = formatPhoneForWhatsApp(profile.phone ?? null);
+src/app/(marketplace)/store/[slug]/page.tsx:14:import { formatPhoneForWhatsApp } from '@/lib/utils';
 src/app/(marketplace)/store/[slug]/page.tsx:407:    const wa = formatPhoneForWhatsApp(store?.contact_phone ?? null);
-src/app/api/whatsapp/notify-seller/route.ts:114:    const formattedPhone = formatPhoneForWhatsApp(sellerPhone);
+src/app/api/whatsapp/notify-seller/route.ts:4:import { formatPhoneForWhatsApp } from '@/lib/utils';
+src/app/api/whatsapp/notify-seller/route.ts:114:    const whatsappBase = formatPhoneForWhatsApp(sellerPhone);
 ```
 
 ## QA automatizada (scripts/qa-tracking.mjs)
@@ -60,12 +63,10 @@ $ node scripts/qa-tracking.mjs --base="https://mercadito-online-py-git-fix-gtm-m
 - El preview responde **401 (Unauthorized)** para `/`, `/icons/*` y `/manifest.webmanifest`; no se pudo validar la presencia del snippet en HTML ni el estado HTTP de los iconos. Probablemente causado por el Firewall 24h activo en el proyecto Vercel.
 
 ## Hallazgos
-1. ❌ **WhatsApp duplicado (regresión funcional)**
-   - `src/app/(marketplace)/seller/[id]/page.tsx` y `src/app/api/whatsapp/notify-seller/route.ts` siguen esperando que `formatPhoneForWhatsApp` retorne solo dígitos, por lo que generan URLs del tipo `https://wa.me/https://wa.me/<...>`. Impacto: botón y notificaciones no funcionan.
+1. ✅ **WhatsApp corregido**
+   - `src/app/(marketplace)/seller/[id]/page.tsx` y `src/app/api/whatsapp/notify-seller/route.ts` ahora utilizan directamente la URL devuelta por `formatPhoneForWhatsApp`; ya no ocurre la doble concatenación.
 2. ⚠️ **Validaciones en preview bloqueadas por 401**
-   - No se pudo comprobar automáticamente la entrega de iconos ni del manifest debido al Firewall; se requiere desactivar temporalmente la protección o facilitar credenciales para concluir la revisión.
+   - Sin acceso a los recursos del preview debido al firewall de Vercel; queda pendiente confirmar la entrega de íconos/manifest y el snippet GTM en entorno remoto.
 
 ## Conclusión
-**FAIL** — No mergeado. Se requieren ajustes:
-- Actualizar los consumidores de `formatPhoneForWhatsApp` que aún agregan manualmente `https://wa.me/`.
-- Facilitar acceso al preview (o desactivar firewall) para confirmar íconos/manifest y snippet GTM.
+**BLOCKED** — Cambios de WhatsApp listos, pero QA remoto sigue pendiente hasta que el preview esté accesible (sin 401). Se requiere habilitar acceso para finalizar la verificación.

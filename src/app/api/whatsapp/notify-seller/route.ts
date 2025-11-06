@@ -111,9 +111,9 @@ Puedes ver y gestionar este pedido desde tu panel de vendedor.
 ¡Gracias por usar Mercadito Online PY! 🎉`;
 
     // Formatear teléfono usando función utilitaria
-    const formattedPhone = formatPhoneForWhatsApp(sellerPhone);
+    const whatsappBase = formatPhoneForWhatsApp(sellerPhone);
     
-    if (!formattedPhone) {
+    if (!whatsappBase) {
       console.warn('⚠️ Número de teléfono inválido para WhatsApp:', sellerPhone);
       return NextResponse.json(
         { 
@@ -130,7 +130,7 @@ Puedes ver y gestionar este pedido desde tu panel de vendedor.
 
     // Crear URL de WhatsApp
     // Opción 1: URL directa de WhatsApp (abre la app/web)
-    const whatsappUrl = `https://wa.me/${formattedPhone}?text=${encodedMessage}`;
+    const whatsappUrl = `${whatsappBase}?text=${encodedMessage}`;
 
     // Opción 2: Usar API externa si está configurada (ej: Twilio, ChatAPI, etc.)
     // Por ahora usamos la URL directa, pero puedes agregar integración con API aquí
@@ -147,18 +147,18 @@ Puedes ver y gestionar este pedido desde tu panel de vendedor.
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            to: formattedPhone,
+            to: whatsappBase,
             message: message,
             type: 'text',
           }),
         });
 
         if (apiResponse.ok) {
-          console.log('✅ Mensaje WhatsApp enviado vía API:', formattedPhone);
+          console.log('✅ Mensaje WhatsApp enviado vía API:', whatsappBase);
           return NextResponse.json({ 
             success: true, 
             method: 'api',
-            phone: formattedPhone 
+            phone: whatsappBase 
           });
         }
       } catch (apiError) {
@@ -200,7 +200,7 @@ Puedes ver y gestionar este pedido desde tu panel de vendedor.
       success: true, 
       method: 'url',
       whatsapp_url: whatsappUrl,
-      phone: formattedPhone,
+      phone: whatsappBase,
       seller_name: sellerName,
       order_id: orderId,
       message: 'Notificación preparada. Configura WhatsApp API para envío automático en producción.',

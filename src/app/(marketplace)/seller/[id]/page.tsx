@@ -324,13 +324,6 @@ export default function SellerProfilePage() {
     setSortBy('date_desc');
   }
 
-  function getWhatsAppLink() {
-    if (!profile?.phone) return '#';
-    const formattedPhone = formatPhoneForWhatsApp(profile.phone);
-    if (!formattedPhone) return '#';
-    return `https://wa.me/${formattedPhone}`;
-  }
-
   const hasActiveFilters = Object.values(filters).some(v => v !== '') || searchQuery.trim() !== '';
 
   if (loading) {
@@ -367,6 +360,8 @@ export default function SellerProfilePage() {
     || (profile.first_name || profile.last_name
       ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim()
       : profile.email?.split('@')[0] || 'Vendedor');
+
+  const whatsappLink = formatPhoneForWhatsApp(profile.phone ?? null);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -470,10 +465,13 @@ export default function SellerProfilePage() {
             <div className="flex items-center gap-2">
               {profile.phone && (
                 <a
-                  href={getWhatsAppLink()}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors font-medium"
+                  href={whatsappLink ?? undefined}
+                  target={whatsappLink ? '_blank' : undefined}
+                  rel={whatsappLink ? 'noopener noreferrer' : undefined}
+                  aria-disabled={!whatsappLink}
+                  className={`flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors font-medium ${
+                    whatsappLink ? '' : 'pointer-events-none opacity-50 cursor-not-allowed'
+                  }`}
                 >
                   <MessageCircle className="w-5 h-5" />
                   <span>Enviar mensaje</span>
