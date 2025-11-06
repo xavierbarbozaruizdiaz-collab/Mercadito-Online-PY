@@ -1,0 +1,22 @@
+# ============================================
+# ESLINT IGNORE - Mercadito Online PY
+# ============================================
+
+# Scripts de Node.js (usan CommonJS require)
+scripts/**/*.js
+
+# Archivos de configuración
+*.config.js
+*.config.cjs
+*.config.mjs
+
+# Build y dependencias
+.next/
+node_modules/
+dist/
+build/
+
+# Archivos generados
+*.generated.*
+**/types/supabase.ts
+

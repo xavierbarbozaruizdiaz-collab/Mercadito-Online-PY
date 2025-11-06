@@ -1,0 +1,74 @@
+# Change Management Configuration
+# ============================================
+
+# Change Strategy
+CHANGE_STRATEGY:
+  change_planning: true
+  change_goals: true
+  change_standards: true
+  change_metrics: true
+  change_improvement: true
+
+# Change Management
+CHANGE_MANAGEMENT:
+  change_planning: true
+  change_execution: true
+  change_monitoring: true
+  change_evaluation: true
+  change_improvement: true
+
+# Change Communication
+CHANGE_COMMUNICATION:
+  change_communication: true
+  stakeholder_engagement: true
+  change_awareness: true
+  change_education: true
+  change_feedback: true
+
+# Change Training
+CHANGE_TRAINING:
+  change_awareness: true
+  change_skills: true
+  change_tools: true
+  change_methods: true
+  change_best_practices: true
+
+# Change Analytics
+CHANGE_ANALYTICS:
+  change_metrics: true
+  performance_analysis: true
+  trend_analysis: true
+  impact_analysis: true
+  predictive_analytics: true
+
+# Change Technology
+CHANGE_TECHNOLOGY:
+  change_systems: true
+  collaboration_tools: true
+  analytics_platforms: true
+  automation_tools: true
+  integration_platforms: true
+
+# Change Culture
+CHANGE_CULTURE:
+  change_mindset: true
+  change_acceptance: true
+  change_adaptability: true
+  change_innovation: true
+  change_collaboration: true
+
+# Change Governance
+CHANGE_GOVERNANCE:
+  change_policies: true
+  change_procedures: true
+  change_standards: true
+  change_compliance: true
+  change_oversight: true
+
+# Change Operations
+CHANGE_OPERATIONS:
+  change_processes: true
+  change_workflows: true
+  change_governance: true
+  change_support: true
+  change_administration: true

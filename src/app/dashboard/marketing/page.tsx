@@ -1,0 +1,454 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useAuth } from '@/lib/hooks/useAuth';
+import { supabase } from '@/lib/supabase/client';
+import { formatCurrency, formatDate } from '@/lib/utils';
+import { logger } from '@/lib/utils/logger';
+import {
+  Plus,
+  TrendingUp,
+  Eye,
+  Pause,
+  Play,
+  Trash2,
+  Edit,
+  Target,
+  DollarSign,
+  Users,
+  Calendar,
+  BarChart3,
+  RefreshCw,
+  CheckCircle,
+  XCircle,
+  AlertCircle,
+  ExternalLink,
+  Settings
+} from 'lucide-react';
+import Link from 'next/link';
+
+// ============================================
+// TIPOS
+// ============================================
+
+interface MarketingCampaign {
+  id: string;
+  store_id: string | null;
+  campaign_type: 'general' | 'individual';
+  meta_campaign_id: string | null;
+  name: string;
+  objective: string | null;
+  budget_amount: number | null;
+  budget_type: 'daily' | 'lifetime' | null;
+  status: 'draft' | 'active' | 'paused' | 'archived';
+  target_url: string;
+  ad_set_id: string | null;
+  creative_id: string | null;
+  created_at: string;
+  updated_at: string;
+  created_by: string | null;
+  metadata: Record<string, any>;
+}
+
+interface CampaignMetrics {
+  id: string;
+  campaign_id: string;
+  date: string;
+  impressions: number;
+  clicks: number;
+  spend: number;
+  conversions: number;
+  ctr: number | null;
+  cpc: number | null;
+  cpm: number | null;
+}
+
+interface Store {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+// ============================================
+// COMPONENTE PRINCIPAL
+// ============================================
+
+export default function MarketingPage() {
+  const { user } = useAuth();
+  const [campaigns, setCampaigns] = useState<MarketingCampaign[]>([]);
+  const [stores, setStores] = useState<Store[]>([]);
+  const [selectedStore, setSelectedStore] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [metrics, setMetrics] = useState<Record<string, CampaignMetrics[]>>({});
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [syncingCatalog, setSyncingCatalog] = useState(false);
+
+  // Cargar tiendas del usuario
+  useEffect(() => {
+    loadStores();
+  }, [user]);
+
+  // Cargar campañas
+  useEffect(() => {
+    if (user) {
+      loadCampaigns();
+    }
+  }, [user, selectedStore]);
+
+  async function loadStores() {
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      if (!session?.session?.user?.id) return;
+
+      const { data, error } = await supabase
+        .from('stores')
+        .select('id, name, slug')
+        .eq('seller_id', session.session.user.id)
+        .eq('is_active', true);
+
+      if (error) throw error;
+      setStores(data || []);
+      
+      // Seleccionar la primera tienda por defecto
+      if (data && data.length > 0 && !selectedStore) {
+        setSelectedStore(data[0].id);
+      }
+    } catch (err) {
+      logger.error('Error loading stores', err);
+    }
+  }
+
+  async function loadCampaigns() {
+    try {
+      setLoading(true);
+      const { data: session } = await supabase.auth.getSession();
+      if (!session?.session?.user?.id) return;
+
+      let query = supabase
+        .from('marketing_campaigns')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      // Si hay una tienda seleccionada, filtrar por ella
+      if (selectedStore) {
+        query = query.eq('store_id', selectedStore);
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+      setCampaigns(data || []);
+
+      // Cargar métricas para cada campaña
+      if (data && data.length > 0) {
+        loadMetrics(data.map(c => c.id));
+      }
+    } catch (err) {
+      logger.error('Error loading campaigns', err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function loadMetrics(campaignIds: string[]) {
+    try {
+      const { data, error } = await supabase
+        .from('campaign_metrics')
+        .select('*')
+        .in('campaign_id', campaignIds)
+        .order('date', { ascending: false });
+
+      if (error) throw error;
+
+      // Agrupar métricas por campaign_id
+      const grouped: Record<string, CampaignMetrics[]> = {};
+      (data || []).forEach((metric: CampaignMetrics) => {
+        if (!grouped[metric.campaign_id]) {
+          grouped[metric.campaign_id] = [];
+        }
+        grouped[metric.campaign_id].push(metric);
+      });
+
+      setMetrics(grouped);
+    } catch (err) {
+      logger.error('Error loading metrics', err);
+    }
+  }
+
+  async function syncCatalog() {
+    try {
+      setSyncingCatalog(true);
+      const response = await fetch('/api/catalog/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ platforms: ['meta', 'tiktok', 'google'] }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Error sincronizando catálogo');
+      }
+
+      alert('Sincronización de catálogo iniciada. Esto puede tardar unos minutos.');
+    } catch (err) {
+      logger.error('Error syncing catalog', err);
+      alert('Error al sincronizar catálogo: ' + (err as Error).message);
+    } finally {
+      setSyncingCatalog(false);
+    }
+  }
+
+  function getCampaignStatusBadge(status: string) {
+    const styles = {
+      draft: 'bg-gray-100 text-gray-800',
+      active: 'bg-green-100 text-green-800',
+      paused: 'bg-yellow-100 text-yellow-800',
+      archived: 'bg-gray-100 text-gray-600',
+    };
+
+    const icons = {
+      draft: <AlertCircle className="w-3 h-3" />,
+      active: <CheckCircle className="w-3 h-3" />,
+      paused: <Pause className="w-3 h-3" />,
+      archived: <XCircle className="w-3 h-3" />,
+    };
+
+    return (
+      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${styles[status as keyof typeof styles]}`}>
+        {icons[status as keyof typeof icons]}
+        {status === 'draft' ? 'Borrador' : status === 'active' ? 'Activa' : status === 'paused' ? 'Pausada' : 'Archivada'}
+      </span>
+    );
+  }
+
+  function getTotalMetrics(campaignId: string) {
+    const campaignMetrics = metrics[campaignId] || [];
+    return {
+      impressions: campaignMetrics.reduce((sum, m) => sum + m.impressions, 0),
+      clicks: campaignMetrics.reduce((sum, m) => sum + m.clicks, 0),
+      spend: campaignMetrics.reduce((sum, m) => sum + m.spend, 0),
+      conversions: campaignMetrics.reduce((sum, m) => sum + m.conversions, 0),
+      ctr: campaignMetrics.length > 0 ? campaignMetrics.reduce((sum, m) => sum + (m.ctr || 0), 0) / campaignMetrics.length : 0,
+    };
+  }
+
+  if (loading && campaigns.length === 0) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Cargando campañas...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white shadow-sm border-b mb-6">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Marketing y Campañas</h1>
+              <p className="text-gray-600 mt-1">Gestiona tus campañas publicitarias y sincroniza tu catálogo</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={syncCatalog}
+                disabled={syncingCatalog}
+                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+              >
+                <RefreshCw className={`w-4 h-4 mr-2 ${syncingCatalog ? 'animate-spin' : ''}`} />
+                {syncingCatalog ? 'Sincronizando...' : 'Sincronizar Catálogo'}
+              </button>
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Nueva Campaña
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Filtro de tienda */}
+      {stores.length > 0 && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-6">
+          <div className="bg-white rounded-lg shadow p-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Filtrar por tienda:
+            </label>
+            <select
+              value={selectedStore || ''}
+              onChange={(e) => setSelectedStore(e.target.value || null)}
+              className="w-full md:w-64 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Todas las tiendas</option>
+              {stores.map((store) => (
+                <option key={store.id} value={store.id}>
+                  {store.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      )}
+
+      {/* Lista de campañas */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {campaigns.length === 0 ? (
+          <div className="bg-white rounded-lg shadow p-12 text-center">
+            <Target className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No hay campañas</h3>
+            <p className="text-gray-600 mb-6">Crea tu primera campaña publicitaria para empezar</p>
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Crear Primera Campaña
+            </button>
+          </div>
+        ) : (
+          <div className="grid gap-6">
+            {campaigns.map((campaign) => {
+              const totalMetrics = getTotalMetrics(campaign.id);
+              const store = stores.find(s => s.id === campaign.store_id);
+
+              return (
+                <div key={campaign.id} className="bg-white rounded-lg shadow hover:shadow-md transition-shadow">
+                  <div className="p-6">
+                    {/* Header de la campaña */}
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <h3 className="text-lg font-semibold text-gray-900">{campaign.name}</h3>
+                          {getCampaignStatusBadge(campaign.status)}
+                          {campaign.campaign_type === 'general' && (
+                            <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
+                              General
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap gap-4 text-sm text-gray-600">
+                          {store && (
+                            <span className="flex items-center gap-1">
+                              <span>Tienda:</span>
+                              <span className="font-medium">{store.name}</span>
+                            </span>
+                          )}
+                          {campaign.objective && (
+                            <span className="flex items-center gap-1">
+                              <Target className="w-4 h-4" />
+                              {campaign.objective}
+                            </span>
+                          )}
+                          {campaign.budget_amount && (
+                            <span className="flex items-center gap-1">
+                              <DollarSign className="w-4 h-4" />
+                              {formatCurrency(campaign.budget_amount)} / {campaign.budget_type === 'daily' ? 'día' : 'total'}
+                            </span>
+                          )}
+                          <span className="flex items-center gap-1">
+                            <Calendar className="w-4 h-4" />
+                            Creada: {formatDate(campaign.created_at)}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Link
+                          href={`/dashboard/marketing/${campaign.id}`}
+                          className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+                          title="Ver detalles"
+                        >
+                          <Eye className="w-5 h-5" />
+                        </Link>
+                        <button
+                          className="p-2 text-gray-600 hover:text-yellow-600 hover:bg-yellow-50 rounded-md transition-colors"
+                          title="Editar"
+                        >
+                          <Edit className="w-5 h-5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Métricas */}
+                    {totalMetrics.impressions > 0 && (
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t">
+                        <div>
+                          <div className="text-sm text-gray-600">Impresiones</div>
+                          <div className="text-lg font-semibold text-gray-900">
+                            {totalMetrics.impressions.toLocaleString()}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-sm text-gray-600">Clics</div>
+                          <div className="text-lg font-semibold text-gray-900">
+                            {totalMetrics.clicks.toLocaleString()}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-sm text-gray-600">CTR</div>
+                          <div className="text-lg font-semibold text-gray-900">
+                            {totalMetrics.ctr.toFixed(2)}%
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-sm text-gray-600">Conversiones</div>
+                          <div className="text-lg font-semibold text-gray-900">
+                            {totalMetrics.conversions.toLocaleString()}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Modal de crear campaña (simplificado) */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-bold text-gray-900">Nueva Campaña</h2>
+                <button
+                  onClick={() => setShowCreateModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <XCircle className="w-6 h-6" />
+                </button>
+              </div>
+              <p className="text-gray-600 mb-4">
+                Para crear una campaña completa, ve a la página de detalle de la campaña.
+              </p>
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => setShowCreateModal(false)}
+                  className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                >
+                  Cancelar
+                </button>
+                <Link
+                  href="/dashboard/marketing/new"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                >
+                  Continuar
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+

@@ -1,0 +1,91 @@
+# Compliance Configuration
+# ============================================
+
+# GDPR Compliance
+GDPR_COMPLIANCE:
+  data_protection_officer: true
+  privacy_policy: true
+  cookie_consent: true
+  data_portability: true
+  right_to_erasure: true
+  data_minimization: true
+  purpose_limitation: true
+  storage_limitation: true
+  accuracy: true
+  security: true
+  accountability: true
+
+# CCPA Compliance
+CCPA_COMPLIANCE:
+  privacy_notice: true
+  opt_out_rights: true
+  data_deletion: true
+  data_portability: true
+  non_discrimination: true
+  authorized_agent: true
+
+# PCI DSS Compliance
+PCI_DSS_COMPLIANCE:
+  secure_network: true
+  cardholder_data_protection: true
+  vulnerability_management: true
+  access_control: true
+  network_monitoring: true
+  security_policy: true
+
+# ISO 27001 Compliance
+ISO_27001_COMPLIANCE:
+  information_security_policy: true
+  risk_assessment: true
+  security_controls: true
+  incident_management: true
+  business_continuity: true
+  compliance_monitoring: true
+
+# SOC 2 Compliance
+SOC_2_COMPLIANCE:
+  security: true
+  availability: true
+  processing_integrity: true
+  confidentiality: true
+  privacy: true
+
+# Data Retention
+DATA_RETENTION:
+  user_data: "1 year"
+  transaction_data: "7 years"
+  log_data: "90 days"
+  analytics_data: "2 years"
+  backup_data: "7 years"
+
+# Audit Requirements
+AUDIT_REQUIREMENTS:
+  access_logs: true
+  change_logs: true
+  security_logs: true
+  compliance_reports: true
+  audit_trails: true
+
+# Legal Requirements
+LEGAL_REQUIREMENTS:
+  terms_of_service: true
+  privacy_policy: true
+  cookie_policy: true
+  data_processing_agreement: true
+  service_level_agreement: true
+
+# Documentation
+COMPLIANCE_DOCUMENTATION:
+  policies: true
+  procedures: true
+  guidelines: true
+  training_materials: true
+  incident_response_plan: true
+
+# Monitoring
+COMPLIANCE_MONITORING:
+  automated_checks: true
+  regular_audits: true
+  compliance_dashboard: true
+  alert_system: true
+  reporting: true

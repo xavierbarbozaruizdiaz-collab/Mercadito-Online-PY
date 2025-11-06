@@ -1,0 +1,66 @@
+# Project Management Configuration
+# ============================================
+
+# Project Planning
+PROJECT_PLANNING:
+  project_initiation: true
+  project_planning: true
+  project_scheduling: true
+  resource_planning: true
+  risk_planning: true
+
+# Project Execution
+PROJECT_EXECUTION:
+  project_monitoring: true
+  project_control: true
+  change_management: true
+  quality_management: true
+  communication_management: true
+
+# Project Methodology
+PROJECT_METHODOLOGY:
+  agile: true
+  scrum: true
+  kanban: true
+  waterfall: true
+  hybrid: true
+
+# Project Governance
+PROJECT_GOVERNANCE:
+  project_governance: true
+  project_oversight: true
+  project_approval: true
+  project_review: true
+  project_audit: true
+
+# Project Technology
+PROJECT_TECHNOLOGY:
+  project_management_software: true
+  collaboration_tools: true
+  time_tracking: true
+  resource_management: true
+  reporting_tools: true
+
+# Project Analytics
+PROJECT_ANALYTICS:
+  project_metrics: true
+  performance_tracking: true
+  progress_reporting: true
+  trend_analysis: true
+  predictive_analytics: true
+
+# Project Training
+PROJECT_TRAINING:
+  project_management_training: true
+  methodology_training: true
+  tool_training: true
+  leadership_training: true
+  team_training: true
+
+# Project Operations
+PROJECT_OPERATIONS:
+  project_processes: true
+  project_workflows: true
+  project_standards: true
+  project_templates: true
+  project_best_practices: true

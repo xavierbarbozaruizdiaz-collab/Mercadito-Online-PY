@@ -77,18 +77,6 @@ export interface RaffleStats {
   won_raffles_count: number;
 }
 
-export interface RaffleWinnerPhoto {
-  id: string;
-  raffle_id: string;
-  user_id: string;
-  photo_url: string;
-  image_url?: string; // Alias para photo_url (compatibilidad)
-  storage_path?: string | null;
-  caption?: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
 export interface CreateRaffleData {
   title: string;
   description?: string;
@@ -120,8 +108,7 @@ export async function getActiveRaffles(options?: {
       .from('raffles')
       .select(`
         *,
-        product:products(id, title, price, cover_url),
-        seller:profiles!raffles_seller_id_fkey(id, first_name, last_name, email)
+        product:products(id, title, price, cover_url)
       `)
       .eq('is_enabled', true);
     
@@ -136,7 +123,24 @@ export async function getActiveRaffles(options?: {
     
     if (error) throw error;
     
-    return (data || []) as Raffle[];
+    // Cargar información de sellers por separado
+    const raffles = (data || []) as any[];
+    if (raffles.length > 0) {
+      const sellerIds = [...new Set(raffles.map(r => r.seller_id).filter(Boolean))];
+      const { data: sellersData } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email')
+        .in('id', sellerIds);
+      
+      const sellersMap = new Map();
+      (sellersData || []).forEach((s: any) => sellersMap.set(s.id, s));
+      
+      raffles.forEach((r: any) => {
+        r.seller = sellersMap.get(r.seller_id) || null;
+      });
+    }
+    
+    return raffles as Raffle[];
   } catch (error) {
     console.error('Error loading active raffles:', error);
     throw error;
@@ -152,9 +156,7 @@ export async function getRaffleById(raffleId: string): Promise<Raffle | null> {
       .from('raffles')
       .select(`
         *,
-        product:products(id, title, price, cover_url, description),
-        seller:profiles!raffles_seller_id_fkey(id, first_name, last_name, email),
-        winner:profiles!raffles_winner_id_fkey(id, first_name, last_name, email)
+        product:products(id, title, price, cover_url, description)
       `)
       .eq('id', raffleId)
       .single();
@@ -164,7 +166,31 @@ export async function getRaffleById(raffleId: string): Promise<Raffle | null> {
       throw error;
     }
     
-    return data as Raffle;
+    const raffle = data as any;
+    
+    // Cargar información de seller y winner por separado
+    const idsToLoad: string[] = [];
+    if (raffle.seller_id) idsToLoad.push(raffle.seller_id);
+    if (raffle.winner_id) idsToLoad.push(raffle.winner_id);
+    
+    if (idsToLoad.length > 0) {
+      const { data: profilesData } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email')
+        .in('id', idsToLoad);
+      
+      const profilesMap = new Map();
+      (profilesData || []).forEach((p: any) => profilesMap.set(p.id, p));
+      
+      if (raffle.seller_id) {
+        raffle.seller = profilesMap.get(raffle.seller_id) || null;
+      }
+      if (raffle.winner_id) {
+        raffle.winner = profilesMap.get(raffle.winner_id) || null;
+      }
+    }
+    
+    return raffle as Raffle;
   } catch (error) {
     console.error('Error loading raffle:', error);
     throw error;
@@ -255,7 +281,7 @@ export async function getUserRaffleStats(userId: string): Promise<RaffleStats> {
 export async function createRaffle(data: CreateRaffleData, userId: string): Promise<Raffle> {
   try {
     // Verificar que el producto existe y pertenece al vendedor (si es seller_raffle)
-    if (data.raffle_type === 'seller_raffle') {
+    if (data.raffle_type === 'seller_raffle' && data.product_id) {
       const { data: product, error: productError } = await supabase
         .from('products')
         .select('id, seller_id')
@@ -282,13 +308,13 @@ export async function createRaffle(data: CreateRaffleData, userId: string): Prom
       .from('raffles')
       .insert({
         title: data.title,
-        description: data.description,
-        product_id: data.product_id,
+        description: data.description || null,
+        product_id: data.product_id || null,
         seller_id: userId,
         raffle_type: data.raffle_type,
         min_purchase_amount: data.min_purchase_amount || 0,
         tickets_per_amount: data.tickets_per_amount || 100000,
-        max_tickets_per_user: data.max_tickets_per_user,
+        max_tickets_per_user: data.max_tickets_per_user || null,
         start_date: data.start_date,
         end_date: data.end_date,
         draw_date: data.draw_date,
@@ -363,6 +389,18 @@ export async function drawRaffleWinner(raffleId: string): Promise<{
   winner_name: string;
 }> {
   try {
+    // Obtener detalles del sorteo antes de sortear
+    const { data: raffleData, error: raffleError } = await supabase
+      .from('raffles')
+      .select('id, title, description, product_id, draw_date, cover_url')
+      .eq('id', raffleId)
+      .single();
+    
+    if (raffleError || !raffleData) {
+      console.warn('No se pudieron obtener detalles del sorteo para el email:', raffleError);
+    }
+
+    // Realizar el sorteo
     const { data, error } = await supabase.rpc('draw_raffle_winner', {
       p_raffle_id: raffleId
     });
@@ -373,9 +411,201 @@ export async function drawRaffleWinner(raffleId: string): Promise<{
       throw new Error('No se pudo seleccionar ganador');
     }
     
-    return data[0];
+    const winnerData = data[0];
+
+    // Enviar email al ganador (no bloquear si falla)
+    if (winnerData.winner_email && raffleData) {
+      try {
+        // Obtener nombre del producto si existe
+        let productName: string | undefined;
+        if (raffleData.product_id) {
+          const { data: product } = await supabase
+            .from('products')
+            .select('title')
+            .eq('id', raffleData.product_id)
+            .single();
+          productName = product?.title;
+        }
+
+        const { EmailService } = await import('@/lib/services/emailService');
+        await EmailService.sendRaffleWinnerEmail(
+          winnerData.winner_email,
+          winnerData.winner_name || 'Usuario',
+          raffleData.title || 'Sorteo',
+          {
+            productName,
+            prize: raffleData.description || undefined,
+            drawDate: raffleData.draw_date || new Date().toISOString(),
+            raffleId: raffleId,
+          }
+        );
+        console.log('✅ Email enviado al ganador:', winnerData.winner_email);
+      } catch (emailError) {
+        // No lanzar error, solo loguear (el sorteo ya fue exitoso)
+        console.error('⚠️ Error enviando email al ganador (no crítico):', emailError);
+      }
+    }
+    
+    return winnerData;
   } catch (error) {
     console.error('Error drawing raffle winner:', error);
+    throw error;
+  }
+}
+
+/**
+ * Obtiene sorteos ganados por un usuario
+ */
+export async function getWonRaffles(userId: string): Promise<Raffle[]> {
+  try {
+    const { data, error } = await supabase
+      .from('raffles')
+      .select(`
+        *,
+        product:products(id, title, price, cover_url, description)
+      `)
+      .eq('winner_id', userId)
+      .eq('status', 'drawn')
+      .order('drawn_at', { ascending: false });
+    
+    if (error) throw error;
+    
+    // Cargar información de sellers por separado
+    const raffles = (data || []) as any[];
+    if (raffles.length > 0) {
+      const sellerIds = [...new Set(raffles.map(r => r.seller_id).filter(Boolean))];
+      const { data: sellersData } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email')
+        .in('id', sellerIds);
+      
+      const sellersMap = new Map();
+      (sellersData || []).forEach((s: any) => sellersMap.set(s.id, s));
+      
+      raffles.forEach((r: any) => {
+        r.seller = sellersMap.get(r.seller_id) || null;
+      });
+    }
+    
+    return raffles as Raffle[];
+  } catch (error) {
+    console.error('Error loading won raffles:', error);
+    throw error;
+  }
+}
+
+/**
+ * Obtiene fotos de ganador para un sorteo
+ */
+export interface RaffleWinnerPhoto {
+  id: string;
+  raffle_id: string;
+  winner_id: string;
+  image_url: string;
+  caption?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function getRaffleWinnerPhotos(raffleId: string): Promise<RaffleWinnerPhoto[]> {
+  try {
+    const { data, error } = await supabase
+      .from('raffle_winner_photos')
+      .select('*')
+      .eq('raffle_id', raffleId)
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    
+    return (data || []) as RaffleWinnerPhoto[];
+  } catch (error) {
+    console.error('Error loading winner photos:', error);
+    throw error;
+  }
+}
+
+/**
+ * Sube una foto de ganador con su premio
+ */
+export async function uploadWinnerPhoto(
+  raffleId: string,
+  winnerId: string,
+  imageUrl: string,
+  caption?: string
+): Promise<RaffleWinnerPhoto> {
+  try {
+    // Verificar que el usuario es realmente el ganador
+    const { data: raffle, error: raffleError } = await supabase
+      .from('raffles')
+      .select('id, winner_id, status')
+      .eq('id', raffleId)
+      .eq('winner_id', winnerId)
+      .eq('status', 'drawn')
+      .single();
+    
+    if (raffleError || !raffle) {
+      throw new Error('No eres el ganador de este sorteo o el sorteo no ha sido realizado');
+    }
+
+    // Insertar nueva foto (permitir múltiples fotos)
+    const { data, error } = await supabase
+      .from('raffle_winner_photos')
+      .insert({
+        raffle_id: raffleId,
+        winner_id: winnerId,
+        image_url: imageUrl,
+        caption: caption || null,
+      })
+      .select()
+      .single();
+    
+    if (error) throw error;
+    
+    return data as RaffleWinnerPhoto;
+  } catch (error) {
+    console.error('Error uploading winner photo:', error);
+    throw error;
+  }
+}
+
+/**
+ * Elimina una foto de ganador
+ */
+export async function deleteWinnerPhoto(photoId: string, userId: string): Promise<void> {
+  try {
+    // Verificar que el usuario es el dueño de la foto
+    const { data: photo, error: photoError } = await supabase
+      .from('raffle_winner_photos')
+      .select('winner_id')
+      .eq('id', photoId)
+      .single();
+    
+    if (photoError || !photo) {
+      throw new Error('Foto no encontrada');
+    }
+    
+    // Verificar que es el ganador o admin
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', userId)
+      .single();
+    
+    const isAdmin = (profile as any)?.role === 'admin';
+    const isWinner = photo.winner_id === userId;
+    
+    if (!isAdmin && !isWinner) {
+      throw new Error('No tienes permiso para eliminar esta foto');
+    }
+
+    const { error } = await supabase
+      .from('raffle_winner_photos')
+      .delete()
+      .eq('id', photoId);
+    
+    if (error) throw error;
+  } catch (error) {
+    console.error('Error deleting winner photo:', error);
     throw error;
   }
 }
@@ -389,8 +619,7 @@ export async function getPendingRaffles(): Promise<Raffle[]> {
       .from('raffles')
       .select(`
         *,
-        product:products(id, title, price, cover_url),
-        seller:profiles!raffles_seller_id_fkey(id, first_name, last_name, email)
+        product:products(id, title, price, cover_url)
       `)
       .eq('status', 'draft')
       .eq('admin_approved', false)
@@ -398,7 +627,24 @@ export async function getPendingRaffles(): Promise<Raffle[]> {
     
     if (error) throw error;
     
-    return (data || []) as Raffle[];
+    // Cargar información de sellers por separado
+    const raffles = (data || []) as any[];
+    if (raffles.length > 0) {
+      const sellerIds = [...new Set(raffles.map(r => r.seller_id).filter(Boolean))];
+      const { data: sellersData } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email')
+        .in('id', sellerIds);
+      
+      const sellersMap = new Map();
+      (sellersData || []).forEach((s: any) => sellersMap.set(s.id, s));
+      
+      raffles.forEach((r: any) => {
+        r.seller = sellersMap.get(r.seller_id) || null;
+      });
+    }
+    
+    return raffles as Raffle[];
   } catch (error) {
     console.error('Error loading pending raffles:', error);
     throw error;
@@ -455,146 +701,3 @@ export async function updateRaffleSetting(
   }
 }
 
-/**
- * Obtiene sorteos ganados por un usuario
- */
-export async function getWonRaffles(userId: string): Promise<Raffle[]> {
-  try {
-    const { data, error } = await supabase
-      .from('raffles')
-      .select(`
-        *,
-        product:products(id, title, price, cover_url),
-        seller:profiles!raffles_seller_id_fkey(id, first_name, last_name, email)
-      `)
-      .eq('winner_id', userId)
-      .eq('status', 'drawn')
-      .order('drawn_at', { ascending: false });
-    
-    if (error) throw error;
-    
-    return (data || []) as Raffle[];
-  } catch (error) {
-    console.error('Error loading won raffles:', error);
-    throw error;
-  }
-}
-
-/**
- * Obtiene fotos de ganadores de un sorteo
- */
-export async function getRaffleWinnerPhotos(raffleId: string): Promise<RaffleWinnerPhoto[]> {
-  try {
-    const { data, error } = await supabase
-      .from('raffle_winner_photos')
-      .select('*')
-      .eq('raffle_id', raffleId)
-      .order('created_at', { ascending: false });
-    
-    if (error) throw error;
-    
-    // Mapear para incluir image_url como alias de photo_url
-    return (data || []).map((photo: any) => ({
-      ...photo,
-      image_url: photo.image_url || photo.photo_url,
-    })) as RaffleWinnerPhoto[];
-  } catch (error) {
-    console.error('Error loading raffle winner photos:', error);
-    throw error;
-  }
-}
-
-/**
- * Sube una foto de ganador
- */
-export async function uploadWinnerPhoto(
-  raffleId: string,
-  userId: string,
-  file: File,
-  caption?: string
-): Promise<RaffleWinnerPhoto> {
-  try {
-    // Subir imagen a storage
-    const ext = file.name.split('.').pop() || 'jpg';
-    const fileName = `raffle-winners/${raffleId}/${userId}-${Date.now()}.${ext}`;
-    
-    const { error: uploadError } = await supabase.storage
-      .from('raffle-photos')
-      .upload(fileName, file, {
-        cacheControl: '3600',
-        upsert: false,
-      });
-    
-    if (uploadError) throw uploadError;
-    
-    // Obtener URL pública
-    const { data: urlData } = supabase.storage
-      .from('raffle-photos')
-      .getPublicUrl(fileName);
-    
-    if (!urlData?.publicUrl) {
-      throw new Error('No se pudo obtener la URL pública');
-    }
-    
-    // Guardar referencia en la base de datos
-    const { data, error } = await supabase
-      .from('raffle_winner_photos')
-      .insert({
-        raffle_id: raffleId,
-        user_id: userId,
-        photo_url: urlData.publicUrl,
-        image_url: urlData.publicUrl, // Alias para compatibilidad
-        storage_path: fileName,
-        caption: caption || null,
-      })
-      .select()
-      .single();
-    
-    if (error) throw error;
-    
-    return data as RaffleWinnerPhoto;
-  } catch (error) {
-    console.error('Error uploading winner photo:', error);
-    throw error;
-  }
-}
-
-/**
- * Elimina una foto de ganador
- */
-export async function deleteWinnerPhoto(photoId: string, userId: string): Promise<void> {
-  try {
-    // Verificar que el usuario es el dueño de la foto
-    const { data: photo, error: fetchError } = await supabase
-      .from('raffle_winner_photos')
-      .select('id, user_id, storage_path')
-      .eq('id', photoId)
-      .single();
-    
-    if (fetchError || !photo) {
-      throw new Error('Foto no encontrada');
-    }
-    
-    if (photo.user_id !== userId) {
-      throw new Error('No tienes permisos para eliminar esta foto');
-    }
-    
-    // Eliminar de storage si existe
-    if (photo.storage_path) {
-      await supabase.storage
-        .from('raffle-photos')
-        .remove([photo.storage_path]);
-    }
-    
-    // Eliminar de la base de datos
-    const { error } = await supabase
-      .from('raffle_winner_photos')
-      .delete()
-      .eq('id', photoId);
-    
-    if (error) throw error;
-  } catch (error) {
-    console.error('Error deleting winner photo:', error);
-    throw error;
-  }
-}

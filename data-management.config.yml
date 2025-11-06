@@ -1,0 +1,73 @@
+# Data Management Configuration
+# ============================================
+
+# Data Strategy
+DATA_STRATEGY:
+  data_planning: true
+  data_goals: true
+  data_standards: true
+  data_metrics: true
+  data_improvement: true
+
+# Data Management
+DATA_MANAGEMENT:
+  data_planning: true
+  data_execution: true
+  data_evaluation: true
+  data_improvement: true
+
+# Data Systems
+DATA_SYSTEMS:
+  data_platforms: true
+  data_warehouses: true
+  data_lakes: true
+  data_pipelines: true
+  data_governance: true
+
+# Data Analytics
+DATA_ANALYTICS:
+  data_metrics: true
+  performance_analysis: true
+  trend_analysis: true
+  impact_analysis: true
+  predictive_analytics: true
+
+# Data Technology
+DATA_TECHNOLOGY:
+  data_tools: true
+  data_platforms: true
+  data_pipelines: true
+  automation_tools: true
+  integration_platforms: true
+
+# Data Culture
+DATA_CULTURE:
+  data_mindset: true
+  data_driven_decisions: true
+  data_innovation: true
+  data_collaboration: true
+  data_leadership: true
+
+# Data Training
+DATA_TRAINING:
+  data_awareness: true
+  data_skills: true
+  data_tools: true
+  data_methods: true
+  data_best_practices: true
+
+# Data Governance
+DATA_GOVERNANCE:
+  data_policies: true
+  data_procedures: true
+  data_standards: true
+  data_compliance: true
+  data_oversight: true
+
+# Data Operations
+DATA_OPERATIONS:
+  data_processes: true
+  data_workflows: true
+  data_governance: true
+  data_support: true
+  data_administration: true

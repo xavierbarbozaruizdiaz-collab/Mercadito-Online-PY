@@ -1,0 +1,74 @@
+# Procurement Configuration
+# ============================================
+
+# Procurement Strategy
+PROCUREMENT_STRATEGY:
+  procurement_planning: true
+  supplier_strategy: true
+  cost_optimization: true
+  risk_management: true
+  sustainability: true
+
+# Supplier Management
+SUPPLIER_MANAGEMENT:
+  supplier_selection: true
+  supplier_evaluation: true
+  supplier_development: true
+  supplier_relationship: true
+  supplier_performance: true
+
+# Procurement Process
+PROCUREMENT_PROCESS:
+  requisition: true
+  sourcing: true
+  negotiation: true
+  contracting: true
+  order_management: true
+
+# Contract Management
+PROCUREMENT_CONTRACT_MANAGEMENT:
+  contract_creation: true
+  contract_negotiation: true
+  contract_execution: true
+  contract_monitoring: true
+  contract_renewal: true
+
+# Procurement Analytics
+PROCUREMENT_ANALYTICS:
+  spend_analysis: true
+  supplier_analytics: true
+  performance_metrics: true
+  cost_analysis: true
+  trend_analysis: true
+
+# Procurement Technology
+PROCUREMENT_TECHNOLOGY:
+  procurement_systems: true
+  e_procurement: true
+  supplier_portals: true
+  analytics_platforms: true
+  automation_tools: true
+
+# Procurement Compliance
+PROCUREMENT_COMPLIANCE:
+  regulatory_compliance: true
+  ethical_procurement: true
+  sustainability_standards: true
+  quality_standards: true
+  compliance_monitoring: true
+
+# Procurement Operations
+PROCUREMENT_OPERATIONS:
+  procurement_processes: true
+  procurement_workflows: true
+  procurement_governance: true
+  procurement_support: true
+  procurement_administration: true
+
+# Procurement Training
+PROCUREMENT_TRAINING:
+  procurement_skills: true
+  negotiation_training: true
+  compliance_training: true
+  technology_training: true
+  best_practices: true

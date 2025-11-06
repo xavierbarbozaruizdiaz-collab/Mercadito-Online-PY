@@ -1,0 +1,63 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - link "🛒 Mercadito Online PY" [ref=e3] [cursor=pointer]:
+      - /url: /
+    - generic [ref=e4]:
+      - link "🛒" [ref=e6] [cursor=pointer]:
+        - /url: /cart
+        - generic [ref=e7]: 🛒
+      - link "Entrar" [ref=e8] [cursor=pointer]:
+        - /url: /auth/sign-in
+  - main [ref=e9]:
+    - generic [ref=e11]:
+      - heading "🛒 Mercadito Online PY" [level=1] [ref=e12]
+      - paragraph [ref=e13]: Encuentra los mejores productos en Paraguay
+      - generic [ref=e14]:
+        - link "Explorar productos" [ref=e15] [cursor=pointer]:
+          - /url: "#products"
+        - link "Vender productos" [ref=e16] [cursor=pointer]:
+          - /url: /dashboard
+    - generic [ref=e19]:
+      - generic [ref=e20]:
+        - generic [ref=e22]:
+          - textbox "Buscar productos..." [ref=e23]
+          - generic [ref=e24]: 🔍
+        - combobox [ref=e26]:
+          - option "Más recientes" [selected]
+          - option "Más antiguos"
+          - 'option "Precio: menor a mayor"'
+          - 'option "Precio: mayor a menor"'
+          - option "Nombre A-Z"
+      - generic [ref=e27]:
+        - heading "Filtros" [level=3] [ref=e29]
+        - generic [ref=e30]:
+          - generic [ref=e31]:
+            - generic [ref=e32]: Categoría
+            - combobox [ref=e33]:
+              - option "Todas las categorías" [selected]
+          - generic [ref=e34]:
+            - generic [ref=e35]: Precio mínimo
+            - spinbutton [ref=e36]
+          - generic [ref=e37]:
+            - generic [ref=e38]: Precio máximo
+            - spinbutton [ref=e39]
+          - generic [ref=e40]:
+            - generic [ref=e41]: Condición
+            - combobox [ref=e42]:
+              - option "Todas las condiciones" [selected]
+              - option "Nuevo"
+              - option "Usado como nuevo"
+              - option "Usado"
+          - generic [ref=e43]:
+            - generic [ref=e44]: Tipo de venta
+            - combobox [ref=e45]:
+              - option "Todos los tipos" [selected]
+              - option "Venta directa"
+              - option "Subasta"
+  - button "Open Next.js Dev Tools" [ref=e53] [cursor=pointer]:
+    - img [ref=e54]
+  - alert [ref=e57]
+```

@@ -46,6 +46,7 @@ Icon?
 .env.*
 !.env.example
 .env.local
+.supabase-token.local
 
 # Editors / IDEs
 .vscode/*
@@ -59,19 +60,4 @@ supabase/.branches/
 supabase/docker/
 supabase/.env
 
-# Scripts de sincronización - archivos exportados
-scripts/data-export/
-
-# Build & caches adicionales
-build/
-.turbo/
-
-# Package managers adicionales
-pnpm-lock.yaml
-
-# Archivos locales adicionales
-*.local
-
-# Editor swap files
-*.swp
-*.swo
+.vercel

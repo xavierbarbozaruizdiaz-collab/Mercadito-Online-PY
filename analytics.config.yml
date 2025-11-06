@@ -1,0 +1,92 @@
+# Analytics Configuration
+# ============================================
+
+# Event Tracking
+EVENT_TRACKING:
+  page_views: true
+  user_interactions: true
+  ecommerce_events: true
+  performance_metrics: true
+  error_tracking: true
+  custom_events: true
+
+# E-commerce Events
+ECOMMERCE_EVENTS:
+  product_view: true
+  add_to_cart: true
+  remove_from_cart: true
+  checkout_start: true
+  checkout_progress: true
+  purchase_complete: true
+  refund: true
+  product_search: true
+  category_view: true
+
+# User Behavior
+USER_BEHAVIOR:
+  session_duration: true
+  page_depth: true
+  bounce_rate: true
+  exit_rate: true
+  user_flow: true
+  conversion_funnel: true
+  retention_analysis: true
+
+# Performance Metrics
+PERFORMANCE_METRICS:
+  page_load_time: true
+  first_contentful_paint: true
+  largest_contentful_paint: true
+  cumulative_layout_shift: true
+  first_input_delay: true
+  time_to_interactive: true
+  server_response_time: true
+
+# Custom Dimensions
+CUSTOM_DIMENSIONS:
+  user_type: "buyer|seller|admin"
+  product_category: "category_name"
+  seller_location: "city|department"
+  device_type: "mobile|tablet|desktop"
+  traffic_source: "organic|paid|direct|referral"
+
+# Custom Metrics
+CUSTOM_METRICS:
+  cart_value: "currency"
+  product_rating: "number"
+  review_count: "integer"
+  seller_rating: "number"
+  message_count: "integer"
+
+# Data Retention
+DATA_RETENTION:
+  raw_data: "90 days"
+  aggregated_data: "2 years"
+  user_data: "1 year"
+  event_data: "6 months"
+
+# Privacy Settings
+PRIVACY_SETTINGS:
+  anonymize_ip: true
+  respect_dnt: true
+  cookie_consent: true
+  data_deletion: true
+  gdpr_compliance: true
+  ccpa_compliance: true
+
+# Reporting
+REPORTING:
+  real_time_reports: true
+  scheduled_reports: true
+  custom_dashboards: true
+  automated_alerts: true
+  data_export: true
+
+# Integration
+INTEGRATION:
+  google_analytics: true
+  google_tag_manager: true
+  facebook_pixel: true
+  hotjar: true
+  mixpanel: true
+  amplitude: true

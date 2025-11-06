@@ -13,12 +13,8 @@ interface HeroMountProbeProps {
 
 export default function HeroMountProbe({ slides }: HeroMountProbeProps) {
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      (window as any).__HERO_SLIDES__ = slides;
-      if (process.env.NODE_ENV === 'development') {
-        console.log('[HERO/DIAG set]', Array.isArray(slides), slides?.length);
-      }
-    }
+    (window as any).__HERO_SLIDES__ = slides;
+    console.log('[HERO/DIAG set]', Array.isArray(slides), slides?.length);
   }, [slides]);
 
   return null;

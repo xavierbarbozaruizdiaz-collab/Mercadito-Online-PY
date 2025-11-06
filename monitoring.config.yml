@@ -1,0 +1,60 @@
+# Monitoring Configuration
+# ============================================
+
+# Health Check Endpoints
+HEALTH_CHECK_ENDPOINTS:
+  - /api/health
+  - /api/health/database
+  - /api/health/storage
+  - /api/health/auth
+
+# Performance Monitoring
+PERFORMANCE_THRESHOLDS:
+  page_load_time: 3000ms
+  api_response_time: 1000ms
+  database_query_time: 500ms
+  image_optimization_time: 2000ms
+
+# Error Monitoring
+ERROR_MONITORING:
+  javascript_errors: true
+  api_errors: true
+  database_errors: true
+  network_errors: true
+  unhandled_rejections: true
+
+# Analytics Events
+ANALYTICS_EVENTS:
+  - page_view
+  - product_view
+  - add_to_cart
+  - checkout_start
+  - checkout_complete
+  - user_signup
+  - user_login
+  - product_search
+  - category_view
+  - seller_view
+  - chat_message
+  - review_submit
+
+# Alerts Configuration
+ALERTS:
+  error_rate_threshold: 5%
+  response_time_threshold: 2000ms
+  uptime_threshold: 99.5%
+  memory_usage_threshold: 80%
+  cpu_usage_threshold: 80%
+
+# Log Levels
+LOG_LEVELS:
+  production: info
+  development: debug
+  test: warn
+
+# Retention Policies
+RETENTION_POLICIES:
+  logs: 30 days
+  analytics: 1 year
+  errors: 90 days
+  performance: 7 days

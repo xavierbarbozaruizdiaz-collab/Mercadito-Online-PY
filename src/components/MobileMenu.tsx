@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Menu, X, Home, Gavel, ShoppingBag, User, Ticket } from 'lucide-react';
+import { Menu, X, Home, Gavel, ShoppingBag, User } from 'lucide-react';
 
 export default function MobileMenu() {
   const [isOpen, setIsOpen] = useState(false);
@@ -12,7 +12,6 @@ export default function MobileMenu() {
   const navigationItems = [
     { href: '/', label: 'Inicio', icon: Home },
     { href: '/auctions', label: 'Subastas', icon: Gavel },
-    { href: '/raffles', label: 'Sorteos', icon: Ticket },
     { href: '/stores', label: 'Tiendas', icon: ShoppingBag },
   ];
 
@@ -21,7 +20,7 @@ export default function MobileMenu() {
       {/* Botón hamburguesa */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="md:hidden p-2 text-gray-600 hover:text-gray-900 transition-colors"
+        className="md:hidden p-3 min-h-[44px] min-w-[44px] text-gray-600 hover:text-gray-900 flex items-center justify-center"
         aria-label="Toggle menu"
       >
         {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -36,7 +35,7 @@ export default function MobileMenu() {
         />
       )}
 
-      {/* Menú móvil con slide */}
+      {/* Menú móvil */}
       <nav
         className={`
           fixed top-0 left-0 h-full w-64 bg-white shadow-xl z-50
@@ -49,7 +48,7 @@ export default function MobileMenu() {
           <span className="text-lg font-bold text-blue-600">Menú</span>
           <button
             onClick={() => setIsOpen(false)}
-            className="p-2 text-gray-600 hover:text-gray-900 transition-colors"
+            className="p-3 min-h-[44px] min-w-[44px] text-gray-600 hover:text-gray-900 flex items-center justify-center"
             aria-label="Close menu"
           >
             <X className="w-6 h-6" />
@@ -66,7 +65,7 @@ export default function MobileMenu() {
                 href={item.href}
                 onClick={() => setIsOpen(false)}
                 className={`
-                  flex items-center gap-3 px-4 py-3 mx-2 rounded-lg transition-colors
+                  flex items-center gap-3 px-4 py-3 mx-2 min-h-[44px] rounded-lg transition-colors
                   ${isActive
                     ? 'bg-blue-50 text-blue-600'
                     : 'text-gray-700 hover:bg-gray-50'

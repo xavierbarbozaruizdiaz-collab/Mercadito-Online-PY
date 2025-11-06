@@ -1,0 +1,74 @@
+# Communication Configuration
+# ============================================
+
+# Internal Communication
+INTERNAL_COMMUNICATION:
+  team_communication: true
+  project_updates: true
+  status_reports: true
+  meeting_management: true
+  knowledge_sharing: true
+
+# External Communication
+EXTERNAL_COMMUNICATION:
+  customer_communication: true
+  vendor_communication: true
+  partner_communication: true
+  public_relations: true
+  media_relations: true
+
+# Communication Channels
+COMMUNICATION_CHANNELS:
+  email: true
+  instant_messaging: true
+  video_conferencing: true
+  phone: true
+  social_media: true
+
+# Communication Tools
+COMMUNICATION_TOOLS:
+  slack: true
+  microsoft_teams: true
+  zoom: true
+  email_systems: true
+  project_management: true
+
+# Communication Policies
+COMMUNICATION_POLICIES:
+  response_times: true
+  escalation_procedures: true
+  confidentiality: true
+  record_keeping: true
+  approval_processes: true
+
+# Crisis Communication
+CRISIS_COMMUNICATION:
+  incident_communication: true
+  stakeholder_notification: true
+  media_management: true
+  reputation_management: true
+  recovery_communication: true
+
+# Communication Metrics
+COMMUNICATION_METRICS:
+  response_times: true
+  satisfaction_scores: true
+  engagement_rates: true
+  reach_metrics: true
+  effectiveness_measures: true
+
+# Communication Training
+COMMUNICATION_TRAINING:
+  communication_skills: true
+  crisis_communication: true
+  media_training: true
+  presentation_skills: true
+  writing_skills: true
+
+# Communication Technology
+COMMUNICATION_TECHNOLOGY:
+  unified_communications: true
+  collaboration_platforms: true
+  document_management: true
+  workflow_automation: true
+  analytics_tools: true

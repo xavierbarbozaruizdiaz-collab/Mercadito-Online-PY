@@ -5,6 +5,7 @@
 // ============================================
 
 import { createClient } from '@supabase/supabase-js';
+import { Database } from '@/types/database';
 
 // Usar variables de servidor si existen, sino fallback a NEXT_PUBLIC_*
 const url = 
@@ -24,7 +25,7 @@ if (!anon) {
 
 // Cliente de Supabase para uso en servidor
 // No persiste sesiones (servidor no tiene localStorage/cookies de usuario)
-export const supabase = createClient(url, anon, {
+export const supabase = createClient<Database>(url, anon, {
   auth: {
     persistSession: false,
     autoRefreshToken: false,

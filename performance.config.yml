@@ -1,0 +1,85 @@
+# Performance Configuration
+# ============================================
+
+# Core Web Vitals
+CORE_WEB_VITALS:
+  largest_contentful_paint: 2500ms
+  first_input_delay: 100ms
+  cumulative_layout_shift: 0.1
+  first_contentful_paint: 1800ms
+  time_to_interactive: 3800ms
+
+# Performance Budget
+PERFORMANCE_BUDGET:
+  javascript: "500kb"
+  css: "100kb"
+  images: "2mb"
+  fonts: "200kb"
+  total_page_size: "3mb"
+  total_requests: 50
+
+# Caching Strategy
+CACHING_STRATEGY:
+  static_assets:
+    cache_control: "public, max-age=31536000, immutable"
+    files: ["*.js", "*.css", "*.png", "*.jpg", "*.jpeg", "*.gif", "*.svg", "*.woff", "*.woff2"]
+  
+  api_responses:
+    cache_control: "public, max-age=300, s-maxage=600"
+    files: ["/api/products", "/api/categories", "/api/sellers"]
+  
+  user_content:
+    cache_control: "public, max-age=3600"
+    files: ["/api/user/*"]
+
+# Image Optimization
+IMAGE_OPTIMIZATION:
+  formats: [webp, avif, jpeg, png]
+  quality: 75
+  max_width: 1920
+  max_height: 1080
+  compression_level: 6
+  lazy_loading: true
+  responsive_images: true
+
+# Code Splitting
+CODE_SPLITTING:
+  route_based: true
+  component_based: true
+  vendor_splitting: true
+  dynamic_imports: true
+  preloading: true
+
+# Compression
+COMPRESSION:
+  gzip: true
+  brotli: true
+  minify_html: true
+  minify_css: true
+  minify_js: true
+  remove_comments: true
+
+# CDN Configuration
+CDN_CONFIG:
+  enabled: true
+  edge_caching: true
+  geographic_distribution: true
+  http2: true
+  http3: true
+  tls_1_3: true
+
+# Database Optimization
+DATABASE_OPTIMIZATION:
+  connection_pooling: true
+  query_optimization: true
+  indexing: true
+  caching: true
+  read_replicas: true
+
+# Monitoring
+PERFORMANCE_MONITORING:
+  real_user_monitoring: true
+  synthetic_monitoring: true
+  performance_alerts: true
+  bottleneck_detection: true
+  optimization_recommendations: true

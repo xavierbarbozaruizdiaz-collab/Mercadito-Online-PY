@@ -1,6 +1,18 @@
 import { supabase } from '@/lib/supabaseClient';
 import Link from 'next/link';
 import AddToCartButton from '@/components/AddToCartButton';
+import StartConversationButton from '@/components/StartConversationButton';
+import ProductReviews from '@/components/ProductReviews';
+import ProductQandA from '@/components/ProductQandA';
+import PriceAlertButton from '@/components/PriceAlertButton';
+import PriceHistoryChart from '@/components/PriceHistoryChart';
+import ProductImageGallery from '@/components/ProductImageGallery';
+import ProductQuantitySelector from './ProductQuantitySelector';
+import WholesalePriceBadge from '@/components/WholesalePriceBadge';
+import ProductPageClient from './ProductPageClient';
+import Breadcrumbs from '@/components/Breadcrumbs';
+import { Metadata } from 'next';
+import { generateProductStructuredData, generateBreadcrumbStructuredData } from '@/lib/structuredData';
 
 type Product = {
   id: string;
@@ -12,6 +24,12 @@ type Product = {
   sale_type: string;
   category_id: string | null;
   seller_id: string;
+  store_id?: string | null;
+  wholesale_enabled?: boolean;
+  wholesale_min_quantity?: number | null;
+  wholesale_discount_percent?: number | null;
+  stock_quantity?: number | null;
+  stock_management_enabled?: boolean;
   created_at: string;
 };
 
@@ -22,14 +40,97 @@ type Category = {
 
 export const revalidate = 0; // sin cache en dev
 
+// Función para generar metadatos dinámicos
+export async function generateMetadata(
+  props: { params: Promise<{ id: string }> }
+): Promise<Metadata> {
+  const { id } = await props.params;
+  
+  try {
+    const { data: product } = await supabase
+      .from('products')
+      .select(`
+        title,
+        description,
+        price,
+        cover_url,
+        condition,
+        sale_type,
+        categories (name)
+      `)
+      .eq('id', id)
+      .single();
+
+    if (!product) {
+      return {
+        title: 'Producto no encontrado | Mercadito Online PY',
+        description: 'El producto que buscas no está disponible.',
+      };
+    }
+
+    const productData = product as any; // Cast para evitar errores de tipo
+    const category = productData.categories?.[0]?.name || 'General';
+    const price = Number(productData.price).toLocaleString('es-PY');
+    
+    return {
+      title: `${productData.title} | Mercadito Online PY`,
+      description: productData.description || `Compra ${productData.title} por ${price} Gs. ${category} - Mercadito Online PY`,
+      keywords: [
+        productData.title,
+        category,
+        'comprar',
+        'venta',
+        'Paraguay',
+        'Mercadito Online PY',
+        productData.condition,
+        productData.sale_type === 'auction' ? 'subasta' : 'venta directa'
+      ],
+      openGraph: {
+        title: productData.title,
+        description: productData.description || `Compra ${productData.title} por ${price} Gs.`,
+        images: productData.cover_url ? [productData.cover_url] : [],
+        type: 'website',
+        locale: 'es_PY',
+        siteName: 'Mercadito Online PY',
+      },
+      twitter: {
+        card: 'summary_large_image',
+        title: productData.title,
+        description: productData.description || `Compra ${productData.title} por ${price} Gs.`,
+        images: productData.cover_url ? [productData.cover_url] : [],
+      },
+      alternates: {
+        canonical: `https://mercadito-online-py.vercel.app/products/${id}`,
+      },
+    };
+  } catch (error) {
+    return {
+      title: 'Error | Mercadito Online PY',
+      description: 'Error al cargar el producto.',
+    };
+  }
+}
+
 export default async function ProductPage(
   props: { params: Promise<{ id: string }> } // 👈 en Next 15 params es Promise
 ) {
   const { id } = await props.params; // 👈 OBLIGATORIO: await
 
+  // Obtener sesión del usuario actual para verificar si es el vendedor
+  // En Server Components, usar cookies() para obtener la sesión
+  let currentUserId: string | null = null;
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    currentUserId = session?.user?.id || null;
+  } catch (err) {
+    // Si falla obtener sesión en servidor, será null (no es crítico)
+    console.warn('No se pudo obtener sesión en servidor:', err);
+    currentUserId = null;
+  }
+
   const { data, error } = await supabase
     .from('products')
-    .select(`
+      .select(`
       id, 
       title, 
       description, 
@@ -39,14 +140,34 @@ export default async function ProductPage(
       sale_type,
       category_id,
       seller_id,
+      store_id,
+      wholesale_enabled,
+      wholesale_min_quantity,
+      wholesale_discount_percent,
+      stock_quantity,
+      stock_management_enabled,
       created_at,
       categories (
         id,
         name
+      ),
+      stores (
+        id,
+        name,
+        slug,
+        logo_url,
+        description
       )
     `)
     .eq('id', id)
     .single();
+
+  // Cargar todas las imágenes del producto
+  const { data: productImages } = await supabase
+    .from('product_images')
+    .select('id, url, idx')
+    .eq('product_id', id)
+    .order('idx', { ascending: true });
 
   if (error || !data) {
     return (
@@ -61,23 +182,135 @@ export default async function ProductPage(
   }
 
   // El tipo correcto es que categories viene como array desde Supabase
-  const p = data as Product & { categories: Category[] };
+  const p = data as Product & { 
+    categories: Category[];
+    stores?: Array<{
+      id: string;
+      name: string;
+      slug: string;
+      logo_url: string | null;
+      description: string | null;
+    }> | null;
+  };
   
   // Obtener la primera categoría (debería ser solo una)
   const category = p.categories && p.categories.length > 0 ? p.categories[0] : null;
+  
+  // Obtener información de la tienda si existe (cargar directamente si no viene en la query)
+  let store: { id: string; name: string; slug: string; logo_url: string | null; description: string | null } | null = null;
+  
+  if (p.stores && p.stores.length > 0) {
+    store = p.stores[0];
+  } else if (p.store_id) {
+    // Si no viene en la relación, cargar directamente
+    try {
+      const { data: storeData } = await supabase
+        .from('stores')
+        .select('id, name, slug, logo_url, description')
+        .eq('id', p.store_id)
+        .single();
+      
+      if (storeData) {
+        store = storeData;
+      }
+    } catch (err) {
+      console.warn('No se pudo cargar información de la tienda:', err);
+    }
+  }
+  
+  // Obtener información del vendedor si no hay tienda
+  let sellerInfo: { name: string; email?: string } | null = null;
+  if (!store && p.seller_id) {
+    try {
+      const { data: sellerProfile } = await supabase
+        .from('profiles')
+        .select('email, first_name, last_name')
+        .eq('id', p.seller_id)
+        .single();
+      
+      if (sellerProfile) {
+        sellerInfo = {
+          name: sellerProfile.first_name && sellerProfile.last_name 
+            ? `${sellerProfile.first_name} ${sellerProfile.last_name}`
+            : sellerProfile.email?.split('@')[0] || 'Vendedor',
+          email: sellerProfile.email
+        };
+      }
+    } catch (err) {
+      console.warn('No se pudo cargar información del vendedor:', err);
+    }
+  }
+
+  // Preparar array de imágenes: si hay imágenes en product_images, usarlas; si no, usar cover_url
+        const images = (productImages && productImages.length > 0) 
+          ? productImages.map((img: any) => img.url).sort((a: string, b: string) => {
+              // Ordenar por idx si está disponible
+              const imgA = productImages.find((img: any) => img.url === a) as any;
+              const imgB = productImages.find((img: any) => img.url === b) as any;
+              return (imgA?.idx || 0) - (imgB?.idx || 0);
+            })
+          : (p.cover_url ? [p.cover_url] : []);
+  
+  // Si no hay imágenes, usar placeholder
+  const displayImages = images.length > 0 ? images : ['https://placehold.co/800x600?text=Producto'];
+  const mainImage = displayImages[0];
+
+  // Generar structured data
+  const productStructuredData = generateProductStructuredData({
+    id: p.id,
+    title: p.title,
+    description: p.description || '',
+    price: Number(p.price),
+    currency: 'PYG',
+    image: mainImage || '',
+    condition: p.condition,
+    availability: 'InStock',
+    seller: {
+      name: 'Vendedor Verificado',
+      url: `https://mercadito-online-py.vercel.app/store/seller-${p.seller_id}`,
+    },
+    category: category?.name || 'General',
+  });
+
+  const breadcrumbStructuredData = generateBreadcrumbStructuredData([
+    { name: 'Inicio', url: 'https://mercadito-online-py.vercel.app/' },
+    { name: category?.name || 'Productos', url: `https://mercadito-online-py.vercel.app/search?category=${category?.id || ''}` },
+    { name: p.title, url: `https://mercadito-online-py.vercel.app/products/${p.id}` },
+  ]);
 
   return (
-    <main className="min-h-screen bg-gray-50 p-4 sm:p-8">
-      <Link href="/" className="underline text-sm">← Volver</Link>
+    <>
+      {/* Structured Data */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(productStructuredData),
+        }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(breadcrumbStructuredData),
+        }}
+      />
+      
+      <main className="min-h-screen bg-gray-50 p-4 sm:p-8">
+        <div className="mb-4">
+          <Breadcrumbs
+            items={[
+              ...(category ? [{ label: category.name, href: `/search?category=${category.id}` }] : []),
+              { label: p.title }
+            ]}
+          />
+        </div>
 
       <div className="bg-white rounded-lg sm:rounded-2xl shadow p-4 sm:p-6 mt-3">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
-          {/* Imagen del producto */}
-          <div className="space-y-4">
-            <img
-              src={p.cover_url ?? 'https://placehold.co/800x600?text=Producto'}
-              alt={p.title}
-              className="w-full rounded-lg sm:rounded-xl object-cover"
+          {/* Galería de imágenes del producto */}
+          <div>
+            <ProductImageGallery 
+              images={displayImages} 
+              title={p.title}
             />
             
             {/* Información adicional */}
@@ -111,13 +344,26 @@ export default async function ProductPage(
               </div>
             )}
 
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+            <div className={`${p.sale_type === 'auction' ? 'bg-yellow-50 border-yellow-200' : 'bg-green-50 border-green-200'} border rounded-lg p-4`}>
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-green-600 font-medium">Precio</p>
-                  <p className="text-3xl font-bold text-green-700">
+                  {p.sale_type === 'auction' && (
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-lg">🔨</span>
+                      <span className="text-xs bg-yellow-500 text-white px-2 py-1 rounded-full font-bold">SUBASTA</span>
+                    </div>
+                  )}
+                  <p className={`text-sm ${p.sale_type === 'auction' ? 'text-yellow-600' : 'text-green-600'} font-medium`}>
+                    {p.sale_type === 'auction' ? 'Precio base' : 'Precio'}
+                  </p>
+                  <p className={`text-3xl font-bold ${p.sale_type === 'auction' ? 'text-yellow-700' : 'text-green-700'}`}>
                     {Number(p.price).toLocaleString('es-PY')} Gs.
                   </p>
+                  {p.sale_type === 'auction' && (
+                    <p className="text-xs text-yellow-600 mt-1">
+                      Los compradores pueden ofertar. El mejor precio gana.
+                    </p>
+                  )}
                 </div>
                 <div className="text-right">
                   <p className="text-sm text-gray-500">Publicado</p>
@@ -128,18 +374,98 @@ export default async function ProductPage(
               </div>
             </div>
 
-            <AddToCartButton productId={p.id} />
+            {/* Componente cliente para manejar sesión y mostrar botones condicionalmente */}
+            <ProductPageClient product={p} />
 
-            {/* Información del vendedor */}
+            {/* Alerta de precio */}
+            <div className="mt-4">
+              <PriceAlertButton 
+                productId={p.id} 
+                currentPrice={Number(p.price)}
+              />
+            </div>
+
+            {/* Información del vendedor/tienda */}
             <div className="bg-gray-50 rounded-lg p-4">
               <h3 className="font-semibold mb-2">Información del vendedor</h3>
-              <p className="text-sm text-gray-600">
-                Este producto fue publicado por un vendedor verificado de nuestra plataforma.
-              </p>
+              {store ? (
+                <div className="flex items-center gap-3">
+                  {store.logo_url ? (
+                    <img
+                      src={store.logo_url}
+                      alt={store.name}
+                      className="w-12 h-12 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center">
+                      <span className="text-purple-600 font-semibold text-lg">
+                        {store.name.charAt(0).toUpperCase()}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex-1">
+                    <Link
+                      href={`/store/${store.slug}`}
+                      className="text-blue-600 hover:text-blue-800 font-medium hover:underline"
+                    >
+                      {store.name}
+                    </Link>
+                    {store.description && (
+                      <p className="text-xs text-gray-500 mt-1 line-clamp-2">
+                        {store.description}
+                      </p>
+                    )}
+                  </div>
+                  <Link
+                    href={`/store/${store.slug}`}
+                    className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                  >
+                    Ver tienda →
+                  </Link>
+                </div>
+              ) : sellerInfo ? (
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center">
+                    <span className="text-gray-600 font-semibold text-lg">
+                      {sellerInfo.name.charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium text-gray-900">{sellerInfo.name}</p>
+                    {sellerInfo.email && (
+                      <p className="text-xs text-gray-500">{sellerInfo.email}</p>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-gray-600">
+                  Este producto fue publicado por un vendedor verificado de nuestra plataforma.
+                </p>
+              )}
             </div>
           </div>
         </div>
       </div>
-    </main>
+
+      {/* Marketplace Features Avanzadas */}
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+        {/* Historial de precios */}
+        <PriceHistoryChart 
+          productId={p.id} 
+          currentPrice={Number(p.price)}
+        />
+
+        {/* Preguntas y respuestas */}
+        <ProductQandA
+          productId={p.id}
+          sellerId={p.seller_id}
+          currentUserId={undefined}
+        />
+
+        {/* Reseñas del producto */}
+        <ProductReviews productId={p.id} storeId={p.store_id || undefined} />
+      </div>
+      </main>
+    </>
   );
 }

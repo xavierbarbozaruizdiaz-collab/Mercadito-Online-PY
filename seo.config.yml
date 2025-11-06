@@ -1,0 +1,87 @@
+# SEO Configuration
+# ============================================
+
+# Meta Tags
+META_TAGS:
+  default_title: "Mercadito Online PY - Tu marketplace de confianza en Paraguay"
+  title_template: "%s | Mercadito Online PY"
+  default_description: "Descubre productos únicos de vendedores locales en Paraguay. Compra y vende de forma segura en nuestro marketplace."
+  default_keywords: "marketplace, paraguay, comprar, vender, productos, tienda online"
+  author: "Mercadito Online PY"
+  robots: "index, follow"
+  language: "es-PY"
+
+# Open Graph
+OPEN_GRAPH:
+  site_name: "Mercadito Online PY"
+  type: "website"
+  locale: "es_PY"
+  image_width: 1200
+  image_height: 630
+  image_alt: "Mercadito Online PY - Marketplace de Paraguay"
+
+# Twitter Card
+TWITTER_CARD:
+  card: "summary_large_image"
+  site: "@mercaditopy"
+  creator: "@mercaditopy"
+  image_alt: "Mercadito Online PY - Marketplace de Paraguay"
+
+# Structured Data
+STRUCTURED_DATA:
+  organization:
+    name: "Mercadito Online PY"
+    url: "https://mercadito-online-py.vercel.app"
+    logo: "https://mercadito-online-py.vercel.app/logo.png"
+    description: "Marketplace de confianza en Paraguay"
+    contact_point:
+      telephone: "+595-XX-XXX-XXXX"
+      contact_type: "customer service"
+      area_served: "PY"
+      available_language: "Spanish"
+  
+  website:
+    name: "Mercadito Online PY"
+    url: "https://mercadito-online-py.vercel.app"
+    description: "Tu marketplace de confianza en Paraguay"
+    in_language: "es-PY"
+    is_accessible_for_free: true
+
+# Sitemap
+SITEMAP:
+  enabled: true
+  priority:
+    home: 1.0
+    categories: 0.8
+    products: 0.7
+    sellers: 0.6
+    pages: 0.5
+  changefreq:
+    home: "daily"
+    categories: "weekly"
+    products: "daily"
+    sellers: "weekly"
+    pages: "monthly"
+
+# Robots.txt
+ROBOTS_TXT:
+  user_agent: "*"
+  allow: ["/"]
+  disallow: ["/admin", "/dashboard", "/api", "/_next"]
+  sitemap: "https://mercadito-online-py.vercel.app/sitemap.xml"
+
+# Performance
+PERFORMANCE:
+  core_web_vitals: true
+  lighthouse_score: 90
+  page_speed: "fast"
+  mobile_friendly: true
+  accessibility: true
+
+# Analytics
+ANALYTICS:
+  google_analytics: true
+  google_search_console: true
+  bing_webmaster: true
+  facebook_pixel: true
+  conversion_tracking: true

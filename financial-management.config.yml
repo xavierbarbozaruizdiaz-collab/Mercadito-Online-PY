@@ -1,0 +1,74 @@
+# Financial Management Configuration
+# ============================================
+
+# Financial Planning
+FINANCIAL_PLANNING:
+  budgeting: true
+  forecasting: true
+  financial_modeling: true
+  scenario_planning: true
+  investment_planning: true
+
+# Financial Control
+FINANCIAL_CONTROL:
+  cost_control: true
+  budget_management: true
+  expense_management: true
+  revenue_management: true
+  financial_monitoring: true
+
+# Financial Reporting
+FINANCIAL_REPORTING:
+  financial_statements: true
+  management_reporting: true
+  regulatory_reporting: true
+  investor_reporting: true
+  dashboard_reporting: true
+
+# Financial Analysis
+FINANCIAL_ANALYSIS:
+  profitability_analysis: true
+  cash_flow_analysis: true
+  variance_analysis: true
+  trend_analysis: true
+  ratio_analysis: true
+
+# Financial Operations
+FINANCIAL_OPERATIONS:
+  accounts_payable: true
+  accounts_receivable: true
+  payroll: true
+  tax_management: true
+  treasury_management: true
+
+# Financial Risk Management
+FINANCIAL_RISK_MANAGEMENT:
+  credit_risk: true
+  market_risk: true
+  liquidity_risk: true
+  operational_risk: true
+  compliance_risk: true
+
+# Financial Technology
+FINANCIAL_TECHNOLOGY:
+  accounting_systems: true
+  erp_systems: true
+  financial_analytics: true
+  automation_tools: true
+  integration_platforms: true
+
+# Financial Compliance
+FINANCIAL_COMPLIANCE:
+  regulatory_compliance: true
+  audit_management: true
+  internal_controls: true
+  risk_assessment: true
+  compliance_monitoring: true
+
+# Financial Performance
+FINANCIAL_PERFORMANCE:
+  kpi_tracking: true
+  performance_metrics: true
+  benchmarking: true
+  target_setting: true
+  performance_review: true

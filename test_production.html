@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Producción - Mercadito Online PY</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-item {
+            background: white;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border-left: 4px solid #0070f3;
+        }
+        .success { border-left-color: #22c55e; }
+        .error { border-left-color: #ef4444; }
+        .warning { border-left-color: #f59e0b; }
+        pre {
+            background: #f4f4f4;
+            padding: 10px;
+            border-radius: 3px;
+            overflow-x: auto;
+        }
+        button {
+            background: #0070f3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0051cc;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 Test de Producción - Mercadito Online PY</h1>
+    
+    <div class="test-item">
+        <h3>1. Verificar Variables de Entorno</h3>
+        <div id="env-test">
+            <p>Cargando...</p>
+        </div>
+        <button onclick="testEnv()">Re-test Variables</button>
+    </div>
+    
+    <div class="test-item">
+        <h3>2. Test de Conexión a Supabase</h3>
+        <div id="supabase-test">
+            <p>Presiona el botón para probar</p>
+        </div>
+        <button onclick="testSupabase()">Test Supabase</button>
+    </div>
+    
+    <div class="test-item">
+        <h3>3. Test de Query a Products</h3>
+        <div id="products-test">
+            <p>Presiona el botón para probar</p>
+        </div>
+        <button onclick="testProducts()">Test Products Query</button>
+    </div>
+    
+    <div class="test-item">
+        <h3>4. Información del Navegador</h3>
+        <div id="browser-info">
+            <pre id="browser-details"></pre>
+        </div>
+        <button onclick="showBrowserInfo()">Mostrar Info</button>
+    </div>
+    
+    <div class="test-item">
+        <h3>5. Errores en Consola</h3>
+        <div id="console-errors">
+            <p>Revisa la consola del navegador (F12) para ver errores</p>
+        </div>
+    </div>
+
+    <script>
+        // Test Variables de Entorno
+        function testEnv() {
+            const div = document.getElementById('env-test');
+            const supabaseUrl = window.location.origin.includes('localhost') 
+                ? 'http://localhost:3000' 
+                : 'https://mercadito-online-py.vercel.app';
+            
+            div.innerHTML = `
+                <pre>
+NEXT_PUBLIC_SUPABASE_URL: ${supabaseUrl.includes('localhost') ? '⚠️ Usando localhost' : '✅ Producción'}
+Window Location: ${window.location.href}
+User Agent: ${navigator.userAgent}
+                </pre>
+            `;
+            
+            // Intentar leer variables desde window
+            if (window.__NEXT_DATA__) {
+                div.innerHTML += `<p class="success">✅ Next.js está cargado</p>`;
+            } else {
+                div.innerHTML += `<p class="error">❌ Next.js no está cargado (¿estás en la página correcta?)</p>`;
+            }
+        }
+        
+        // Test Supabase
+        async function testSupabase() {
+            const div = document.getElementById('supabase-test');
+            div.innerHTML = '<p>Probando...</p>';
+            
+            try {
+                const response = await fetch('https://hqdatzhliaordlsqtjea.supabase.co/rest/v1/', {
+                    headers: {
+                        'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhxZGF0emhsaWFvcmRsc3F0amVhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE1MTk1NzQsImV4cCI6MjA3NzA5NTU3NH0.u1VFWCN4yHZ_v_bR4MNw5wt7jTPdfpIwjhDRYfQ5qRw',
+                        'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhxZGF0emhsaWFvcmRsc3F0amVhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE1MTk1NzQsImV4cCI6MjA3NzA5NTU3NH0.u1VFWCN4yHZ_v_bR4MNw5wt7jTPdfpIwjhDRYfQ5qRw'
+                    }
+                });
+                
+                if (response.ok) {
+                    div.innerHTML = '<p class="success">✅ Conexión a Supabase OK</p>';
+                } else {
+                    div.innerHTML = `<p class="error">❌ Error: ${response.status} ${response.statusText}</p>`;
+                }
+            } catch (error) {
+                div.innerHTML = `<p class="error">❌ Error de conexión: ${error.message}</p>`;
+            }
+        }
+        
+        // Test Products Query
+        async function testProducts() {
+            const div = document.getElementById('products-test');
+            div.innerHTML = '<p>Probando query a products...</p>';
+            
+            try {
+                const response = await fetch('https://hqdatzhliaordlsqtjea.supabase.co/rest/v1/products?select=id,title,price,cover_url&limit=1', {
+                    headers: {
+                        'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhxZGF0emhsaWFvcmRsc3F0amVhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE1MTk1NzQsImV4cCI6MjA3NzA5NTU3NH0.u1VFWCN4yHZ_v_bR4MNw5wt7jTPdfpIwjhDRYfQ5qRw',
+                        'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhxZGF0emhsaWFvcmRsc3F0amVhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE1MTk1NzQsImV4cCI6MjA3NzA5NTU3NH0.u1VFWCN4yHZ_v_bR4MNw5wt7jTPdfpIwjhDRYfQ5qRw',
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    div.innerHTML = `
+                        <p class="success">✅ Query exitosa</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                } else {
+                    div.innerHTML = `
+                        <p class="error">❌ Error ${response.status}: ${response.statusText}</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                }
+            } catch (error) {
+                div.innerHTML = `<p class="error">❌ Error: ${error.message}</p>`;
+            }
+        }
+        
+        // Browser Info
+        function showBrowserInfo() {
+            const div = document.getElementById('browser-details');
+            div.textContent = `
+URL: ${window.location.href}
+Host: ${window.location.host}
+Protocol: ${window.location.protocol}
+User Agent: ${navigator.userAgent}
+Cookies Enabled: ${navigator.cookieEnabled}
+Online: ${navigator.onLine}
+Language: ${navigator.language}
+Platform: ${navigator.platform}
+            `;
+        }
+        
+        // Capturar errores de consola
+        window.addEventListener('error', (event) => {
+            const div = document.getElementById('console-errors');
+            div.innerHTML += `<p class="error">❌ Error: ${event.message} (${event.filename}:${event.lineno})</p>`;
+        });
+        
+        // Ejecutar tests al cargar
+        window.addEventListener('load', () => {
+            testEnv();
+            showBrowserInfo();
+        });
+    </script>
+</body>
+</html>
+
+
+
+
+

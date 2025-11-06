@@ -1,0 +1,66 @@
+# Product Management Configuration
+# ============================================
+
+# Product Strategy
+PRODUCT_STRATEGY:
+  product_vision: true
+  product_roadmap: true
+  market_analysis: true
+  competitive_analysis: true
+  product_positioning: true
+
+# Product Development
+PRODUCT_DEVELOPMENT:
+  product_planning: true
+  feature_development: true
+  product_design: true
+  user_experience: true
+  product_testing: true
+
+# Product Lifecycle
+PRODUCT_LIFECYCLE:
+  product_launch: true
+  product_growth: true
+  product_maturity: true
+  product_decline: true
+  product_retirement: true
+
+# Product Analytics
+PRODUCT_ANALYTICS:
+  usage_analytics: true
+  performance_metrics: true
+  user_behavior: true
+  feature_adoption: true
+  product_roi: true
+
+# Product Management
+PRODUCT_MANAGEMENT:
+  product_planning: true
+  feature_prioritization: true
+  product_governance: true
+  product_communication: true
+  product_documentation: true
+
+# Product Technology
+PRODUCT_TECHNOLOGY:
+  product_platforms: true
+  product_integrations: true
+  product_apis: true
+  product_automation: true
+  product_monitoring: true
+
+# Product Innovation
+PRODUCT_INNOVATION:
+  innovation_management: true
+  idea_management: true
+  prototype_development: true
+  user_research: true
+  market_research: true
+
+# Product Operations
+PRODUCT_OPERATIONS:
+  product_processes: true
+  product_workflows: true
+  product_governance: true
+  product_support: true
+  product_administration: true

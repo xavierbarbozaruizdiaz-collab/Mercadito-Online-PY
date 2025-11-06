@@ -1,0 +1,66 @@
+# Sales Configuration
+# ============================================
+
+# Sales Strategy
+SALES_STRATEGY:
+  sales_planning: true
+  target_setting: true
+  territory_management: true
+  channel_strategy: true
+  pricing_strategy: true
+
+# Sales Process
+SALES_PROCESS:
+  lead_generation: true
+  lead_qualification: true
+  opportunity_management: true
+  proposal_development: true
+  closing_process: true
+
+# Sales Management
+SALES_MANAGEMENT:
+  sales_forecasting: true
+  pipeline_management: true
+  quota_management: true
+  performance_management: true
+  territory_management: true
+
+# Customer Relationship Management
+CRM:
+  customer_database: true
+  contact_management: true
+  interaction_tracking: true
+  customer_segmentation: true
+  customer_analytics: true
+
+# Sales Analytics
+SALES_ANALYTICS:
+  sales_reporting: true
+  performance_metrics: true
+  trend_analysis: true
+  forecasting: true
+  roi_measurement: true
+
+# Sales Technology
+SALES_TECHNOLOGY:
+  crm_systems: true
+  sales_automation: true
+  communication_tools: true
+  analytics_platforms: true
+  mobile_applications: true
+
+# Sales Training
+SALES_TRAINING:
+  product_training: true
+  sales_skills: true
+  negotiation_training: true
+  customer_service: true
+  technology_training: true
+
+# Sales Operations
+SALES_OPERATIONS:
+  sales_processes: true
+  sales_workflows: true
+  sales_governance: true
+  sales_support: true
+  sales_administration: true

@@ -1,0 +1,137 @@
+# Ansible Playbook for Production Deployment
+---
+- name: Deploy Mercadito Online PY to Production
+  hosts: production
+  become: yes
+  vars:
+    app_name: mercadito-online-py
+    app_user: mercadito
+    app_dir: /opt/mercadito-online-py
+    nginx_config_dir: /etc/nginx/sites-available
+    nginx_enabled_dir: /etc/nginx/sites-enabled
+
+  tasks:
+    - name: Update system packages
+      apt:
+        update_cache: yes
+        upgrade: yes
+
+    - name: Install required packages
+      apt:
+        name:
+          - nginx
+          - nodejs
+          - npm
+          - redis-server
+          - certbot
+          - python3-certbot-nginx
+        state: present
+
+    - name: Create application user
+      user:
+        name: "{{ app_user }}"
+        system: yes
+        shell: /bin/bash
+        home: "{{ app_dir }}"
+        create_home: yes
+
+    - name: Create application directory
+      file:
+        path: "{{ app_dir }}"
+        state: directory
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: '0755'
+
+    - name: Copy application files
+      copy:
+        src: "{{ item }}"
+        dest: "{{ app_dir }}/{{ item }}"
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+      with_fileglob:
+        - "src/*"
+        - "public/*"
+        - "package.json"
+        - "package-lock.json"
+        - "next.config.js"
+        - "tailwind.config.js"
+        - "tsconfig.json"
+
+    - name: Install Node.js dependencies
+      npm:
+        path: "{{ app_dir }}"
+        state: present
+        production: yes
+      become_user: "{{ app_user }}"
+
+    - name: Build application
+      npm:
+        path: "{{ app_dir }}"
+        state: present
+        production: yes
+      become_user: "{{ app_user }}"
+
+    - name: Create systemd service file
+      template:
+        src: mercadito-online-py.service.j2
+        dest: /etc/systemd/system/mercadito-online-py.service
+      notify: restart app
+
+    - name: Enable and start application service
+      systemd:
+        name: mercadito-online-py
+        enabled: yes
+        state: started
+        daemon_reload: yes
+
+    - name: Configure Nginx
+      template:
+        src: nginx.conf.j2
+        dest: "{{ nginx_config_dir }}/mercadito-online-py"
+      notify: restart nginx
+
+    - name: Enable Nginx site
+      file:
+        src: "{{ nginx_config_dir }}/mercadito-online-py"
+        dest: "{{ nginx_enabled_dir }}/mercadito-online-py"
+        state: link
+      notify: restart nginx
+
+    - name: Remove default Nginx site
+      file:
+        path: "{{ nginx_enabled_dir }}/default"
+        state: absent
+      notify: restart nginx
+
+    - name: Configure SSL with Let's Encrypt
+      command: certbot --nginx -d mercadito-online-py.com -d www.mercadito-online-py.com --non-interactive --agree-tos --email admin@mercadito-online-py.com
+      when: ssl_enabled | default(true)
+
+    - name: Configure Redis
+      template:
+        src: redis.conf.j2
+        dest: /etc/redis/redis.conf
+      notify: restart redis
+
+    - name: Enable and start Redis
+      systemd:
+        name: redis-server
+        enabled: yes
+        state: started
+
+  handlers:
+    - name: restart app
+      systemd:
+        name: mercadito-online-py
+        state: restarted
+
+    - name: restart nginx
+      systemd:
+        name: nginx
+        state: restarted
+
+    - name: restart redis
+      systemd:
+        name: redis-server
+        state: restarted

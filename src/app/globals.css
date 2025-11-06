@@ -1,26 +1,163 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: 160 30% 98%;         /* #F9FAFB - fondo casi blanco */
+  --foreground: 160 10% 15%;         /* #1A2E2B - texto principal */
+  --primary: 150 65% 47%;            /* #22C55E - verde menta */
+  --primary-foreground: 0 0% 100%;   /* blanco */
+  --secondary: 160 60% 40%;          /* #10B981 - esmeralda */
+  --secondary-foreground: 0 0% 100%; /* blanco */
+  --muted: 160 20% 90%;              /* #D1FAE5 - verde pastel claro */
+  --muted-foreground: 160 10% 25%;   /* texto gris verdoso */
+  --accent: 165 70% 40%;             /* #059669 - verde más intenso */
+  --accent-foreground: 0 0% 100%;
+  --border: 160 15% 85%;             /* borde sutil */
+  --input: 160 15% 85%;
+  --ring: 150 65% 47%;               /* mismo tono que primary */
+  --radius: 0.5rem;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --radius: var(--radius);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: 160 15% 12%;      /* verde oscuro casi negro */
+    --foreground: 160 20% 95%;      /* texto claro */
+    --primary: 150 65% 47%;         /* verde menta */
+    --primary-foreground: 0 0% 100%; /* blanco */
+    --secondary: 160 60% 40%;       /* esmeralda */
+    --secondary-foreground: 0 0% 100%; /* blanco */
+    --muted: 160 20% 25%;           /* verde oscuro suave */
+    --muted-foreground: 160 20% 80%; /* texto claro */
+    --accent: 165 70% 40%;          /* verde intenso */
+    --accent-foreground: 0 0% 100%;
+    --border: 160 15% 30%;          /* borde más visible en oscuro */
+    --input: 160 15% 30%;
+    --ring: 150 65% 47%;            /* mismo tono que primary */
   }
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
   font-family: Arial, Helvetica, sans-serif;
+}
+
+@keyframes slide-in-right {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.3s ease-out;
+}
+
+/* Animaciones para timer y efectos emocionantes */
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 5px rgba(139, 92, 246, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(139, 92, 246, 0.8), 0 0 30px rgba(139, 92, 246, 0.6);
+  }
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+
+@keyframes bounce-in {
+  0% {
+    transform: scale(0.3);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  70% {
+    transform: scale(0.9);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.animate-shake {
+  animation: shake 0.5s ease-in-out;
+}
+
+.animate-bounce-in {
+  animation: bounce-in 0.6s ease-out;
+}
+
+
+/* ============================================
+   CLASES FORZADAS PARA TAILWIND V4
+   Estas clases se fuerzan porque Tailwind v4
+   no las detecta correctamente en clases dinámicas
+   ============================================ */
+@layer utilities {
+  /* Padding valores medios - Tailwind v4 puede no tener estos */
+  .px-2\.5 { padding-left: 0.625rem; padding-right: 0.625rem; }
+  .py-1\.5 { padding-top: 0.375rem; padding-bottom: 0.375rem; }
+  
+  /* Hover states - Forzar generación */
+  .hover\:bg-blue-700:hover { background-color: rgb(29 78 216); }
+  .hover\:bg-gray-700:hover { background-color: rgb(55 65 81); }
+  .hover\:bg-red-700:hover { background-color: rgb(185 28 28); }
+  .hover\:bg-gray-50:hover { background-color: rgb(249 250 251); }
+  .hover\:bg-gray-100:hover { background-color: rgb(243 244 246); }
+  
+  /* Focus states - Forzar generación */
+  .focus\:ring-blue-500:focus { --tw-ring-color: rgb(59 130 246); }
+  .focus\:ring-gray-500:focus { --tw-ring-color: rgb(107 114 128); }
+  .focus\:ring-red-500:focus { --tw-ring-color: rgb(239 68 68); }
+  
+  /* Active states */
+  .active\:scale-95:active { transform: scale(0.95); }
+  
+  /* Colores adicionales */
+  .bg-blue-800 { background-color: rgb(30 64 175); }
+  .bg-green-800 { background-color: rgb(22 101 52); }
+  .bg-red-800 { background-color: rgb(153 27 27); }
+  .bg-yellow-800 { background-color: rgb(133 77 14); }
+  .bg-neutral-300 { background-color: rgb(212 212 212); }
+  .bg-purple-500 { background-color: rgb(168 85 247); }
+  .bg-purple-900 { background-color: rgb(88 28 135); }
+  
+  /* Borders */
+  .border-b-0 { border-bottom-width: 0px; }
+  
+  /* Text */
+  .text-2xl { font-size: 1.5rem; line-height: 2rem; }
 }

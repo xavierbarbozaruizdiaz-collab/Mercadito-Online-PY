@@ -1,0 +1,14 @@
+REPORTE DE COMPARACIÓN DE MIGRACIONES
+================================================================================
+
+Total local: 101
+Total producción: 97
+Diferencia: 4
+
+MIGRACIONES FALTANTES EN PRODUCCIÓN:
+--------------------------------------------------------------------------------
+- 20250130000004_auction_security_enhancements.sql
+- 20250130000005_setup_scheduler.sql
+- 20251103000000_fix_hero_slides_table.sql
+- fix_hero_slides_table.sql
+

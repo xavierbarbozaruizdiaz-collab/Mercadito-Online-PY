@@ -27,15 +27,11 @@ type HeroSlide = {
   public_url?: string | null;
   sort_order: number;
   created_at?: string | null;
-  position?: number;
 };
 
 // Import dinámico sin SSR para evitar bloqueos en prod
 const HeroSlider = dynamic(() => import('@/components/hero/HeroSlider'), {
   ssr: false,
-  loading: () => (
-    <div className="w-full h-[220px] md:h-[340px] lg:h-[420px] bg-gradient-to-r from-blue-600 to-purple-600 animate-pulse" />
-  ),
 });
 
 interface HeroSliderClientProps {
