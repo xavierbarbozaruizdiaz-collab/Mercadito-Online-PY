@@ -425,7 +425,7 @@ export async function addInternalNotes(
 export async function getOrderStats(dateFrom?: string, dateTo?: string): Promise<OrderStats> {
   try {
     // Using 'as any' to bypass Supabase strict type constraint
-    let baseQuery = (supabase as any).from('orders');
+    const baseQuery = (supabase as any).from('orders');
     let filteredQuery = baseQuery;
 
     if (dateFrom) {

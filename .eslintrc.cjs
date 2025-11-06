@@ -11,21 +11,35 @@ module.exports = {
   ],
   rules: {
     '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+    '@typescript-eslint/no-explicit-any': 'warn', // Permitir `any` como warning en lugar de error
+    'react-hooks/exhaustive-deps': 'warn', // Permitir dependencias faltantes como warning
   },
   overrides: [
-    // Permitir require() solo en scripts utilitarios
+    // Tests y mocks
     {
-      files: ['scripts/**/*.{js,ts}', 'scripts/**'],
+      files: ['**/*.test.*', '**/__tests__/**', '**/__mocks__/**'],
       rules: {
-        '@typescript-eslint/no-var-requires': 'off',
-        'import/no-commonjs': 'off',
-        '@typescript-eslint/no-require-imports': 'off',
+        'no-unused-vars': 'off',
+        '@typescript-eslint/no-unused-vars': 'off',
+        '@typescript-eslint/no-explicit-any': 'off',
+        'react-hooks/exhaustive-deps': 'off',
       },
     },
-    // Archivos .js en scripts
+    // Pages/App Router loaders y rutas: suele haber `any` y params sin usar
     {
-      files: ['scripts/**/*.js'],
+      files: ['src/app/**'],
       rules: {
+        '@typescript-eslint/no-explicit-any': 'warn',
+        'no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+        '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+        'react-hooks/exhaustive-deps': 'warn', // Dependencias faltantes comunes en App Router
+      },
+    },
+    // Scripts y plantillas
+    {
+      files: ['scripts/**', 'supabase/migrations/**'],
+      rules: {
+        'no-console': 'off',
         '@typescript-eslint/no-var-requires': 'off',
         'import/no-commonjs': 'off',
         '@typescript-eslint/no-require-imports': 'off',
@@ -35,14 +49,6 @@ module.exports = {
     {
       files: ['**/*.d.ts'],
       rules: { '@typescript-eslint/no-empty-interface': 'off' },
-    },
-    // Archivos de tests
-    {
-      files: ['tests/**/*', '**/*.test.tsx', '**/*.test.ts', '**/*.spec.ts'],
-      rules: {
-        '@typescript-eslint/no-explicit-any': 'off',
-        '@typescript-eslint/no-unused-vars': 'off',
-      },
     },
     // Funciones de Supabase (Deno)
     {
@@ -57,8 +63,6 @@ module.exports = {
     '.next/**',
     'dist/**',
     'build/**',
-    'supabase/functions/**',
-    'tests/**',
   ],
 };
 

@@ -7,8 +7,7 @@
 
 import { useState, useEffect } from 'react';
 import { 
-  Badge,
-  Button
+  Badge
 } from '@/components/ui';
 import { 
   Search, 
@@ -77,6 +76,7 @@ export default function SearchSuggestions({
   useEffect(() => {
     loadTrending();
     loadRecent();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Simular carga de sugerencias (en una implementación real, esto vendría de un API)
@@ -324,7 +324,7 @@ export default function SearchSuggestions({
         <div className="bg-white rounded-lg shadow-sm border p-4">
           <h3 className="text-sm font-medium text-gray-700 mb-3">
             <Search className="w-4 h-4 inline mr-2" />
-            Sugerencias para "{query}"
+            Sugerencias para &quot;{query}&quot;
           </h3>
           
           {loading ? (

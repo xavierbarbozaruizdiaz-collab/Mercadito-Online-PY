@@ -8,9 +8,10 @@ export default function ThemeToggle() {
   const { theme, toggleTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
+  // Efecto intencional: marcar como montado para evitar problemas de hidratación
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     setMounted(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Prevenir hidratación incorrecta

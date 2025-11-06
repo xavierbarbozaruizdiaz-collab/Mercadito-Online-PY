@@ -32,7 +32,7 @@ function LocationMarker({
 
   useEffect(() => {
     setMarkerPosition(position);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [position]);
 
   useMapEvents({
@@ -69,9 +69,10 @@ export default function LocationPicker({
 }: LocationPickerProps) {
   const [isClient, setIsClient] = useState(false);
 
+  // Efecto intencional: marcar como cliente para evitar problemas de hidratación
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     setIsClient(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Coordenadas por defecto (Paraguay - Asunción)

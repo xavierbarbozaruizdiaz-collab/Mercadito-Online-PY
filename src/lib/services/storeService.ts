@@ -150,7 +150,7 @@ export async function getStoreProducts(
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1);
 
-  let { data, error, count } = await query;
+  const { data, error, count } = await query;
 
   // Si hay error relacionado con stock_quantity y usamos select('*'), 
   // Supabase debería manejarlo, pero si hay un problema, ignorarlo
@@ -455,7 +455,7 @@ export async function isStoreSlugAvailable(slug: string, excludeStoreId?: string
  */
 export async function generateUniqueStoreSlug(name: string, excludeStoreId?: string): Promise<string> {
   // Convertir nombre a slug
-  let baseSlug = name
+  const baseSlug = name
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '') // Remover acentos

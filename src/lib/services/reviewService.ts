@@ -379,7 +379,7 @@ export class ReviewService {
 
       // Obtener información de buyers (profiles) por separado
       const buyerIds = [...new Set((data || []).map((r: any) => r.buyer_id).filter(Boolean))];
-      let buyersMap: Record<string, any> = {};
+      const buyersMap: Record<string, any> = {};
       
       if (buyerIds.length > 0) {
         try {

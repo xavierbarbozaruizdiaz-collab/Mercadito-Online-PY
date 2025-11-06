@@ -62,7 +62,7 @@ export default function AdminCategories() {
     setLoading(true);
     setMsg(null);
     try {
-      let slug = trimmedName
+      const slug = trimmedName
         .toLowerCase()
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '')
@@ -136,7 +136,7 @@ export default function AdminCategories() {
     setLoading(true);
     setMsg(null);
     try {
-      let slug = trimmedName
+      const slug = trimmedName
         .toLowerCase()
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '')

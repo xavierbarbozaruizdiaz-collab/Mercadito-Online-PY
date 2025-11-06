@@ -24,6 +24,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // Efecto intencional: inicializar tema y marcar como montado para evitar problemas de hidratación
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     setMounted(true);
     // Leer tema guardado o usar preferencia del sistema

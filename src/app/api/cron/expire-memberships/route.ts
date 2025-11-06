@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
       .lt('membership_expires_at', new Date().toISOString())
       .gte('membership_expires_at', new Date(Date.now() - 60 * 60 * 1000).toISOString()); // Última hora
 
-    let productsPausedSummary: any[] = [];
+    const productsPausedSummary: any[] = [];
 
     if (usersError) {
       logger.warn('Error obteniendo usuarios con membresía expirada', usersError);

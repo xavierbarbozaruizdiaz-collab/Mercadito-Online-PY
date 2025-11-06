@@ -9,7 +9,6 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   SearchBar,
-  SearchSuggestions,
   LoadingSpinner
 } from '@/components/ui';
 import { useSearch } from '@/lib/hooks/useSearch';
@@ -68,18 +67,18 @@ export default function RealTimeSearch({
     loadRecent();
   }, [loadTrending, loadRecent]);
 
-  // Manejar cambio de query
-  const handleQueryChange = (value: string) => {
-    setQuery(value);
-    setSelectedIndex(-1);
-    
-    if (value.length > 2) {
-      loadSuggestions(value);
-      setIsOpen(true);
-    } else {
-      setIsOpen(false);
-    }
-  };
+  // Manejar cambio de query (no usado actualmente, pero puede ser útil en el futuro)
+  // const handleQueryChange = (value: string) => {
+  //   setQuery(value);
+  //   setSelectedIndex(-1);
+  //   
+  //   if (value.length > 2) {
+  //     loadSuggestions(value);
+  //     setIsOpen(true);
+  //   } else {
+  //     setIsOpen(false);
+  //   }
+  // };
 
   // Manejar búsqueda
   const handleSearch = (searchQuery?: string) => {
@@ -128,7 +127,8 @@ export default function RealTimeSearch({
     handleSearch(trend);
   };
 
-  // Manejar teclas
+  // Manejar teclas (no usado actualmente, pero puede ser útil en el futuro)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (!isOpen) return;
 
@@ -184,7 +184,8 @@ export default function RealTimeSearch({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Obtener todas las sugerencias
+  // Obtener todas las sugerencias (no usado actualmente, pero puede ser útil en el futuro)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const getAllSuggestions = () => {
     const allSuggestions = [
       ...suggestions,
@@ -217,7 +218,7 @@ export default function RealTimeSearch({
             {query.length > 2 && (
               <div className="mb-4">
                 <h4 className="text-sm font-medium text-gray-700 mb-2">
-                  Sugerencias para "{query}"
+                  Sugerencias para &quot;{query}&quot;
                 </h4>
                 {loading ? (
                   <div className="flex items-center justify-center py-2">

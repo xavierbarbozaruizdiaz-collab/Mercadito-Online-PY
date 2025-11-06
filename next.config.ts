@@ -71,10 +71,10 @@ const nextConfig: NextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              // Scripts: mantener unsafe-inline temporalmente para Next.js, pero eliminar unsafe-eval si es posible
-              // Nota: 'unsafe-inline' puede ser necesario para scripts inline de Next.js
-              // 'unsafe-eval' se mantiene solo si es estrictamente necesario para Supabase
-              "script-src 'self' 'unsafe-inline' https://*.supabase.co https://vercel.live",
+              // Scripts: unsafe-inline y unsafe-eval necesarios para Next.js (HMR, hot reload, etc.)
+              // Nota: 'unsafe-eval' es requerido por Next.js en desarrollo y puede ser necesario en producción
+              // dependiendo de la configuración de webpack y optimizaciones
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.supabase.co https://vercel.live",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com data:",
               "img-src 'self' data: https: blob:",

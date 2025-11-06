@@ -189,7 +189,7 @@ export default function StoresPage() {
           }
         }
 
-        let enrichedStores = (storesData as any[]).map((store: any) => ({
+        const enrichedStores = (storesData as any[]).map((store: any) => ({
           ...store,
           seller: store.seller_id ? (sellersMap[store.seller_id] || null) : null,
         }));

@@ -31,37 +31,28 @@ class GoogleAnalyticsService {
 
   /**
    * Inicializa Google Analytics 4
+   * NOTA: NO carga gtag.js directamente. Solo usa gtag si ya existe (cargado por GTM).
+   * GTM debe ser la única fuente de carga de GA4.
    */
   initialize(measurementId: string): void {
     if (typeof window === 'undefined' || this.initialized) return;
 
-    this.measurementId = measurementId;
-
-    // Crear dataLayer
-    if (!window.dataLayer) {
-      window.dataLayer = [];
+    // Verificar si gtag ya existe (debe estar cargado vía GTM)
+    if (typeof window !== 'undefined' && (window as any).gtag) {
+      this.measurementId = measurementId;
+      this.initialized = true;
+      return; // Usar la instancia de GTM, NO cargar gtag.js directamente
     }
 
-    // Script de Google Analytics
-    const script1 = document.createElement('script');
-    script1.async = true;
-    script1.src = `https://www.googletagmanager.com/gtag/js?id=${measurementId}`;
-    document.head.appendChild(script1);
-
-    // Script de inicialización
-    const script2 = document.createElement('script');
-    script2.innerHTML = `
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-      gtag('config', '${measurementId}', {
-        page_path: window.location.pathname,
-        send_page_view: true
-      });
-    `;
-    document.head.appendChild(script2);
-
+    // Si gtag no existe, NO lo cargamos. GTM debe cargarlo.
+    // Solo guardamos el measurementId para uso futuro
+    this.measurementId = measurementId;
     this.initialized = true;
+    
+    // Log en desarrollo para debugging
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('[GoogleAnalyticsService] gtag no encontrado. Asegúrate de que GTM esté cargado.');
+    }
   }
 
   /**

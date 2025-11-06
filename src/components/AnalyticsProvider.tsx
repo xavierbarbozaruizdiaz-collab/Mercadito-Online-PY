@@ -2,15 +2,13 @@
 // MERCADITO ONLINE PY - ANALYTICS PROVIDER
 // Provider para tracking de analytics en toda la app
 // ============================================
+// NOTA: GTM es la única fuente de carga de GA4.
+// Este provider solo usa gtag si ya existe (cargado por GTM).
 
 'use client';
 
 import { useEffect, Suspense } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
-import { analytics } from '@/lib/services/analyticsService';
-import { errorMonitoring } from '@/lib/monitoring/errorMonitoring';
-import { useAuth } from '@/lib/hooks/useAuth';
-import { facebookPixel as facebookPixelService } from '@/lib/services/facebookPixelService';
 import { googleAnalytics as googleAnalyticsService } from '@/lib/services/googleAnalyticsService';
 
 interface AnalyticsProviderProps {
@@ -21,156 +19,46 @@ interface AnalyticsProviderProps {
 function AnalyticsTracker() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { user } = useAuth();
 
-  // Inicializar servicios de analytics
+  // Google Analytics: NO inicializar directamente.
+  // GTM es la única fuente de carga. Si gtag ya existe (de GTM), solo configuramos el measurementId.
   useEffect(() => {
-    // Inicializar Facebook Pixel
-    const fbPixelId = process.env.NEXT_PUBLIC_FACEBOOK_PIXEL_ID;
-    if (fbPixelId && typeof window !== 'undefined' && !window.fbq) {
-      facebookPixelService.initialize(fbPixelId);
-    }
-
-    // Inicializar Google Analytics
     const gaId = process.env.NEXT_PUBLIC_GA_ID;
-    if (gaId && typeof window !== 'undefined' && !window.gtag) {
-      googleAnalyticsService.initialize(gaId);
+    if (gaId && typeof window !== 'undefined') {
+      // Solo usar gtag si ya existe (de GTM), nunca cargar gtag.js directamente
+      if ((window as any).gtag) {
+        googleAnalyticsService.initialize(gaId);
+      } else {
+        // Esperar a que GTM cargue gtag
+        const checkGtag = setInterval(() => {
+          if ((window as any).gtag) {
+            googleAnalyticsService.initialize(gaId);
+            clearInterval(checkGtag);
+          }
+        }, 100);
+        
+        // Timeout después de 5 segundos
+        setTimeout(() => clearInterval(checkGtag), 5000);
+      }
     }
   }, []);
 
-  // Track page views
+  // Track page views vía GTM (dataLayer)
   useEffect(() => {
-    const url = `${pathname}${searchParams.toString() ? `?${searchParams.toString()}` : ''}`;
-    
-    // Determinar el nombre de la página basado en la ruta
-    let pageName = 'unknown';
-    if (pathname === '/') {
-      pageName = 'home';
-    } else if (pathname.startsWith('/products/')) {
-      pageName = 'product_detail';
-    } else if (pathname.startsWith('/store/')) {
-      pageName = 'store_profile';
-    } else if (pathname.startsWith('/stores')) {
-      pageName = 'stores_list';
-    } else if (pathname.startsWith('/search')) {
-      pageName = 'search';
-    } else if (pathname.startsWith('/dashboard')) {
-      pageName = 'dashboard';
-    } else if (pathname.startsWith('/chat')) {
-      pageName = 'chat';
-    } else if (pathname.startsWith('/auth')) {
-      pageName = 'auth';
+    // Usar dataLayer.push para eventos e-commerce (GTM maneja todo)
+    if (typeof window !== 'undefined' && window.dataLayer) {
+      window.dataLayer.push({
+        event: 'page_view',
+        page_path: pathname,
+        page_title: document.title,
+      });
     }
 
-    // Track en todos los servicios
-    analytics.trackPageView(pageName, {
-      url,
-      pathname,
-      search_params: searchParams.toString(),
-    });
-
-    // Facebook Pixel ya trackea PageView automáticamente desde layout.tsx
-    // Pero podemos trackear también manualmente si es necesario
-    if (typeof window !== 'undefined' && window.fbq) {
-      facebookPixelService.trackPageView();
-    }
-
-    // Google Analytics
-    if (typeof window !== 'undefined' && window.gtag) {
+    // Google Analytics: solo trackear si gtag existe (de GTM)
+    if (typeof window !== 'undefined' && (window as any).gtag) {
       googleAnalyticsService.trackPageView(pathname, document.title);
     }
   }, [pathname, searchParams]);
-
-  // Set user ID when user changes
-  useEffect(() => {
-    if (user?.id) {
-      analytics.setUserId(user.id);
-      errorMonitoring.setUserId(user.id);
-      
-      // Identificar usuario en Facebook Pixel
-      if (typeof window !== 'undefined' && window.fbq) {
-        facebookPixelService.identify(user.id, {
-          email: user.email,
-        });
-      }
-
-      // Identificar usuario en Google Analytics
-      if (typeof window !== 'undefined' && window.gtag) {
-        googleAnalyticsService.setUserId(user.id);
-        googleAnalyticsService.setUserProperties({
-          userId: user.id,
-          email: user.email,
-        });
-      }
-    }
-  }, [user?.id, user?.email]);
-
-  // Track performance metrics
-  useEffect(() => {
-    if (typeof window !== 'undefined' && 'performance' in window) {
-      const trackPerformance = () => {
-        const navigation = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming;
-        
-        if (navigation) {
-          const metrics = {
-            page_load_time: Math.round(navigation.loadEventEnd - navigation.fetchStart),
-            first_contentful_paint: 0,
-            largest_contentful_paint: 0,
-            cumulative_layout_shift: 0,
-            first_input_delay: 0,
-          };
-
-          // Try to get Core Web Vitals if available
-          if ('web-vitals' in window) {
-            // This would require importing web-vitals library
-            // For now, we'll track basic metrics
-          }
-
-          analytics.trackPerformanceMetrics(metrics);
-        }
-      };
-
-      // Track performance after page load
-      if (document.readyState === 'complete') {
-        trackPerformance();
-      } else {
-        window.addEventListener('load', trackPerformance);
-      }
-
-      return () => {
-        window.removeEventListener('load', trackPerformance);
-      };
-    }
-  }, []);
-
-  // Track errors
-  useEffect(() => {
-    const handleError = (event: ErrorEvent) => {
-      analytics.trackEvent('error', {
-        error_type: 'javascript_error',
-        error_message: event.message,
-        error_stack: event.error?.stack,
-        page_url: window.location.href,
-      });
-    };
-
-    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
-      analytics.trackEvent('error', {
-        error_type: 'unhandled_promise_rejection',
-        error_message: event.reason?.message || 'Unknown promise rejection',
-        error_stack: event.reason?.stack,
-        page_url: window.location.href,
-      });
-    };
-
-    window.addEventListener('error', handleError);
-    window.addEventListener('unhandledrejection', handleUnhandledRejection);
-
-    return () => {
-      window.removeEventListener('error', handleError);
-      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
-    };
-  }, []);
 
   return null;
 }

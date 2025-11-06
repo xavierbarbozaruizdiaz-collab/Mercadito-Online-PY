@@ -9,7 +9,6 @@ import {
   Share2,
   Facebook,
   Twitter,
-  Instagram,
   Copy,
   Link as LinkIcon,
   Check,
