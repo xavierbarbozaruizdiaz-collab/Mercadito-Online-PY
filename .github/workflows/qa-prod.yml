@@ -1,0 +1,33 @@
+﻿name: QA Prod
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  qa-prod:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install
+        run: npm ci
+
+      - name: Run QA Prod
+        run: npm run qa:prod
+
+      - name: Archive QA artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-prod-artifact
+          path: docs/.artifacts/qa-prod.json
