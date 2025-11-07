@@ -34,7 +34,9 @@
     "analizar:componentes-dinamicos": "node scripts/analizar-componentes-dinamicos.js",
     "verificar:clases-css": "node scripts/verificar-clases-en-css.js",
     "verificar:diferencias-render": "node scripts/verificar-diferencias-render.js",
-    "diagnostico:profundo": "node scripts/diagnostico-profundo.js"
+    "diagnostico:profundo": "node scripts/diagnostico-profundo.js",
+    "qa:preview": "node scripts/qa-preview.mjs",
+    "qa:tracking": "node scripts/qa-tracking.mjs"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx}": [

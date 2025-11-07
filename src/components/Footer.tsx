@@ -10,6 +10,8 @@ import { Facebook, Instagram, Twitter, Mail, Phone, MapPin } from 'lucide-react'
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
+  const enableProductsApi = process.env.NEXT_PUBLIC_ENABLE_PRODUCTS_API === 'true';
+  const productsHref = enableProductsApi ? '/products' : '/vitrina';
 
   return (
     <footer className="bg-gray-900 text-gray-300">
@@ -62,7 +64,12 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/products" className="hover:text-white transition-colors">
+                <Link
+                  href={productsHref}
+                  prefetch={enableProductsApi}
+                  aria-disabled={!enableProductsApi}
+                  className="hover:text-white transition-colors"
+                >
                   Productos
                 </Link>
               </li>

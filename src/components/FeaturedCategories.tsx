@@ -19,6 +19,7 @@ type Category = {
 export default function FeaturedCategories() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
+  const enableProductsApi = process.env.NEXT_PUBLIC_ENABLE_PRODUCTS_API === 'true';
 
   useEffect(() => {
     loadCategories();
@@ -99,10 +100,13 @@ export default function FeaturedCategories() {
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
           {categories.map((category, index) => {
             const Icon = icons[index % icons.length];
+            const categoryHref = enableProductsApi ? `/products?category=${category.id}` : '/vitrina';
             return (
               <Link
                 key={category.id}
-                href={`/products?category=${category.id}`}
+                href={categoryHref}
+                prefetch={enableProductsApi}
+                aria-disabled={!enableProductsApi}
                 className="group relative flex flex-col items-center justify-center p-4 sm:p-6 bg-gradient-to-br from-blue-50 to-purple-50 rounded-xl border border-gray-200 hover:border-purple-300 hover:shadow-lg transition-all duration-300 hover:scale-105"
               >
                 <div className="mb-3 p-3 bg-white rounded-full shadow-sm group-hover:shadow-md transition-shadow">

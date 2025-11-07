@@ -9,6 +9,9 @@ import Link from 'next/link';
 import { Store, Star, Heart } from 'lucide-react';
 
 export default function CategoryButtons() {
+  const enableProductsApi = process.env.NEXT_PUBLIC_ENABLE_PRODUCTS_API === 'true';
+  const vitrinaHref = enableProductsApi ? '/products?showcase=true' : '/vitrina';
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
@@ -33,7 +36,9 @@ export default function CategoryButtons() {
 
         {/* Botón Vitrina - Amarillo */}
         <Link
-          href="/products?showcase=true"
+          href={vitrinaHref}
+          prefetch={enableProductsApi}
+          aria-disabled={!enableProductsApi}
           className="group relative flex items-center gap-4 p-4 sm:p-6 bg-gradient-to-r from-yellow-400 to-yellow-500 rounded-lg shadow-md hover:shadow-xl transition-all hover:scale-105 min-h-[100px]"
         >
           <div className="flex-shrink-0">
