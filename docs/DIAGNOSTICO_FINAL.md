@@ -129,8 +129,8 @@ PRODUCTS_REFS: src/components/Footer.tsx
     /icons/favicon-32x32.png -> 401 FAIL
     /icons/icon-96x96.png -> 401 FAIL
     ```
-    *(Pendiente ejecutar con `x-vercel-protection-bypass` cuando esté disponible).* 
-  - `node scripts/qa-tracking.mjs --base="https://mercadito-online-py-git-fix-gtm-minimal-icons-wa-barboza.vercel.app"` →
+    *(Pendiente repetir con `x-vercel-protection-bypass` cuando esté disponible; se usó el preview `https://mercadito-online-py-git-fix-preview-bypass-csp-p-bad709-barboza.vercel.app`.)*
+  - `node scripts/qa-tracking.mjs --base="https://mercadito-online-py-git-fix-preview-bypass-csp-p-bad709-barboza.vercel.app"` →
     ```
     {
       "rootStatus": 401,
