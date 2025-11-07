@@ -2,11 +2,15 @@ name: QA Prod
 
 on:
   workflow_dispatch:
+  push:
+    branches: [ main ]
 
 jobs:
   qa-prod:
     name: QA Prod Checks
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -32,9 +36,42 @@ jobs:
           node scripts/qa-prod.mjs --base=https://mercaditoonlinepy.com > docs/.artifacts/qa-prod.json
           cat docs/.artifacts/qa-prod.json
 
-      - name: Upload QA Prod artifact
+      - name: Archive QA artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: qa-prod-artifact
           path: docs/.artifacts/qa-prod.json
+
+      - name: Job Summary (QA Prod)
+        if: always()
+        run: |
+          echo "## QA Prod Summary" >> $GITHUB_STEP_SUMMARY
+          if [ -f docs/.artifacts/qa-prod.json ]; then
+            echo '```json' >> $GITHUB_STEP_SUMMARY
+            cat docs/.artifacts/qa-prod.json >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          else
+            echo "_No artifact found_" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Comment on PR (if PR)
+        if: ${{ github.event_name == 'pull_request' && always() }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let body = "QA Prod ran on this PR.\n\n";
+            try {
+              const j = JSON.parse(fs.readFileSync('docs/.artifacts/qa-prod.json','utf8'));
+              body += "```json\n" + JSON.stringify(j, null, 2) + "\n```";
+            } catch(e) {
+              body += "_No artifact or parse error._";
+            }
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body
+            })
 

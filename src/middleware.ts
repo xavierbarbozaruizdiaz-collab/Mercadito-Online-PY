@@ -77,6 +77,12 @@ setInterval(() => {
 }, 5 * 60 * 1000);
 
 export function middleware(request: NextRequest) {
+  const hostname = request.headers.get('host') ?? request.nextUrl.hostname;
+
+  if (hostname?.includes('vercel.live')) {
+    return NextResponse.next();
+  }
+
   // Solo aplicar rate limiting a rutas API
   if (!request.nextUrl.pathname.startsWith('/api/')) {
     return NextResponse.next();
@@ -113,7 +119,7 @@ export function middleware(request: NextRequest) {
 // Aplicar middleware excluyendo rutas estáticas/PWA
 export const config = {
   matcher: [
-    '/((?!_next/|icons/|favicon.ico|manifest.webmanifest|robots.txt|sitemap.xml|images/|api/).*)',
+    '/((?!_next/static|_next/image|favicon\\.ico|robots\\.txt|sitemap\\.xml|manifest\\.json|icons/|images/|.*\\.(png|jpg|jpeg|gif|svg|webp)).*)',
   ],
 };
 

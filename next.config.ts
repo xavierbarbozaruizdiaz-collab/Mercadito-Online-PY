@@ -79,7 +79,7 @@ const nextConfig: NextConfig = {
               // Imágenes: permitir GTM, GA y Facebook Pixel para tracking pixels
               "img-src 'self' data: https: blob: https://www.googletagmanager.com https://www.google-analytics.com https://connect.facebook.net",
               // Conexiones: permitir Google Analytics y mantener Supabase
-              "connect-src 'self' https://*.supabase.co https://*.supabase.io wss://*.supabase.co https://www.google-analytics.com https://region1.google-analytics.com",
+              "connect-src 'self' https://*.supabase.co https://*.supabase.io wss://*.supabase.co https://www.google-analytics.com https://region1.google-analytics.com https://vercel.live",
               // Frames: permitir GTM y Facebook Pixel
               "frame-src 'self' https://www.googletagmanager.com https://connect.facebook.net https://vercel.live",
               "object-src 'none'",
