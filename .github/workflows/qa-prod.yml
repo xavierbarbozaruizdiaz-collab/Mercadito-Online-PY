@@ -33,7 +33,7 @@ jobs:
       - name: Run QA Prod checks
         run: |
           mkdir -p docs/.artifacts
-          node scripts/qa-prod.mjs --base=https://mercaditoonlinepy.com > docs/.artifacts/qa-prod.json
+          node scripts/qa-prod.mjs --base=https://mercaditoonlinepy.com --out=docs/.artifacts/qa-prod.json
           cat docs/.artifacts/qa-prod.json
 
       - name: Archive QA artifact
