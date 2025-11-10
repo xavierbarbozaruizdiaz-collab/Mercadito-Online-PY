@@ -3,7 +3,7 @@
 // Inyecta scripts de tracking específicos de la tienda
 // ============================================
 
-import { Metadata } from 'next';
+import { type Metadata } from 'next';
 import Script from 'next/script';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
@@ -14,42 +14,34 @@ interface StoreLayoutProps {
   params: Promise<{ slug: string }>;
 }
 
-export async function generateMetadata({ params }: StoreLayoutProps): Promise<Metadata> {
+export async function generateMetadata(): Promise<Metadata> {
   // Metadata básica, puede mejorarse después
-  return {
-    title: 'Tienda',
-  };
+  return { title: 'Tienda' };
 }
 
 export default async function StoreLayout({ children, params }: StoreLayoutProps) {
   const featureEnabled = process.env.NEXT_PUBLIC_FEATURE_MARKETING === '1';
   const { slug } = await params;
-<<<<<<< HEAD
 
   const trackingIds = featureEnabled ? await getTrackingIdsForStore(slug) : null;
   const globalGTMId = process.env.NEXT_PUBLIC_GTM_ID || 'GTM-PQ8Q6JGW';
-=======
-  
-  // Obtener IDs de tracking para esta tienda
-  const trackingIds = await getTrackingIdsForStore(slug);
-  const globalGTMId = process.env.NEXT_PUBLIC_GTM_ID || 'GTM-PQ8Q6JGW';
 
-  // Determinar qué scripts cargar
-  const hasPixel = !!trackingIds.pixelId;
-  // Tracking centralizado en layout raíz (GTM global). No cargar GTM/GA aquí para evitar duplicados.
-  // Si la tienda tiene gtmId y coincide con el global, NO inyectar nada nuevo (ya está en layout raíz)
-  // const hasGA = !!trackingIds.gaId; // Deshabilitado: GA debe cargarse vía GTM en layout raíz
-  // const hasGTM = !!trackingIds.gtmId && trackingIds.gtmId !== globalGTMId; // Solo si es diferente del global (pero NO inyectar)
->>>>>>> origin/main
+  // Si la tienda tiene un GTM distinto del global, lo inyectamos aquí
+  const storeGtmId =
+    trackingIds?.gtmId && trackingIds.gtmId !== globalGTMId ? trackingIds.gtmId : null;
 
-  const storeGtmId = trackingIds?.gtmId && trackingIds.gtmId !== globalGTMId ? trackingIds.gtmId : null;
+  // Pixel global y por tienda (si es diferente del global)
   const globalPixelId = process.env.NEXT_PUBLIC_FACEBOOK_PIXEL_ID;
   const hasGlobalPixel = featureEnabled && !!globalPixelId;
-  const storePixelId = featureEnabled && trackingIds?.pixelId && trackingIds.pixelId !== globalPixelId ? trackingIds.pixelId : null;
+
+  const storePixelId =
+    featureEnabled && trackingIds?.pixelId && trackingIds.pixelId !== globalPixelId
+      ? trackingIds.pixelId
+      : null;
 
   return (
     <>
-<<<<<<< HEAD
+      {/* GTM por tienda (solo si difiere del global para evitar duplicados) */}
       {storeGtmId && (
         <>
           <Script
@@ -75,9 +67,8 @@ export default async function StoreLayout({ children, params }: StoreLayoutProps
           </noscript>
         </>
       )}
-=======
->>>>>>> origin/main
 
+      {/* Pixel global */}
       {hasGlobalPixel && (
         <>
           <Script
@@ -110,14 +101,15 @@ export default async function StoreLayout({ children, params }: StoreLayoutProps
         </>
       )}
 
+      {/* Pixel específico de la tienda (si difiere del global) */}
       {storePixelId && (
         <>
           <Script
-            id="fb-pixel-store"
+            id={`fb-pixel-store-${slug}`}
             strategy="afterInteractive"
             dangerouslySetInnerHTML={{
               __html: `
-                if(typeof fbq !== 'undefined') {
+                if (typeof fbq !== 'undefined') {
                   fbq('init', '${storePixelId}', {}, 'store');
                   fbq('track', 'PageView', {}, 'store');
                 } else {
@@ -147,10 +139,11 @@ export default async function StoreLayout({ children, params }: StoreLayoutProps
         </>
       )}
 
-<<<<<<< HEAD
       <ErrorBoundary>
         <ThemeProvider>
           {children}
+
+          {/* Limpieza de SW y caches (útil si vienes de versiones previas con sw.js) */}
           <Script
             id="sw-cleanup-store"
             strategy="afterInteractive"
@@ -162,21 +155,19 @@ export default async function StoreLayout({ children, params }: StoreLayoutProps
                       registration.unregister();
                     }
                   });
-                  caches.keys().then(function(names) {
-                    for (const name of names) {
-                      caches.delete(name);
-                    }
-                  });
+                  if (window.caches) {
+                    caches.keys().then(function(names) {
+                      for (const name of names) {
+                        caches.delete(name);
+                      }
+                    });
+                  }
                 }
               `,
             }}
           />
         </ThemeProvider>
       </ErrorBoundary>
-=======
-      {children}
->>>>>>> origin/main
     </>
   );
 }
-
