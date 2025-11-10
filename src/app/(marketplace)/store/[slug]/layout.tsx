@@ -5,6 +5,8 @@
 
 import { Metadata } from 'next';
 import Script from 'next/script';
+import { ThemeProvider } from '@/contexts/ThemeContext';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { getTrackingIdsForStore } from '@/lib/marketing/getTrackingIdsForStore';
 
 interface StoreLayoutProps {
@@ -20,15 +22,13 @@ export async function generateMetadata({ params }: StoreLayoutProps): Promise<Me
 }
 
 export default async function StoreLayout({ children, params }: StoreLayoutProps) {
-  // Feature flag check
   const featureEnabled = process.env.NEXT_PUBLIC_FEATURE_MARKETING === '1';
-  
-  if (!featureEnabled) {
-    return <>{children}</>;
-  }
-
-  // Obtener params
   const { slug } = await params;
+<<<<<<< HEAD
+
+  const trackingIds = featureEnabled ? await getTrackingIdsForStore(slug) : null;
+  const globalGTMId = process.env.NEXT_PUBLIC_GTM_ID || 'GTM-PQ8Q6JGW';
+=======
   
   // Obtener IDs de tracking para esta tienda
   const trackingIds = await getTrackingIdsForStore(slug);
@@ -40,15 +40,44 @@ export default async function StoreLayout({ children, params }: StoreLayoutProps
   // Si la tienda tiene gtmId y coincide con el global, NO inyectar nada nuevo (ya está en layout raíz)
   // const hasGA = !!trackingIds.gaId; // Deshabilitado: GA debe cargarse vía GTM en layout raíz
   // const hasGTM = !!trackingIds.gtmId && trackingIds.gtmId !== globalGTMId; // Solo si es diferente del global (pero NO inyectar)
+>>>>>>> origin/main
 
-  // IDs globales (para multi-pixel)
+  const storeGtmId = trackingIds?.gtmId && trackingIds.gtmId !== globalGTMId ? trackingIds.gtmId : null;
   const globalPixelId = process.env.NEXT_PUBLIC_FACEBOOK_PIXEL_ID;
-  const hasGlobalPixel = !!globalPixelId;
+  const hasGlobalPixel = featureEnabled && !!globalPixelId;
+  const storePixelId = featureEnabled && trackingIds?.pixelId && trackingIds.pixelId !== globalPixelId ? trackingIds.pixelId : null;
 
   return (
     <>
+<<<<<<< HEAD
+      {storeGtmId && (
+        <>
+          <Script
+            id={`gtm-store-${slug}`}
+            strategy="afterInteractive"
+            dangerouslySetInnerHTML={{
+              __html: `
+                (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+                new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+                j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+                'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+                })(window,document,'script','dataLayer','${storeGtmId}');
+              `,
+            }}
+          />
+          <noscript>
+            <iframe
+              src={`https://www.googletagmanager.com/ns.html?id=${storeGtmId}`}
+              height="0"
+              width="0"
+              style={{ display: 'none', visibility: 'hidden' }}
+            />
+          </noscript>
+        </>
+      )}
+=======
+>>>>>>> origin/main
 
-      {/* Facebook Pixel - Global (si existe) */}
       {hasGlobalPixel && (
         <>
           <Script
@@ -81,8 +110,7 @@ export default async function StoreLayout({ children, params }: StoreLayoutProps
         </>
       )}
 
-      {/* Facebook Pixel - Store (si existe y es diferente del global) */}
-      {hasPixel && trackingIds.pixelId !== globalPixelId && (
+      {storePixelId && (
         <>
           <Script
             id="fb-pixel-store"
@@ -90,7 +118,7 @@ export default async function StoreLayout({ children, params }: StoreLayoutProps
             dangerouslySetInnerHTML={{
               __html: `
                 if(typeof fbq !== 'undefined') {
-                  fbq('init', '${trackingIds.pixelId}', {}, 'store');
+                  fbq('init', '${storePixelId}', {}, 'store');
                   fbq('track', 'PageView', {}, 'store');
                 } else {
                   !function(f,b,e,v,n,t,s)
@@ -101,7 +129,7 @@ export default async function StoreLayout({ children, params }: StoreLayoutProps
                   t.src=v;s=b.getElementsByTagName(e)[0];
                   s.parentNode.insertBefore(t,s)}(window, document,'script',
                   'https://connect.facebook.net/en_US/fbevents.js');
-                  fbq('init', '${trackingIds.pixelId}', {}, 'store');
+                  fbq('init', '${storePixelId}', {}, 'store');
                   fbq('track', 'PageView', {}, 'store');
                 }
               `,
@@ -112,14 +140,42 @@ export default async function StoreLayout({ children, params }: StoreLayoutProps
               height="1"
               width="1"
               style={{ display: 'none' }}
-              src={`https://www.facebook.com/tr?id=${trackingIds.pixelId}&ev=PageView&noscript=1`}
+              src={`https://www.facebook.com/tr?id=${storePixelId}&ev=PageView&noscript=1`}
               alt=""
             />
           </noscript>
         </>
       )}
 
+<<<<<<< HEAD
+      <ErrorBoundary>
+        <ThemeProvider>
+          {children}
+          <Script
+            id="sw-cleanup-store"
+            strategy="afterInteractive"
+            dangerouslySetInnerHTML={{
+              __html: `
+                if ('serviceWorker' in navigator) {
+                  navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                    for (const registration of registrations) {
+                      registration.unregister();
+                    }
+                  });
+                  caches.keys().then(function(names) {
+                    for (const name of names) {
+                      caches.delete(name);
+                    }
+                  });
+                }
+              `,
+            }}
+          />
+        </ThemeProvider>
+      </ErrorBoundary>
+=======
       {children}
+>>>>>>> origin/main
     </>
   );
 }

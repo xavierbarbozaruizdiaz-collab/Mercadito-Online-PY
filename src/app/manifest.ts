@@ -21,16 +21,30 @@ export default function manifest(): MetadataRoute.Manifest {
     
     icons: [
       {
+<<<<<<< HEAD
+        src: '/icons/icon-96x96.png',
+        sizes: '96x96',
+        type: 'image/png',
+      },
+      {
+        src: '/icons/favicon-16x16.png',
+        sizes: '16x16',
+        type: 'image/png',
+=======
         src: '/icons/favicon-16x16.png',
         sizes: '16x16',
         type: 'image/png',
         purpose: 'any',
+>>>>>>> origin/main
       },
       {
         src: '/icons/favicon-32x32.png',
         sizes: '32x32',
         type: 'image/png',
+<<<<<<< HEAD
+=======
         purpose: 'any',
+>>>>>>> origin/main
       },
       {
         src: '/icons/icon-72x72.png',
@@ -82,8 +96,11 @@ export default function manifest(): MetadataRoute.Manifest {
       },
     ],
     
+<<<<<<< HEAD
+=======
     // Shortcuts removidos temporalmente: los íconos (search-96x96.png, cart-96x96.png, profile-96x96.png, store-96x96.png) no existen
     // Se pueden agregar cuando los íconos estén disponibles en /public/icons/
+>>>>>>> origin/main
     shortcuts: [],
     
     related_applications: [

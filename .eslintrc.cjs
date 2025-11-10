@@ -35,6 +35,16 @@ module.exports = {
         'react-hooks/exhaustive-deps': 'warn', // Dependencias faltantes comunes en App Router
       },
     },
+    // Legacy o código en transición
+    {
+      files: ['src/legacy/**'],
+      rules: {
+        '@typescript-eslint/no-explicit-any': 'warn',
+        'no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+        '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+        'no-console': 'off',
+      },
+    },
     // Scripts y plantillas
     {
       files: ['scripts/**', 'supabase/migrations/**'],
@@ -43,6 +53,8 @@ module.exports = {
         '@typescript-eslint/no-var-requires': 'off',
         'import/no-commonjs': 'off',
         '@typescript-eslint/no-require-imports': 'off',
+        'no-undef': 'off',
+        'no-unused-expressions': 'off',
       },
     },
     // Archivos generados o d.ts

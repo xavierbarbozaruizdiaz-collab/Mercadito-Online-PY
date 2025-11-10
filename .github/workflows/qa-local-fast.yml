@@ -1,0 +1,41 @@
+name: QA Local (FAST)
+
+on:
+  pull_request:
+    branches: [ main, dev ]
+  push:
+    branches: [ main, dev ]
+
+jobs:
+  qa-fast:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: npm ci
+        run: npm ci
+
+      - name: QA fast
+        run: |
+          bash scripts/lpms-local-qa-skip-lh.sh || true
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-fast-artifacts
+          path: |
+            docs/.artifacts/**
+            /tmp/lpms-local-server.log
+          if-no-files-found: ignore
+
+
