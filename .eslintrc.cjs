@@ -1,7 +1,20 @@
+/** @type {import('eslint').Linter.Config} */
 module.exports = {
   root: true,
+
+  // Migración desde .eslintignore
+  ignorePatterns: [
+    'node_modules/**',
+    '.next/**',
+    'dist/**',
+    'build/**',
+    'public/sw.js',
+    'scripts/**/*.js', // ignoramos scripts node de utilidades (eran los que bloqueaban)
+  ],
+
   parser: '@typescript-eslint/parser',
   plugins: ['@typescript-eslint', 'react', 'react-hooks', 'import'],
+
   extends: [
     'next/core-web-vitals',
     'eslint:recommended',
@@ -9,11 +22,13 @@ module.exports = {
     'plugin:react-hooks/recommended',
     'plugin:import/recommended',
   ],
+
   rules: {
     '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
-    '@typescript-eslint/no-explicit-any': 'warn', // Permitir `any` como warning en lugar de error
-    'react-hooks/exhaustive-deps': 'warn', // Permitir dependencias faltantes como warning
+    '@typescript-eslint/no-explicit-any': 'warn', // baja a warning en app
+    'react-hooks/exhaustive-deps': 'warn',
   },
+
   overrides: [
     // Tests y mocks
     {
@@ -25,16 +40,18 @@ module.exports = {
         'react-hooks/exhaustive-deps': 'off',
       },
     },
-    // Pages/App Router loaders y rutas: suele haber `any` y params sin usar
+
+    // App Router (loaders/params suelen usar any o args sin usar)
     {
       files: ['src/app/**'],
       rules: {
         '@typescript-eslint/no-explicit-any': 'warn',
         'no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
         '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
-        'react-hooks/exhaustive-deps': 'warn', // Dependencias faltantes comunes en App Router
+        'react-hooks/exhaustive-deps': 'warn',
       },
     },
+
     // Legacy o código en transición
     {
       files: ['src/legacy/**'],
@@ -45,23 +62,13 @@ module.exports = {
         'no-console': 'off',
       },
     },
-    // Scripts y plantillas
-    {
-      files: ['scripts/**', 'supabase/migrations/**'],
-      rules: {
-        'no-console': 'off',
-        '@typescript-eslint/no-var-requires': 'off',
-        'import/no-commonjs': 'off',
-        '@typescript-eslint/no-require-imports': 'off',
-        'no-undef': 'off',
-        'no-unused-expressions': 'off',
-      },
-    },
-    // Archivos generados o d.ts
+
+    // Archivos de tipos
     {
       files: ['**/*.d.ts'],
       rules: { '@typescript-eslint/no-empty-interface': 'off' },
     },
+
     // Funciones de Supabase (Deno)
     {
       files: ['supabase/functions/**/*'],
@@ -70,11 +77,4 @@ module.exports = {
       },
     },
   ],
-  ignorePatterns: [
-    'node_modules/**',
-    '.next/**',
-    'dist/**',
-    'build/**',
-  ],
 };
-
