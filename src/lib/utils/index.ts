@@ -96,6 +96,7 @@ export function isValidPhone(phone: string): boolean {
  * formatPhoneForWhatsApp('+595981988714') // 'https://wa.me/595981988714'
  * formatPhoneForWhatsApp('595981988714') // 'https://wa.me/595981988714'
  */
+<<<<<<< HEAD
 export function formatPhoneForWhatsApp(raw: string | null | undefined): string | null {
   if (!raw) return null;
 
@@ -121,6 +122,49 @@ export function formatPhoneForWhatsApp(raw: string | null | undefined): string |
   }
 
   return null;
+=======
+export function formatPhoneForWhatsApp(input: unknown): string | null {
+  try {
+    const raw = String(input ?? '').trim();
+    if (!raw) return null;
+
+    // Mantener solo dígitos
+    let clean = raw.replace(/\D/g, '');
+
+    // Si empieza con 595 → usa tal cual
+    if (clean.startsWith('595')) {
+      // Validar que la parte local (sin 595) tenga >= 9 dígitos
+      const localPart = clean.slice(3);
+      if (localPart.length < 9) {
+        console.warn('[WA] telefono invalido:', raw, clean, 'parte local:', localPart.length, 'dígitos');
+        return null;
+      }
+      return clean;
+    }
+
+    // Si empieza con 0 → remove sólo el primer 0 y NO recortes más
+    if (clean.startsWith('0')) {
+      clean = clean.slice(1);
+      // Validar que tenga >= 9 dígitos después de quitar el 0
+      if (clean.length < 9) {
+        console.warn('[WA] telefono invalido:', raw, clean, 'solo', clean.length, 'dígitos después de quitar 0');
+        return null;
+      }
+      return '595' + clean;
+    }
+
+    // Si no empieza con 595 → prefix 595
+    // Validar que tenga >= 9 dígitos antes de agregar 595
+    if (clean.length < 9) {
+      console.warn('[WA] telefono invalido:', raw, clean, 'solo', clean.length, 'dígitos');
+      return null;
+    }
+    return '595' + clean;
+  } catch (e) {
+    console.error('[WA] Error formateando número:', e);
+    return null;
+  }
+>>>>>>> origin/main
 }
 
 export function isValidUrl(url: string): boolean {

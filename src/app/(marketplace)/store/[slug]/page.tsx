@@ -404,6 +404,7 @@ export default function StoreProfilePage() {
   }
 
   function getWhatsAppLink(): string | undefined {
+<<<<<<< HEAD
     const wa = formatPhoneForWhatsApp(store?.contact_phone ?? null);
 
     if (process.env.NODE_ENV === 'development') {
@@ -416,6 +417,23 @@ export default function StoreProfilePage() {
     }
 
     return wa;
+=======
+    const phone = String(store?.contact_phone ?? '').trim();
+    const waDigits = formatPhoneForWhatsApp(phone);
+    
+    // Log temporal para depuración (solo en desarrollo)
+    if (process.env.NODE_ENV === 'development') {
+      console.debug('[WA] fuente:', store?.contact_phone, 'normalizado:', waDigits);
+    }
+    
+    // Si devuelve null, deshabilitar botón
+    if (!waDigits) {
+      console.warn('[WA] Número inválido, deshabilitando botón:', phone);
+      return undefined;
+    }
+    
+    return `https://wa.me/${waDigits}`;
+>>>>>>> origin/main
   }
 
   function getLocationDisplay() {

@@ -24,9 +24,23 @@ export async function generateMetadata({ params }: StoreLayoutProps): Promise<Me
 export default async function StoreLayout({ children, params }: StoreLayoutProps) {
   const featureEnabled = process.env.NEXT_PUBLIC_FEATURE_MARKETING === '1';
   const { slug } = await params;
+<<<<<<< HEAD
 
   const trackingIds = featureEnabled ? await getTrackingIdsForStore(slug) : null;
   const globalGTMId = process.env.NEXT_PUBLIC_GTM_ID || 'GTM-PQ8Q6JGW';
+=======
+  
+  // Obtener IDs de tracking para esta tienda
+  const trackingIds = await getTrackingIdsForStore(slug);
+  const globalGTMId = process.env.NEXT_PUBLIC_GTM_ID || 'GTM-PQ8Q6JGW';
+
+  // Determinar qué scripts cargar
+  const hasPixel = !!trackingIds.pixelId;
+  // Tracking centralizado en layout raíz (GTM global). No cargar GTM/GA aquí para evitar duplicados.
+  // Si la tienda tiene gtmId y coincide con el global, NO inyectar nada nuevo (ya está en layout raíz)
+  // const hasGA = !!trackingIds.gaId; // Deshabilitado: GA debe cargarse vía GTM en layout raíz
+  // const hasGTM = !!trackingIds.gtmId && trackingIds.gtmId !== globalGTMId; // Solo si es diferente del global (pero NO inyectar)
+>>>>>>> origin/main
 
   const storeGtmId = trackingIds?.gtmId && trackingIds.gtmId !== globalGTMId ? trackingIds.gtmId : null;
   const globalPixelId = process.env.NEXT_PUBLIC_FACEBOOK_PIXEL_ID;
@@ -35,6 +49,7 @@ export default async function StoreLayout({ children, params }: StoreLayoutProps
 
   return (
     <>
+<<<<<<< HEAD
       {storeGtmId && (
         <>
           <Script
@@ -60,6 +75,8 @@ export default async function StoreLayout({ children, params }: StoreLayoutProps
           </noscript>
         </>
       )}
+=======
+>>>>>>> origin/main
 
       {hasGlobalPixel && (
         <>
@@ -130,6 +147,7 @@ export default async function StoreLayout({ children, params }: StoreLayoutProps
         </>
       )}
 
+<<<<<<< HEAD
       <ErrorBoundary>
         <ThemeProvider>
           {children}
@@ -155,6 +173,9 @@ export default async function StoreLayout({ children, params }: StoreLayoutProps
           />
         </ThemeProvider>
       </ErrorBoundary>
+=======
+      {children}
+>>>>>>> origin/main
     </>
   );
 }
