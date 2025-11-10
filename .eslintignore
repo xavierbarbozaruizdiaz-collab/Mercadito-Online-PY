@@ -11,3 +11,7 @@ scripts/*.mjs
 src/legacy/**
 src/__tests__/**
 src/__mocks__/**
+
+# LPMS: excluir helpers de Node del estricto
+scripts/**/*.js
+public/sw.js
