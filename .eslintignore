@@ -1,22 +1,13 @@
-# ============================================
-# ESLINT IGNORE - Mercadito Online PY
-# ============================================
-
-# Scripts de Node.js (usan CommonJS require)
-scripts/**/*.js
-
-# Archivos de configuración
-*.config.js
-*.config.cjs
-*.config.mjs
-
-# Build y dependencias
-.next/
+# === Archivos y carpetas que no afectan la app ===
 node_modules/
-dist/
-build/
+.next/
+out/
+coverage/
+docs/.artifacts/
+scripts/*.sh
+scripts/*.mjs
 
-# Archivos generados
-*.generated.*
-**/types/supabase.ts
-
+# === Temporalmente excluir zonas legacy o experimentales ===
+src/legacy/**
+src/__tests__/**
+src/__mocks__/**

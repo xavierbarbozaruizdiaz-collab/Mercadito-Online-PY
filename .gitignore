@@ -25,6 +25,10 @@ pnpm-debug.log*
 # Tests & coverage
 coverage/
 
+# QA artifacts
+docs/.artifacts/*
+!docs/.artifacts/README_LOCAL_QA.md
+
 # Next.js build artifacts
 .next/
 out/
