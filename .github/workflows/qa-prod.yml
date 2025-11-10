@@ -1,8 +1,4 @@
-<<<<<<< HEAD
 name: QA Prod
-=======
-﻿name: QA Prod
->>>>>>> origin/main
 
 on:
   workflow_dispatch:
@@ -11,7 +7,6 @@ on:
 
 jobs:
   qa-prod:
-<<<<<<< HEAD
     name: QA Prod Checks
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -40,25 +35,6 @@ jobs:
           mkdir -p docs/.artifacts
           node scripts/qa-prod.mjs --base=https://mercaditoonlinepy.com --out=docs/.artifacts/qa-prod.json
           cat docs/.artifacts/qa-prod.json
-=======
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-
-      - name: Install
-        run: npm ci
-
-      - name: Run QA Prod
-        run: npm run qa:prod
->>>>>>> origin/main
 
       - name: Archive QA artifact
         if: always()
@@ -66,7 +42,6 @@ jobs:
         with:
           name: qa-prod-artifact
           path: docs/.artifacts/qa-prod.json
-<<<<<<< HEAD
 
       - name: Job Summary (QA Prod)
         if: always()
@@ -99,6 +74,3 @@ jobs:
               issue_number: context.payload.pull_request.number,
               body
             })
-
-=======
->>>>>>> origin/main
