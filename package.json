@@ -36,7 +36,11 @@
     "verificar:diferencias-render": "node scripts/verificar-diferencias-render.js",
     "diagnostico:profundo": "node scripts/diagnostico-profundo.js",
     "qa:preview": "node scripts/qa-preview.mjs",
-    "qa:tracking": "node scripts/qa-tracking.mjs"
+    "qa:tracking": "node scripts/qa-tracking.mjs",
+    "qa:local": "bash scripts/lpms-local-qa.sh",
+    "qa:local:fast": "bash scripts/lpms-local-qa-skip-lh.sh",
+    "verify:icons": "node scripts/verify-icons.mjs",
+    "predeploy:check": "node scripts/predeploy-check.mjs"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx}": [
