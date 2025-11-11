@@ -227,20 +227,6 @@ export class EmailService {
       return { sent: 0, failed: recipients.length };
     }
 
-    const typeColors = {
-      promotion: '#10b981',
-      system: '#3b82f6',
-      announcement: '#8b5cf6',
-      urgent: '#dc2626',
-    };
-
-    const typeIcons = {
-      promotion: '🎉',
-      system: '⚙️',
-      announcement: '📢',
-      urgent: '🚨',
-    };
-
     let sent = 0;
     let failed = 0;
 

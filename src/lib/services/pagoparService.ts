@@ -95,7 +95,6 @@ function getConfig(): PagoparConfig {
 // ============================================
 
 function getApiUrl(endpoint: string): string {
-  const config = getConfig();
   // Pagopar usa la misma URL para sandbox y producción, pero diferentes tokens
   const baseUrl = 'https://api.pagopar.com/api';
   
@@ -150,7 +149,6 @@ export async function createPagoparInvoice(
   try {
     // Primero obtener token
     const token = await createPagoparToken();
-    const config = getConfig();
 
     const invoicePayload: PagoparInvoice = {
       ...invoiceData,
@@ -196,7 +194,6 @@ export async function getPagoparInvoiceStatus(
 ): Promise<PagoparInvoiceStatus['datos']> {
   try {
     const token = await createPagoparToken();
-    const config = getConfig();
 
     const response = await fetch(getApiUrl(`facturacion/${idFactura}`), {
       method: 'GET',

@@ -50,7 +50,7 @@ export class PaymentService {
       };
 
       // Guardar en base de datos
-      const { data, error } = await (supabase as any)
+      const { error } = await (supabase as any)
         .from('payment_intents')
         .insert({
           id: paymentIntent.id,
@@ -77,8 +77,8 @@ export class PaymentService {
    * Procesa un pago con Stripe
    */
   static async processStripePayment(
-    paymentIntentId: string,
-    paymentMethodId: string
+    _paymentIntentId: string,
+    _paymentMethodId: string
   ): Promise<{ success: boolean; clientSecret?: string }> {
     try {
       // En producción, esto se haría desde un endpoint del servidor
@@ -100,7 +100,7 @@ export class PaymentService {
    */
   static async processPayPalPayment(
     orderId: string,
-    amount: number
+    _amount: number
   ): Promise<{ success: boolean; approvalUrl?: string }> {
     try {
       // Similar a Stripe, esto se hace desde el servidor en producción

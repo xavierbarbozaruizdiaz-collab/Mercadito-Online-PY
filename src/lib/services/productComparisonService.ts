@@ -110,7 +110,6 @@ export class ProductComparisonService {
     const stocks = comparison.products.map(
       (p) => p.stock_quantity || 0
     );
-    const hasStock = stocks.some((s) => s > 0);
     const outOfStock = stocks.some((s) => s === 0);
     if (outOfStock) {
       summaries.push('Algunos productos están agotados');

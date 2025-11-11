@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-require-imports, @typescript-eslint/no-unused-vars */
 // ============================================
 // ERROR TRACKING UTILITY
 // Utilidades para tracking de errores con Sentry
@@ -23,6 +22,7 @@ export function captureError(
   if (typeof window === 'undefined') {
     // Server-side
     try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const Sentry = require('@sentry/nextjs');
       if (Sentry && process.env.NEXT_PUBLIC_SENTRY_DSN) {
         if (context?.user) {
@@ -36,7 +36,7 @@ export function captureError(
         }
         Sentry.captureException(error instanceof Error ? error : new Error(error));
       }
-    } catch (e) {
+    } catch (_e) {
       // Sentry no disponible
       console.error('Error tracking (server):', error);
     }
@@ -56,7 +56,7 @@ export function captureError(
         }
         Sentry.captureException(error instanceof Error ? error : new Error(error));
       }
-    } catch (e) {
+    } catch (_e) {
       // Sentry no disponible
       console.error('Error tracking (client):', error);
     }
@@ -76,6 +76,7 @@ export function captureMessage(
 ): void {
   if (typeof window === 'undefined') {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const Sentry = require('@sentry/nextjs');
       if (Sentry && process.env.NEXT_PUBLIC_SENTRY_DSN) {
         if (context?.tags) {
@@ -86,7 +87,7 @@ export function captureMessage(
         }
         Sentry.captureMessage(message, level);
       }
-    } catch (e) {
+    } catch (_e) {
       console.log(`[${level.toUpperCase()}]`, message);
     }
   } else {
@@ -101,7 +102,7 @@ export function captureMessage(
         }
         Sentry.captureMessage(message, level);
       }
-    } catch (e) {
+    } catch (_e) {
       console.log(`[${level.toUpperCase()}]`, message);
     }
   }
@@ -118,11 +119,12 @@ export function setUserContext(user: {
 }): void {
   if (typeof window === 'undefined') {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const Sentry = require('@sentry/nextjs');
       if (Sentry && process.env.NEXT_PUBLIC_SENTRY_DSN) {
         Sentry.setUser(user);
       }
-    } catch (e) {
+    } catch (_e) {
       // Sentry no disponible
     }
   } else {
@@ -131,7 +133,7 @@ export function setUserContext(user: {
       if (Sentry && process.env.NEXT_PUBLIC_SENTRY_DSN) {
         Sentry.setUser(user);
       }
-    } catch (e) {
+    } catch (_e) {
       // Sentry no disponible
     }
   }
@@ -143,11 +145,12 @@ export function setUserContext(user: {
 export function clearUserContext(): void {
   if (typeof window === 'undefined') {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const Sentry = require('@sentry/nextjs');
       if (Sentry && process.env.NEXT_PUBLIC_SENTRY_DSN) {
         Sentry.setUser(null);
       }
-    } catch (e) {
+    } catch (_e) {
       // Sentry no disponible
     }
   } else {
@@ -156,7 +159,7 @@ export function clearUserContext(): void {
       if (Sentry && process.env.NEXT_PUBLIC_SENTRY_DSN) {
         Sentry.setUser(null);
       }
-    } catch (e) {
+    } catch (_e) {
       // Sentry no disponible
     }
   }

@@ -110,7 +110,7 @@ export async function getDeliverySettings(): Promise<DeliverySettings | null> {
  */
 export async function getPendingDeliveries(sellerId: string): Promise<any[]> {
   try {
-    const { data: ordersData, error } = await supabase
+    const { data: ordersData } = await supabase
       .from('orders')
       .select(`
         id,

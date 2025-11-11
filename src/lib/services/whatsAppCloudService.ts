@@ -270,7 +270,7 @@ class WhatsAppCloudService {
    */
   private formatPhoneNumber(phone: string): string {
     // Eliminar espacios, guiones, paréntesis
-    let formatted = phone.replace(/[\s\-\(\)]/g, '');
+    let formatted = phone.replace(/[\s-()]/g, '');
 
     // Si empieza con +, quitarlo
     if (formatted.startsWith('+')) {

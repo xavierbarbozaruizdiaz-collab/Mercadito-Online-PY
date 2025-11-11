@@ -167,7 +167,7 @@ export async function getSellerAnalyticsReport(
       customersSet.add(order.buyer_id);
 
       const status = order.status as keyof typeof ordersByStatus;
-      if (ordersByStatus.hasOwnProperty(status)) {
+      if (Object.prototype.hasOwnProperty.call(ordersByStatus, status)) {
         ordersByStatus[status]++;
       }
     });

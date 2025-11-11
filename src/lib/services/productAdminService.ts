@@ -280,7 +280,7 @@ export async function deleteProduct(productId: string): Promise<void> {
     const fileNames = images
       .map((img: { url: string }) => {
         const url = img.url;
-        const match = url.match(/products\/([^\/]+)\/(.+)$/);
+        const match = url.match(/products\/([^/]+)\/(.+)$/);
         return match ? `${match[1]}/${match[2]}` : null;
       })
       .filter((fileName): fileName is string => fileName !== null);
