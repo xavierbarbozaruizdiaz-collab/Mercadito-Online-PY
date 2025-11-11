@@ -1,3 +1,4 @@
+/* eslint-disable no-useless-escape */
 // ============================================
 // MERCADITO ONLINE PY - UTILIDADES
 // Funciones de utilidad para el e-commerce

@@ -12,6 +12,7 @@
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
+    "lint:ci": "eslint \"src/**/*.{ts,tsx}\" --quiet --max-warnings=0",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint:hero": "eslint src/app/page.tsx src/components/hero src/app/api/hero-slides src/app/api/site-stats",
     "typecheck:hero": "tsc --noEmit src/app/page.tsx src/components/hero/HeroCarousel.tsx src/app/api/hero-slides/route.ts src/app/api/site-stats/route.ts",

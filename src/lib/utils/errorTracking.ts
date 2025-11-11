@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports, @typescript-eslint/no-unused-vars */
 // ============================================
 // ERROR TRACKING UTILITY
 // Utilidades para tracking de errores con Sentry
