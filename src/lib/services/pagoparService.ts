@@ -118,7 +118,7 @@ export async function createPagoparToken(): Promise<PagoparToken> {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        public_key: config.publicToken,
+        public_key: publicToken,
         private_key: config.privateToken,
       }),
     });
@@ -153,7 +153,7 @@ export async function createPagoparInvoice(
     const invoicePayload: PagoparInvoice = {
       ...invoiceData,
       token: token.token,
-      public_key: config.publicToken,
+      public_key: publicToken,
     };
 
     const response = await fetch(getApiUrl('facturacion'), {
