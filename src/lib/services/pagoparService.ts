@@ -75,7 +75,7 @@ export interface PagoparInvoiceStatus {
 
 function getConfig(): PagoparConfig {
   // Pagopar usa "Token Público" y "Token Privado"
-  const publicToken = process.env.PAGOPAR_PUBLIC_TOKEN || process.env.PAGOPAR_PUBLIC_KEY;
+  const publicToken = process.env.NEXT_PUBLIC_PAGOPAR_PUBLIC_TOKEN || process.env.PAGOPAR_PUBLIC_TOKEN || process.env.PAGOPAR_PUBLIC_KEY;
   const privateToken = process.env.PAGOPAR_PRIVATE_TOKEN || process.env.PAGOPAR_PRIVATE_KEY;
   const environment = (process.env.PAGOPAR_ENVIRONMENT || 'sandbox') as 'sandbox' | 'production';
 
@@ -118,7 +118,7 @@ export async function createPagoparToken(): Promise<PagoparToken> {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        public_key: publicToken,
+        public_key: config.publicToken,
         private_key: config.privateToken,
       }),
     });
@@ -149,11 +149,12 @@ export async function createPagoparInvoice(
   try {
     // Primero obtener token
     const token = await createPagoparToken();
+    const config = getConfig();
 
     const invoicePayload: PagoparInvoice = {
       ...invoiceData,
       token: token.token,
-      public_key: publicToken,
+      public_key: config.publicToken,
     };
 
     const response = await fetch(getApiUrl('facturacion'), {
@@ -194,6 +195,7 @@ export async function getPagoparInvoiceStatus(
 ): Promise<PagoparInvoiceStatus['datos']> {
   try {
     const token = await createPagoparToken();
+    const config = getConfig();
 
     const response = await fetch(getApiUrl(`facturacion/${idFactura}`), {
       method: 'GET',
