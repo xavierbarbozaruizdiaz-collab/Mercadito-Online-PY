@@ -38,7 +38,7 @@ jobs:
 
       - name: Archive QA artifact
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: qa-prod-artifact
           path: docs/.artifacts/qa-prod.json
