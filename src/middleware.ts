@@ -12,7 +12,6 @@ type Bucket = { count: number; resetTime: number };
 // Reutiliza un Map global para evitar reinicios entre hot reloads
 const rateLimitMap: Map<string, Bucket> =
   (globalThis as any).__rateLimitMap ?? new Map<string, Bucket>();
-// @ts-expect-error agregar propiedad global para reuso en dev/edge
 (globalThis as any).__rateLimitMap = rateLimitMap;
 
 interface RateLimitConfig {
@@ -69,7 +68,7 @@ function checkAndUpdateBucket(key: string, cfg: RateLimitConfig) {
   return { allowed: false, remaining: 0, resetTime: existing.resetTime };
 }
 
-export default function middleware(request: NextRequest) {
+export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Preflight CORS pasa directo
