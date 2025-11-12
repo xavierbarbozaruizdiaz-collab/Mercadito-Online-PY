@@ -156,7 +156,7 @@ class ProductCatalogService {
    */
   private formatProductForCatalog(
     product: any,
-    platform: CatalogPlatform
+    _platform: CatalogPlatform
   ): CatalogProduct {
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://mercaditopy.com';
     const store = product.stores || {};
@@ -216,7 +216,7 @@ class ProductCatalogService {
   /**
    * Sincroniza a TikTok Shop
    */
-  private async syncToTikTok(product: CatalogProduct): Promise<SyncResult> {
+  private async syncToTikTok(_product: CatalogProduct): Promise<SyncResult> {
     // TODO: Implementar llamada a TikTok Shop API
     return {
       success: false,
@@ -235,7 +235,7 @@ class ProductCatalogService {
   /**
    * Sincroniza a Google Shopping
    */
-  private async syncToGoogle(product: CatalogProduct): Promise<SyncResult> {
+  private async syncToGoogle(_product: CatalogProduct): Promise<SyncResult> {
     // TODO: Implementar Google Merchant Center API
     return {
       success: false,

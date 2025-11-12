@@ -1,3 +1,4 @@
+/* eslint-disable no-useless-escape */
 // ============================================
 // MERCADITO ONLINE PY - UTILIDADES
 // Funciones de utilidad para el e-commerce
@@ -80,7 +81,7 @@ export function isValidEmail(email: string): boolean {
 }
 
 export function isValidPhone(phone: string): boolean {
-  const phoneRegex = /^[\+]?[0-9\s\-\(\)]{10,}$/;
+  const phoneRegex = /^[+]?[\d\s()-]{10,}$/;
   return phoneRegex.test(phone);
 }
 

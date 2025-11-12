@@ -371,7 +371,7 @@ export async function resolveDispute(
 export async function updatePaymentStatus(
   orderId: string,
   paymentStatus: PaymentStatus,
-  adminId: string
+  _adminId: string
 ): Promise<void> {
   // Using 'as any' to bypass Supabase strict type constraint for updates
   const { error } = await (supabase as any)

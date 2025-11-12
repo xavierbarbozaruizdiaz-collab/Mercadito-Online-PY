@@ -4,7 +4,7 @@
 // ============================================
 
 import { supabase } from '@/lib/supabase/client';
-import { NotificationService, type CreateNotificationInput } from './notificationService';
+import { type CreateNotificationInput } from './notificationService';
 
 export type NotificationRecipient = 
   | 'all'           // Todos los usuarios

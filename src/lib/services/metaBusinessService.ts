@@ -88,7 +88,7 @@ class MetaBusinessService {
   /**
    * Crea una campaña
    */
-  async createCampaign(campaign: Campaign): Promise<{ success: boolean; campaignId?: string; error?: string }> {
+  async createCampaign(_campaign: Campaign): Promise<{ success: boolean; campaignId?: string; error?: string }> {
     if (!this.isConfigured()) {
       return {
         success: false,
@@ -131,7 +131,7 @@ class MetaBusinessService {
   /**
    * Obtiene campañas
    */
-  async getCampaigns(filters?: {
+  async getCampaigns(_filters?: {
     status?: string;
     storeId?: string;
   }): Promise<Campaign[]> {
@@ -162,9 +162,9 @@ class MetaBusinessService {
    * Obtiene métricas de una campaña
    */
   async getCampaignMetrics(
-    campaignId: string,
-    startDate: Date,
-    endDate: Date
+    _campaignId: string,
+    _startDate: Date,
+    _endDate: Date
   ): Promise<CampaignMetrics | null> {
     if (!this.isConfigured()) {
       return null;
@@ -200,8 +200,8 @@ class MetaBusinessService {
    * Actualiza una campaña
    */
   async updateCampaign(
-    campaignId: string,
-    updates: Partial<Campaign>
+    _campaignId: string,
+    _updates: Partial<Campaign>
   ): Promise<{ success: boolean; error?: string }> {
     if (!this.isConfigured()) {
       return {
@@ -224,7 +224,7 @@ class MetaBusinessService {
   /**
    * Crea un Ad Set
    */
-  async createAdSet(adSet: AdSet): Promise<{ success: boolean; adSetId?: string; error?: string }> {
+  async createAdSet(_adSet: AdSet): Promise<{ success: boolean; adSetId?: string; error?: string }> {
     if (!this.isConfigured()) {
       return {
         success: false,
@@ -250,7 +250,7 @@ class MetaBusinessService {
    * Crea un creativo de anuncio
    */
   async createAdCreative(
-    creative: AdCreative
+    _creative: AdCreative
   ): Promise<{ success: boolean; creativeId?: string; error?: string }> {
     if (!this.isConfigured()) {
       return {

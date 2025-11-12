@@ -231,7 +231,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
     let profileResult;
     try {
       profileResult = await Promise.race([profilePromise, profileTimeoutPromise]) as any;
-    } catch (timeoutError) {
+    } catch {
       // Si hay timeout, retornar usuario básico
       console.warn('Profile query timeout, using basic user data');
       return {

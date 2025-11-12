@@ -9,7 +9,8 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: 'Mercadito Online PY - Marketplace de Paraguay',
     short_name: 'Mercadito PY',
-    description: 'El mejor marketplace de Paraguay. Compra y vende productos nuevos y usados de forma segura.',
+    description:
+      'El mejor marketplace de Paraguay. Compra y vende productos nuevos y usados de forma segura.',
     start_url: '/',
     display: 'standalone',
     background_color: '#ffffff',
@@ -18,34 +19,23 @@ export default function manifest(): MetadataRoute.Manifest {
     scope: '/',
     lang: 'es-PY',
     categories: ['shopping', 'business', 'lifestyle'],
-    
+
     icons: [
+      // Favicons (para navegadores)
       {
-<<<<<<< HEAD
-        src: '/icons/icon-96x96.png',
-        sizes: '96x96',
-        type: 'image/png',
-      },
-      {
-        src: '/icons/favicon-16x16.png',
-        sizes: '16x16',
-        type: 'image/png',
-=======
         src: '/icons/favicon-16x16.png',
         sizes: '16x16',
         type: 'image/png',
         purpose: 'any',
->>>>>>> origin/main
       },
       {
         src: '/icons/favicon-32x32.png',
         sizes: '32x32',
         type: 'image/png',
-<<<<<<< HEAD
-=======
         purpose: 'any',
->>>>>>> origin/main
       },
+
+      // Íconos PWA (maskable recomendados)
       {
         src: '/icons/icon-72x72.png',
         sizes: '72x72',
@@ -95,27 +85,19 @@ export default function manifest(): MetadataRoute.Manifest {
         purpose: 'maskable',
       },
     ],
-    
-<<<<<<< HEAD
-=======
-    // Shortcuts removidos temporalmente: los íconos (search-96x96.png, cart-96x96.png, profile-96x96.png, store-96x96.png) no existen
-    // Se pueden agregar cuando los íconos estén disponibles en /public/icons/
->>>>>>> origin/main
+
+    // Shortcuts vacíos por ahora (agregar cuando existan los íconos específicos en /public/icons/)
     shortcuts: [],
-    
+
     related_applications: [
       {
         platform: 'webapp',
         url: 'https://mercadito-online-py.vercel.app/manifest.json',
       },
     ],
-    
+
     prefer_related_applications: false,
-    
-    // edge_side_panel: {
-    //   preferred_width: 400,
-    // },
-    
+
     launch_handler: {
       client_mode: 'navigate-existing',
     },

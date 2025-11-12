@@ -4,15 +4,13 @@
 // ============================================
 
 import { supabase } from '@/lib/supabase/client';
-import { Database } from '@/types/database';
-import { 
-  Conversation, 
-  Message, 
-  ConversationParticipant, 
-  Notification, 
+import {
+  Conversation,
+  Message,
+  Notification,
   UserStatus,
   // ChatConversationSchema,
-  // MessageSchema 
+  // MessageSchema
 } from '@/types';
 
 // ============================================

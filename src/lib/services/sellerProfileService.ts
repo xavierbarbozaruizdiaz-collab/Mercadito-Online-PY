@@ -415,7 +415,7 @@ export async function createSellerStore(
   }
 ): Promise<SellerProfile | null> {
   // Crear la tienda
-  const { data: store, error: storeError } = await (supabase as any)
+  const { error: storeError } = await (supabase as any)
     .from('stores')
     .insert({
       owner_id: sellerId,

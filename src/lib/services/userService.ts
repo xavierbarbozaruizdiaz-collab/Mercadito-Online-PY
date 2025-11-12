@@ -78,11 +78,12 @@ export async function getAllUsers(options: {
       case 'inactive':
         query = query.eq('is_active', false);
         break;
-      case 'online':
+      case 'online': {
         // Usuarios activos en últimos 5 minutos
         const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
         query = query.gte('last_seen', fiveMinutesAgo);
         break;
+      }
     }
   }
 
@@ -158,7 +159,7 @@ export async function updateUser(
 /**
  * Banea un usuario
  */
-export async function banUser(userId: string, reason: string, adminId: string): Promise<UserProfile | null> {
+export async function banUser(userId: string, reason: string, _adminId: string): Promise<UserProfile | null> {
   // Using 'as any' to bypass Supabase strict type constraint for updates
   const { data, error } = await (supabase as any)
     .from('profiles')

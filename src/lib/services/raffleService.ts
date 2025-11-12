@@ -360,7 +360,7 @@ export async function approveRaffle(raffleId: string, adminId: string): Promise<
 /**
  * Rechazar un sorteo (solo admin)
  */
-export async function rejectRaffle(raffleId: string, reason?: string): Promise<void> {
+export async function rejectRaffle(raffleId: string, _reason?: string): Promise<void> {
   try {
     const { error } = await supabase
       .from('raffles')
