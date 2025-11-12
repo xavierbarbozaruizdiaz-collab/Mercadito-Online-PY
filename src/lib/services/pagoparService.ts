@@ -110,7 +110,7 @@ function getApiUrl(endpoint: string): string {
  */
 export async function createPagoparToken(): Promise<PagoparToken> {
   try {
-    const config = getConfig();
+    const { publicToken: cfgPublicToken, privateToken: cfgPrivateToken } = getConfig();
     
     const response = await fetch(getApiUrl('token'), {
       method: 'POST',
@@ -118,8 +118,8 @@ export async function createPagoparToken(): Promise<PagoparToken> {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        public_key: config.publicToken,
-        private_key: config.privateToken,
+        public_key: cfgPublicToken,
+        private_key: cfgPrivateToken,
       }),
     });
 
@@ -149,12 +149,12 @@ export async function createPagoparInvoice(
   try {
     // Primero obtener token
     const token = await createPagoparToken();
-    const config = getConfig();
+    const { publicToken: cfgPublicToken, privateToken: cfgPrivateToken } = getConfig();
 
     const invoicePayload: PagoparInvoice = {
       ...invoiceData,
       token: token.token,
-      public_key: config.publicToken,
+      public_key: cfgPublicToken,
     };
 
     const response = await fetch(getApiUrl('facturacion'), {
@@ -195,7 +195,7 @@ export async function getPagoparInvoiceStatus(
 ): Promise<PagoparInvoiceStatus['datos']> {
   try {
     const token = await createPagoparToken();
-    const config = getConfig();
+    const { publicToken: cfgPublicToken, privateToken: cfgPrivateToken } = getConfig();
 
     const response = await fetch(getApiUrl(`facturacion/${idFactura}`), {
       method: 'GET',
