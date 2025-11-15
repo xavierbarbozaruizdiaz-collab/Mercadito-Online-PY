@@ -71,7 +71,7 @@ export interface Database {
           location?: string;
           contact_email?: string;
           contact_phone?: string;
-          social_links: Record<string, string>;
+          social_links: Record<string, string> | null;
           settings: Record<string, any>;
           is_active: boolean;
           fb_pixel_id?: string | null;
@@ -91,7 +91,7 @@ export interface Database {
           location?: string;
           contact_email?: string;
           contact_phone?: string;
-          social_links?: Record<string, string>;
+          social_links?: Record<string, string> | null;
           settings?: Record<string, any>;
           is_active?: boolean;
           created_at?: string;
@@ -108,7 +108,7 @@ export interface Database {
           location?: string;
           contact_email?: string;
           contact_phone?: string;
-          social_links?: Record<string, string>;
+          social_links?: Record<string, string> | null;
           settings?: Record<string, any>;
           is_active?: boolean;
           fb_pixel_id?: string | null;
@@ -303,7 +303,18 @@ export interface Database {
           buyer_id: string;
           seller_id: string;
           order_number: string;
-          status: 'pending' | 'paid' | 'shipped' | 'delivered' | 'cancelled' | 'refunded';
+          status:
+            | 'pending'
+            | 'pending_payment'
+            | 'cod_pending'
+            | 'confirmed'
+            | 'paid'
+            | 'failed'
+            | 'shipped'
+            | 'delivered'
+            | 'cancelled'
+            | 'canceled'
+            | 'refunded';
           subtotal: number;
           shipping_cost: number;
           tax_amount: number;
@@ -321,7 +332,18 @@ export interface Database {
           buyer_id: string;
           seller_id: string;
           order_number: string;
-          status?: 'pending' | 'paid' | 'shipped' | 'delivered' | 'cancelled' | 'refunded';
+          status?:
+            | 'pending'
+            | 'pending_payment'
+            | 'cod_pending'
+            | 'confirmed'
+            | 'paid'
+            | 'failed'
+            | 'shipped'
+            | 'delivered'
+            | 'cancelled'
+            | 'canceled'
+            | 'refunded';
           subtotal: number;
           shipping_cost?: number;
           tax_amount?: number;
@@ -339,7 +361,18 @@ export interface Database {
           buyer_id?: string;
           seller_id?: string;
           order_number?: string;
-          status?: 'pending' | 'paid' | 'shipped' | 'delivered' | 'cancelled' | 'refunded';
+          status?:
+            | 'pending'
+            | 'pending_payment'
+            | 'cod_pending'
+            | 'confirmed'
+            | 'paid'
+            | 'failed'
+            | 'shipped'
+            | 'delivered'
+            | 'cancelled'
+            | 'canceled'
+            | 'refunded';
           subtotal?: number;
           shipping_cost?: number;
           tax_amount?: number;
