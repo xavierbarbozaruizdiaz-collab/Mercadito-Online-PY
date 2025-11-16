@@ -640,6 +640,62 @@ export interface Database {
           updated_at?: string;
         };
       };
+      membership_plans: {
+        Row: {
+          id: string;
+          level: 'bronze' | 'silver' | 'gold';
+          name: string;
+          description: string | null;
+          price_monthly: number;
+          price_yearly: number | null;
+          price_one_time: number | null;
+          duration_days: number;
+          bid_limit: number | null;
+          bid_limit_formatted: string | null;
+          features: Record<string, any>;
+          is_active: boolean;
+          is_popular: boolean;
+          sort_order: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          level: 'bronze' | 'silver' | 'gold';
+          name: string;
+          description?: string | null;
+          price_monthly: number;
+          price_yearly?: number | null;
+          price_one_time?: number | null;
+          duration_days?: number;
+          bid_limit?: number | null;
+          bid_limit_formatted?: string | null;
+          features?: Record<string, any>;
+          is_active?: boolean;
+          is_popular?: boolean;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          level?: 'bronze' | 'silver' | 'gold';
+          name?: string;
+          description?: string | null;
+          price_monthly?: number;
+          price_yearly?: number | null;
+          price_one_time?: number | null;
+          duration_days?: number;
+          bid_limit?: number | null;
+          bid_limit_formatted?: string | null;
+          features?: Record<string, any>;
+          is_active?: boolean;
+          is_popular?: boolean;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
       membership_subscriptions: {
         Row: {
           id: string;

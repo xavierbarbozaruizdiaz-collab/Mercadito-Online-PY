@@ -216,12 +216,16 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: false, error: 'Plan not found' }, { status: 500 });
       }
 
+      // Type assertion explícito para ayudar a TypeScript a inferir el tipo correcto
+      type PlanRow = Database['public']['Tables']['membership_plans']['Row'];
+      const planRow = plan as PlanRow;
+
       // Calcular fechas según tipo de suscripción
       const now = new Date();
       const durationDays = 
         sub.subscription_type === 'yearly' 
-          ? (plan.duration_days || 30) * 12
-          : plan.duration_days || 30;
+          ? (planRow.duration_days || 30) * 12
+          : planRow.duration_days || 30;
       
       const expiresAt = new Date(now);
       expiresAt.setDate(expiresAt.getDate() + durationDays);
@@ -256,7 +260,7 @@ export async function POST(req: Request) {
       const { error: profileError } = await supabase
         .from('profiles')
         .update({
-          membership_level: plan.level,
+          membership_level: planRow.level,
           membership_expires_at: expiresAt.toISOString(),
         })
         .eq('id', sub.user_id);
@@ -273,7 +277,7 @@ export async function POST(req: Request) {
         subscriptionId: sub.id,
         userId: sub.user_id,
         planId: sub.plan_id,
-        planLevel: plan.level,
+        planLevel: planRow.level,
         expiresAt: expiresAt.toISOString(),
       });
 
