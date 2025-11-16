@@ -67,18 +67,6 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = getSupabaseServer();
-
-    if (!supabase) {
-      return NextResponse.json(
-        {
-          campaign: null,
-          warning: 'Supabase no está configurado (NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY ausentes)',
-        },
-        { status: 200 }
-      );
-    }
-
     const { id } = await params;
     const body = await request.json();
 
