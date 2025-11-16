@@ -177,7 +177,8 @@ export async function POST(req: Request) {
     }
 
     // Si encontramos una suscripción de membresía, procesarla
-    if (subscription) {
+    // Verificar explícitamente que no haya error y que subscription exista
+    if (!subscriptionError && subscription) {
       logger.info('[Pagopar Webhook] Suscripción encontrada', {
         subscriptionId: subscription.id,
         userId: subscription.user_id,
