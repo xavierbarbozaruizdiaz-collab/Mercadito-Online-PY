@@ -259,8 +259,8 @@ export async function POST(req: Request) {
 
       // Actualizar perfil del usuario con la membresía
       // Nota: profiles no tiene columna updated_at según el schema actual
-      const { error: profileError } = await supabase
-        .from('profiles')
+      const { error: profileError } = await (supabase
+        .from('profiles') as any)
         .update({
           membership_level: planRow.level,
           membership_expires_at: expiresAt.toISOString(),
