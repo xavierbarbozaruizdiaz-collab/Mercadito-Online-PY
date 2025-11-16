@@ -174,23 +174,28 @@ export async function POST(req: Request) {
           externalReference,
         });
       }
+      // Si hay error, no hay subscription, continuar para procesar como orden
+      // No procesar suscripción si hay error
     }
 
     // Si encontramos una suscripción de membresía, procesarla
-    // Verificar explícitamente que no haya error y que subscription exista
-    if (!subscriptionError && subscription) {
+    // TypeScript necesita verificación explícita: subscriptionError debe ser null y subscription debe existir
+    if (!subscriptionError && subscription !== null) {
+      // Type assertion explícito para ayudar a TypeScript a inferir el tipo correcto
+      type SubscriptionRow = Database['public']['Tables']['membership_subscriptions']['Row'];
+      const sub = subscription as SubscriptionRow;
       logger.info('[Pagopar Webhook] Suscripción encontrada', {
-        subscriptionId: subscription.id,
-        userId: subscription.user_id,
-        planId: subscription.plan_id,
-        currentStatus: subscription.status,
-        currentPaymentStatus: subscription.payment_status,
+        subscriptionId: sub.id,
+        userId: sub.user_id,
+        planId: sub.plan_id,
+        currentStatus: sub.status,
+        currentPaymentStatus: sub.payment_status,
       });
 
       // Verificar si ya está activa y pagada (idempotencia)
-      if (subscription.status === 'active' && subscription.payment_status === 'completed') {
+      if (sub.status === 'active' && sub.payment_status === 'completed') {
         logger.info('[Pagopar Webhook] Suscripción ya está activa y pagada (idempotencia)', {
-          subscriptionId: subscription.id,
+          subscriptionId: sub.id,
         });
         return NextResponse.json({ ok: true, alreadyActive: true }, { status: 200 });
       }
@@ -199,13 +204,13 @@ export async function POST(req: Request) {
       const { data: plan, error: planError } = await supabase
         .from('membership_plans')
         .select('id, level, name, duration_days')
-        .eq('id', subscription.plan_id)
+        .eq('id', sub.plan_id)
         .single();
 
       if (planError || !plan) {
         logger.error('[Pagopar Webhook] Plan no encontrado', {
-          subscriptionId: subscription.id,
-          planId: subscription.plan_id,
+          subscriptionId: sub.id,
+          planId: sub.plan_id,
           error: planError,
         });
         return NextResponse.json({ ok: false, error: 'Plan not found' }, { status: 500 });
@@ -214,7 +219,7 @@ export async function POST(req: Request) {
       // Calcular fechas según tipo de suscripción
       const now = new Date();
       const durationDays = 
-        subscription.subscription_type === 'yearly' 
+        sub.subscription_type === 'yearly' 
           ? (plan.duration_days || 30) * 12
           : plan.duration_days || 30;
       
@@ -230,17 +235,17 @@ export async function POST(req: Request) {
           payment_method: 'pagopar',
           payment_provider: 'pagopar',
           payment_reference: invoiceId || null,
-          amount_paid: amount || subscription.amount_paid || 0,
+          amount_paid: amount || sub.amount_paid || 0,
           starts_at: now.toISOString(),
           expires_at: expiresAt.toISOString(),
           paid_at: now.toISOString(),
           updated_at: now.toISOString(),
         })
-        .eq('id', subscription.id);
+        .eq('id', sub.id);
 
       if (updateError) {
         logger.error('[Pagopar Webhook] Error actualizando suscripción', {
-          subscriptionId: subscription.id,
+          subscriptionId: sub.id,
           error: updateError,
         });
         return NextResponse.json({ ok: false, error: 'Failed to update subscription' }, { status: 500 });
@@ -254,20 +259,20 @@ export async function POST(req: Request) {
           membership_level: plan.level,
           membership_expires_at: expiresAt.toISOString(),
         })
-        .eq('id', subscription.user_id);
+        .eq('id', sub.user_id);
 
       if (profileError) {
         logger.error('[Pagopar Webhook] Error actualizando perfil', {
-          userId: subscription.user_id,
+          userId: sub.user_id,
           error: profileError,
         });
         // No fallar completamente, la suscripción ya está actualizada
       }
 
       logger.info('[Pagopar Webhook] Membresía activada exitosamente', {
-        subscriptionId: subscription.id,
-        userId: subscription.user_id,
-        planId: subscription.plan_id,
+        subscriptionId: sub.id,
+        userId: sub.user_id,
+        planId: sub.plan_id,
         planLevel: plan.level,
         expiresAt: expiresAt.toISOString(),
       });
@@ -276,7 +281,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ 
         ok: true, 
         activated: true,
-        subscriptionId: subscription.id,
+        subscriptionId: sub.id,
       }, { status: 200 });
     }
 
