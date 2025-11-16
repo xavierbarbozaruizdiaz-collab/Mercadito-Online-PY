@@ -244,8 +244,8 @@ export async function POST(req: Request) {
         paid_at: now.toISOString(),
         updated_at: now.toISOString(),
       };
-      const { error: updateError } = await supabase
-        .from('membership_subscriptions')
+      const { error: updateError } = await (supabase
+        .from('membership_subscriptions') as any)
         .update(updateData)
         .eq('id', sub.id);
 
