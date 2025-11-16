@@ -9,7 +9,18 @@ import { supabase } from '@/lib/supabase/client';
 // TIPOS
 // ============================================
 
-export type OrderStatus = 'pending' | 'confirmed' | 'paid' | 'shipped' | 'delivered' | 'cancelled' | 'refunded';
+export type OrderStatus =
+  | 'pending'
+  | 'pending_payment'
+  | 'cod_pending'
+  | 'confirmed'
+  | 'paid'
+  | 'failed'
+  | 'shipped'
+  | 'delivered'
+  | 'cancelled'
+  | 'canceled'
+  | 'refunded';
 export type DisputeStatus = 'none' | 'pending' | 'under_review' | 'resolved' | 'rejected';
 export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded' | 'partially_refunded';
 
@@ -61,7 +72,18 @@ export type OrderAdmin = {
   }>;
 };
 
-export type OrderFilter = 'all' | 'pending' | 'paid' | 'shipped' | 'delivered' | 'cancelled' | 'refunded' | 'disputed';
+export type OrderFilter =
+  | 'all'
+  | 'pending'
+  | 'pending_payment'
+  | 'cod_pending'
+  | 'paid'
+  | 'failed'
+  | 'shipped'
+  | 'delivered'
+  | 'cancelled'
+  | 'refunded'
+  | 'disputed';
 
 export type OrderStats = {
   total: number;

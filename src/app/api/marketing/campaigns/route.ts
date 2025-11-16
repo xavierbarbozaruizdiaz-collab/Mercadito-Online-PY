@@ -5,17 +5,42 @@
 // ============================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import type { Database } from '@/types/database';
 import { metaBusiness } from '@/lib/services/metaBusinessService';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+function getSupabaseServer(): SupabaseClient<Database> | null {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !serviceKey) {
+    return null;
+  }
+
+  return createClient<Database>(supabaseUrl, serviceKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  });
+}
 
 // GET - Listar campañas
 export async function GET(request: NextRequest) {
   try {
+    const supabase = getSupabaseServer();
+
+    if (!supabase) {
+      // Entorno sin Supabase configurado (por ejemplo, CI): devolver respuesta segura
+      return NextResponse.json(
+        {
+          campaigns: [],
+          warning: 'Supabase no está configurado (NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY ausentes)',
+        },
+        { status: 200 }
+      );
+    }
+
     const searchParams = request.nextUrl.searchParams;
     const storeId = searchParams.get('storeId');
     const campaignType = searchParams.get('type');
@@ -45,6 +70,17 @@ export async function GET(request: NextRequest) {
 // POST - Crear campaña
 export async function POST(request: NextRequest) {
   try {
+    const supabase = getSupabaseServer();
+
+    if (!supabase) {
+      return NextResponse.json(
+        {
+          error: 'Supabase no está configurado (NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY ausentes)',
+        },
+        { status: 200 }
+      );
+    }
+
     const body = await request.json();
     const {
       storeId,
@@ -92,8 +128,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Crear en base de datos
-    const { data, error } = await supabase
-      .from('marketing_campaigns')
+    const { data, error } = await (supabase
+      .from('marketing_campaigns') as any)
       .insert({
         store_id: storeId || null,
         campaign_type: campaignType,

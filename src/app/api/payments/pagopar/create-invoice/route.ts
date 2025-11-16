@@ -4,11 +4,11 @@
 // ============================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { 
-  createPagoparInvoice, 
-  formatPagoparBuyer, 
+import {
+  createPagoparInvoice,
+  formatPagoparBuyer,
   formatPagoparItems,
-  calculateDueDate 
+  calculateDueDate,
 } from '@/lib/services/pagoparService';
 import { supabase } from '@/lib/supabaseClient';
 import { logger } from '@/lib/utils/logger';
@@ -16,9 +16,15 @@ import { logger } from '@/lib/utils/logger';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { orderId, buyerData, items, totalAmount, paymentMethod } = body;
+    const { orderId, buyerData, items, totalAmount, paymentMethod } = body ?? {};
 
-    // Validación básica
+    logger.info('[pagopar][create-invoice] start', {
+      orderId,
+      hasBuyerData: !!buyerData,
+      hasItems: Array.isArray(items) && items.length > 0,
+      hasTokens: Boolean(process.env.NEXT_PUBLIC_PAGOPAR_PUBLIC_TOKEN && process.env.PAGOPAR_PRIVATE_TOKEN),
+    });
+
     if (!orderId || !buyerData || !items || !totalAmount) {
       return NextResponse.json(
         { error: 'Missing required fields: orderId, buyerData, items, totalAmount' },
@@ -26,14 +32,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verificar que la orden existe y pertenece al usuario
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user) {
+    if (!process.env.NEXT_PUBLIC_PAGOPAR_PUBLIC_TOKEN || !process.env.PAGOPAR_PRIVATE_TOKEN) {
+      logger.error('[pagopar][create-invoice] missing env tokens');
       return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
+        { error: 'Pagopar credentials are not configured. Contact support.' },
+        { status: 500 }
       );
     }
+
+    let sessionUserId: string | null = null;
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (session?.user?.id) {
+        sessionUserId = session.user.id;
+      }
+    } catch (sessionError) {
+      logger.warn('[pagopar][create-invoice] session lookup failed', sessionError);
+    }
+
+    const requestBuyerId = sessionUserId ?? 'guest';
 
     const { data: order, error: orderError } = await (supabase as any)
       .from('orders')
@@ -42,70 +61,57 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (orderError || !order) {
-      logger.error('Order not found for Pagopar invoice', orderError);
-      return NextResponse.json(
-        { error: 'Order not found' },
-        { status: 404 }
-      );
+      logger.error('[pagopar][create-invoice] order not found', { orderId, error: orderError });
+      return NextResponse.json({ error: 'Order not found' }, { status: 404 });
     }
 
-    if (order.buyer_id !== session.user.id) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 403 }
-      );
+    if (requestBuyerId !== 'guest' && order.buyer_id !== requestBuyerId) {
+      logger.warn('[pagopar][create-invoice] unauthorized access', { orderId, requestBuyerId });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
-    // Verificar que la orden no esté ya pagada
-    if (order.status === 'paid' || order.status === 'confirmed') {
-      return NextResponse.json(
-        { error: 'Order already paid' },
-        { status: 400 }
-      );
+    if (order.status === 'paid') {
+      return NextResponse.json({ error: 'Order already paid' }, { status: 400 });
+    }
+
+    if (order.status === 'failed') {
+      return NextResponse.json({ error: 'Order is already marked as failed' }, { status: 400 });
     }
 
     // Formatear datos para Pagopar
     const pagoparBuyer = formatPagoparBuyer({
       fullName: buyerData.fullName || buyerData.full_name || 'Cliente',
-      email: buyerData.email || session.user.email || '',
+      email: buyerData.email || buyerData.email_address || '',
       phone: buyerData.phone || '',
       ruc: buyerData.ruc || buyerData.document || undefined,
     });
 
     const pagoparItems = formatPagoparItems(items);
-
-    // Determinar tipo de factura según método de pago
-    // 1 = Factura (solo efectivo/transferencia)
-    // 2 = Factura + Tarjeta (permite tarjeta también)
     const tipoFactura = paymentMethod === 'card' ? 2 : 1;
 
-    // Crear factura en Pagopar
     try {
       const invoice = await createPagoparInvoice({
         monto_total: Math.round(totalAmount),
         tipo_factura: tipoFactura,
         comprador: pagoparBuyer,
         items: pagoparItems,
-        fecha_vencimiento: calculateDueDate(7), // 7 días para pagar
-        venta: {
-          forma_pago: 1, // Contado
-        },
+        fecha_vencimiento: calculateDueDate(7),
+        venta: { forma_pago: 1 },
       });
 
-      // Guardar referencia de factura en la orden
       await (supabase as any)
         .from('orders')
         .update({
           payment_provider: 'pagopar',
           payment_reference: invoice.id_factura.toString(),
+          status: 'pending_payment',
           updated_at: new Date().toISOString(),
         })
         .eq('id', orderId);
 
-      logger.info('Pagopar invoice created for order', {
+      logger.info('[pagopar][create-invoice] invoice created', {
         orderId,
         invoiceId: invoice.id_factura,
-        link: invoice.link_pago,
       });
 
       return NextResponse.json({
@@ -117,33 +123,29 @@ export async function POST(request: NextRequest) {
         },
       });
     } catch (pagoparError: any) {
-      logger.error('Error creating Pagopar invoice', pagoparError);
-      
-      // Si Pagopar no está configurado, retornar mock para desarrollo
-      if (pagoparError.message?.includes('not configured') || 
-          (!process.env.PAGOPAR_PUBLIC_TOKEN && !process.env.PAGOPAR_PUBLIC_KEY)) {
-        logger.warn('Pagopar not configured, returning mock invoice');
-        
-        return NextResponse.json({
-          success: true,
-          invoice: {
-            id: `mock_${Date.now()}`,
-            link_pago: `/checkout/pagopar-mock?order=${orderId}`,
-            qr_code: null,
-          },
-          message: 'Pagopar not configured - using mock. Set PAGOPAR_PUBLIC_KEY and PAGOPAR_PRIVATE_KEY to use real payments.',
-        });
-      }
+      logger.error('[pagopar][create-invoice] error creating invoice', {
+        orderId,
+        message: pagoparError?.message,
+      });
+
+      await (supabase as any)
+        .from('orders')
+        .update({
+          status: 'failed',
+          payment_status: 'failed',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', orderId);
 
       return NextResponse.json(
-        { error: pagoparError.message || 'Error creating Pagopar invoice' },
-        { status: 500 }
+        { error: pagoparError?.message || 'Error al crear factura con Pagopar' },
+        { status: 502 }
       );
     }
   } catch (error: any) {
-    logger.error('Error in create Pagopar invoice endpoint', error);
+    logger.error('[pagopar][create-invoice] unexpected error', error);
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
+      { error: error?.message || 'Internal server error' },
       { status: 500 }
     );
   }

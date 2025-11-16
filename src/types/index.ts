@@ -12,7 +12,18 @@ export type MembershipLevel = 'free' | 'bronze' | 'silver' | 'gold';
 export type ProductCondition = 'new' | 'like_new' | 'used' | 'refurbished';
 export type SaleType = 'fixed' | 'auction' | 'negotiable';
 export type ProductStatus = 'active' | 'paused' | 'archived' | 'sold';
-export type OrderStatus = 'pending' | 'paid' | 'shipped' | 'delivered' | 'cancelled' | 'refunded';
+export type OrderStatus =
+  | 'pending'
+  | 'pending_payment'
+  | 'paid'
+  | 'cod_pending'
+  | 'failed'
+  | 'confirmed'
+  | 'shipped'
+  | 'delivered'
+  | 'cancelled'
+  | 'canceled'
+  | 'refunded';
 export type PaymentStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'refunded';
 export type ShipmentStatus = 'pending' | 'shipped' | 'in_transit' | 'delivered' | 'failed';
 export type PaymentProvider = 'pagopar' | 'gpay' | 'stripe';
@@ -45,6 +56,7 @@ export interface Profile {
     instagram?: string;
     twitter?: string;
     linkedin?: string;
+    tiktok?: string;
   };
   membership_level: MembershipLevel;
   membership_expires_at?: string;
@@ -81,6 +93,7 @@ export interface Store {
     instagram?: string;
     twitter?: string;
     linkedin?: string;
+    tiktok?: string;
   };
   settings: Record<string, any>;
   created_at: string;

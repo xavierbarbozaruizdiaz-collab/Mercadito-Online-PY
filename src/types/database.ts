@@ -71,7 +71,7 @@ export interface Database {
           location?: string;
           contact_email?: string;
           contact_phone?: string;
-          social_links: Record<string, string>;
+          social_links: Record<string, string> | null;
           settings: Record<string, any>;
           is_active: boolean;
           fb_pixel_id?: string | null;
@@ -91,7 +91,7 @@ export interface Database {
           location?: string;
           contact_email?: string;
           contact_phone?: string;
-          social_links?: Record<string, string>;
+          social_links?: Record<string, string> | null;
           settings?: Record<string, any>;
           is_active?: boolean;
           created_at?: string;
@@ -108,7 +108,7 @@ export interface Database {
           location?: string;
           contact_email?: string;
           contact_phone?: string;
-          social_links?: Record<string, string>;
+          social_links?: Record<string, string> | null;
           settings?: Record<string, any>;
           is_active?: boolean;
           fb_pixel_id?: string | null;
@@ -303,7 +303,18 @@ export interface Database {
           buyer_id: string;
           seller_id: string;
           order_number: string;
-          status: 'pending' | 'paid' | 'shipped' | 'delivered' | 'cancelled' | 'refunded';
+          status:
+            | 'pending'
+            | 'pending_payment'
+            | 'cod_pending'
+            | 'confirmed'
+            | 'paid'
+            | 'failed'
+            | 'shipped'
+            | 'delivered'
+            | 'cancelled'
+            | 'canceled'
+            | 'refunded';
           subtotal: number;
           shipping_cost: number;
           tax_amount: number;
@@ -321,7 +332,18 @@ export interface Database {
           buyer_id: string;
           seller_id: string;
           order_number: string;
-          status?: 'pending' | 'paid' | 'shipped' | 'delivered' | 'cancelled' | 'refunded';
+          status?:
+            | 'pending'
+            | 'pending_payment'
+            | 'cod_pending'
+            | 'confirmed'
+            | 'paid'
+            | 'failed'
+            | 'shipped'
+            | 'delivered'
+            | 'cancelled'
+            | 'canceled'
+            | 'refunded';
           subtotal: number;
           shipping_cost?: number;
           tax_amount?: number;
@@ -339,7 +361,18 @@ export interface Database {
           buyer_id?: string;
           seller_id?: string;
           order_number?: string;
-          status?: 'pending' | 'paid' | 'shipped' | 'delivered' | 'cancelled' | 'refunded';
+          status?:
+            | 'pending'
+            | 'pending_payment'
+            | 'cod_pending'
+            | 'confirmed'
+            | 'paid'
+            | 'failed'
+            | 'shipped'
+            | 'delivered'
+            | 'cancelled'
+            | 'canceled'
+            | 'refunded';
           subtotal?: number;
           shipping_cost?: number;
           tax_amount?: number;
@@ -603,6 +636,136 @@ export interface Database {
           resolved_by?: string | null;
           resolved_at?: string | null;
           resolution_notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      membership_plans: {
+        Row: {
+          id: string;
+          level: 'bronze' | 'silver' | 'gold';
+          name: string;
+          description: string | null;
+          price_monthly: number;
+          price_yearly: number | null;
+          price_one_time: number | null;
+          duration_days: number;
+          bid_limit: number | null;
+          bid_limit_formatted: string | null;
+          features: Record<string, any>;
+          is_active: boolean;
+          is_popular: boolean;
+          sort_order: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          level: 'bronze' | 'silver' | 'gold';
+          name: string;
+          description?: string | null;
+          price_monthly: number;
+          price_yearly?: number | null;
+          price_one_time?: number | null;
+          duration_days?: number;
+          bid_limit?: number | null;
+          bid_limit_formatted?: string | null;
+          features?: Record<string, any>;
+          is_active?: boolean;
+          is_popular?: boolean;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          level?: 'bronze' | 'silver' | 'gold';
+          name?: string;
+          description?: string | null;
+          price_monthly?: number;
+          price_yearly?: number | null;
+          price_one_time?: number | null;
+          duration_days?: number;
+          bid_limit?: number | null;
+          bid_limit_formatted?: string | null;
+          features?: Record<string, any>;
+          is_active?: boolean;
+          is_popular?: boolean;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      membership_subscriptions: {
+        Row: {
+          id: string;
+          user_id: string;
+          plan_id: string;
+          status: 'pending' | 'active' | 'expired' | 'cancelled' | 'failed';
+          subscription_type: 'monthly' | 'yearly' | 'one_time';
+          starts_at: string;
+          expires_at: string;
+          cancelled_at: string | null;
+          cancelled_by: string | null;
+          cancellation_reason: string | null;
+          auto_renew: boolean;
+          next_billing_date: string | null;
+          amount_paid: number;
+          payment_method: string | null;
+          payment_provider: string | null;
+          payment_reference: string | null;
+          payment_status: 'pending' | 'completed' | 'failed' | 'refunded';
+          paid_at: string | null;
+          metadata: Record<string, any>;
+          notes: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          plan_id: string;
+          status?: 'pending' | 'active' | 'expired' | 'cancelled' | 'failed';
+          subscription_type: 'monthly' | 'yearly' | 'one_time';
+          starts_at: string;
+          expires_at: string;
+          cancelled_at?: string | null;
+          cancelled_by?: string | null;
+          cancellation_reason?: string | null;
+          auto_renew?: boolean;
+          next_billing_date?: string | null;
+          amount_paid: number;
+          payment_method?: string | null;
+          payment_provider?: string | null;
+          payment_reference?: string | null;
+          payment_status?: 'pending' | 'completed' | 'failed' | 'refunded';
+          paid_at?: string | null;
+          metadata?: Record<string, any>;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          plan_id?: string;
+          status?: 'pending' | 'active' | 'expired' | 'cancelled' | 'failed';
+          subscription_type?: 'monthly' | 'yearly' | 'one_time';
+          starts_at?: string;
+          expires_at?: string;
+          cancelled_at?: string | null;
+          cancelled_by?: string | null;
+          cancellation_reason?: string | null;
+          auto_renew?: boolean;
+          next_billing_date?: string | null;
+          amount_paid?: number;
+          payment_method?: string | null;
+          payment_provider?: string | null;
+          payment_reference?: string | null;
+          payment_status?: 'pending' | 'completed' | 'failed' | 'refunded';
+          paid_at?: string | null;
+          metadata?: Record<string, any>;
+          notes?: string | null;
           created_at?: string;
           updated_at?: string;
         };
