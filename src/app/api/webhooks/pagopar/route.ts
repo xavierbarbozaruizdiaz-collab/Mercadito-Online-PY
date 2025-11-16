@@ -231,20 +231,22 @@ export async function POST(req: Request) {
       expiresAt.setDate(expiresAt.getDate() + durationDays);
 
       // Actualizar suscripción directamente (en lugar de crear una nueva)
+      type SubscriptionUpdate = Database['public']['Tables']['membership_subscriptions']['Update'];
+      const updateData: SubscriptionUpdate = {
+        status: 'active',
+        payment_status: 'completed',
+        payment_method: 'pagopar',
+        payment_provider: 'pagopar',
+        payment_reference: invoiceId || null,
+        amount_paid: amount || sub.amount_paid || 0,
+        starts_at: now.toISOString(),
+        expires_at: expiresAt.toISOString(),
+        paid_at: now.toISOString(),
+        updated_at: now.toISOString(),
+      };
       const { error: updateError } = await supabase
         .from('membership_subscriptions')
-        .update({
-          status: 'active',
-          payment_status: 'completed',
-          payment_method: 'pagopar',
-          payment_provider: 'pagopar',
-          payment_reference: invoiceId || null,
-          amount_paid: amount || sub.amount_paid || 0,
-          starts_at: now.toISOString(),
-          expires_at: expiresAt.toISOString(),
-          paid_at: now.toISOString(),
-          updated_at: now.toISOString(),
-        })
+        .update(updateData)
         .eq('id', sub.id);
 
       if (updateError) {
