@@ -128,8 +128,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Crear en base de datos
-    const { data, error } = await supabase
-      .from('marketing_campaigns')
+    const { data, error } = await (supabase
+      .from('marketing_campaigns') as any)
       .insert({
         store_id: storeId || null,
         campaign_type: campaignType,
