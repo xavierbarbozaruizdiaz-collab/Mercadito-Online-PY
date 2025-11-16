@@ -1,8 +1,33 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabaseServer';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import type { Database } from '@/types/database';
 
 export async function GET() {
   try {
+    const supabaseUrl = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey = process.env.SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    let supabase: SupabaseClient<Database> | null = null;
+    if (supabaseUrl && supabaseAnonKey) {
+      supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+        },
+      });
+    }
+
+    if (!supabase) {
+      console.warn('[hero-slides] Supabase no está configurado. Devolviendo lista vacía.');
+      return new NextResponse(JSON.stringify([]), {
+        status: 200,
+        headers: {
+          'content-type': 'application/json',
+          'cache-control': 's-maxage=60, stale-while-revalidate=120',
+        },
+      });
+    }
+
     const { data, error } = await supabase
       .from('hero_slides')
       .select('*')
