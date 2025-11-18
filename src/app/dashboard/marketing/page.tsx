@@ -113,10 +113,13 @@ export default function MarketingPage() {
     }
   }, [user, authLoading]);
 
-  // Cargar campañas
+  // Cargar campañas (pero no bloquear renderizado si falla)
   useEffect(() => {
     if (user && !authLoading) {
       loadCampaigns();
+    } else if (!authLoading && !user) {
+      // Si no hay usuario después de cargar, no intentar cargar campañas
+      setLoading(false);
     }
   }, [user, authLoading, selectedStore]);
 
@@ -165,12 +168,14 @@ export default function MarketingPage() {
       
       if (sessionError) {
         logger.error('Error getting session', sessionError);
+        setLoading(false);
         return;
       }
       
       if (!session?.session?.user?.id) {
-        logger.warn('No session found, redirecting...');
-        window.location.href = '/auth/sign-in';
+        logger.warn('No session found');
+        setLoading(false);
+        // NO redirigir aquí, dejar que el useEffect de autenticación lo maneje
         return;
       }
 
@@ -192,11 +197,13 @@ export default function MarketingPage() {
         if (error.code === '42P01' || error.code === 'PGRST301' || error.message?.includes('does not exist')) {
           logger.warn('Marketing campaigns table does not exist or no access', error);
           setCampaigns([]);
+          setLoading(false);
           return;
         }
         // Para otros errores, solo loguear pero no fallar
         logger.error('Error loading campaigns', error);
         setCampaigns([]);
+        setLoading(false);
         return;
       }
       
@@ -325,9 +332,21 @@ export default function MarketingPage() {
     };
   }
 
-  // Mostrar loading SOLO si está cargando la autenticación inicialmente
-  // NO bloquear si solo están cargando las campañas (los catálogos deben mostrarse siempre)
-  if (authLoading && !user) {
+  // Mostrar loading SOLO si está cargando la autenticación inicialmente (primeros 2 segundos)
+  // Después de eso, mostrar la página con catálogos aunque las campañas estén cargando
+  const [initialLoad, setInitialLoad] = useState(true);
+  
+  useEffect(() => {
+    // Después de 2 segundos, permitir mostrar la página aunque authLoading sea true
+    const timer = setTimeout(() => {
+      setInitialLoad(false);
+    }, 2000);
+    
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Solo mostrar loading si es carga inicial Y está cargando autenticación Y no hay usuario
+  if (initialLoad && authLoading && !user) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
