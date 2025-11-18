@@ -31,6 +31,226 @@ export interface SyncResult {
   error?: string;
 }
 
+// ============================================
+// TIPOS PARA CATÁLOGO MERCADITO
+// ============================================
+
+export interface ProductCatalogInfo {
+  id: string;
+  title: string;
+  description: string | null;
+  price: number;
+  cover_url: string | null;
+  status: string;
+  is_in_global_catalog: boolean;
+  catalog_valid_from: string | null;
+  catalog_valid_until: string | null;
+  catalog_priority: number;
+  exclude_from_store_catalog: boolean;
+  store_id: string;
+  seller_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// ============================================
+// FUNCIONES PARA CATÁLOGO MERCADITO
+// ============================================
+
+/**
+ * Obtiene los productos de una tienda para el catálogo Mercadito
+ */
+export async function getStoreProductsForCatalog(
+  storeId: string,
+  options: {
+    page?: number;
+    pageSize?: number;
+  } = {}
+): Promise<{
+  products: ProductCatalogInfo[];
+  total: number;
+  hasMore: boolean;
+}> {
+  try {
+    const page = options.page || 1;
+    const pageSize = options.pageSize || 20;
+    const offset = (page - 1) * pageSize;
+
+    const { data, error, count } = await supabase
+      .from('products')
+      .select('*', { count: 'exact' })
+      .eq('store_id', storeId)
+      .order('created_at', { ascending: false })
+      .range(offset, offset + pageSize - 1);
+
+    if (error) {
+      console.error('[ProductCatalogService] Error fetching store products:', error);
+      throw error;
+    }
+
+    return {
+      products: (data || []) as ProductCatalogInfo[],
+      total: count || 0,
+      hasMore: (count || 0) > offset + (data?.length || 0),
+    };
+  } catch (error) {
+    console.error('[ProductCatalogService] Error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Cuenta los productos activos en el catálogo global de una tienda
+ */
+export async function countActiveCatalogProducts(storeId: string): Promise<number> {
+  try {
+    const now = new Date().toISOString();
+
+    const { data, error, count } = await supabase
+      .from('products')
+      .select('id, catalog_valid_from, catalog_valid_until', { count: 'exact' })
+      .eq('store_id', storeId)
+      .eq('is_in_global_catalog', true)
+      .eq('status', 'active');
+
+    if (error) {
+      console.error('[ProductCatalogService] Error counting active catalog products:', error);
+      return 0;
+    }
+
+    // Filtrar por vigencia en memoria
+    const nowDate = new Date();
+    const validCount = (data || []).filter((product: any) => {
+      if (product.catalog_valid_from) {
+        const validFrom = new Date(product.catalog_valid_from);
+        if (validFrom > nowDate) return false;
+      }
+      if (product.catalog_valid_until) {
+        const validUntil = new Date(product.catalog_valid_until);
+        if (validUntil < nowDate) return false;
+      }
+      return true;
+    }).length;
+
+    return validCount;
+  } catch (error) {
+    console.error('[ProductCatalogService] Error:', error);
+    return 0;
+  }
+}
+
+/**
+ * Verifica que un producto pertenezca a una tienda
+ */
+export async function verifyProductOwnership(
+  productId: string,
+  storeId: string
+): Promise<boolean> {
+  try {
+    const { data, error } = await supabase
+      .from('products')
+      .select('id, store_id')
+      .eq('id', productId)
+      .eq('store_id', storeId)
+      .single();
+
+    if (error || !data) {
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('[ProductCatalogService] Error verifying ownership:', error);
+    return false;
+  }
+}
+
+/**
+ * Actualiza la configuración del catálogo global de un producto
+ * Valida que no se exceda el límite de 2 productos activos por tienda
+ */
+export async function updateProductGlobalCatalogSettings(
+  productId: string,
+  storeId: string,
+  settings: {
+    is_in_global_catalog?: boolean;
+    catalog_valid_from?: string | null;
+    catalog_valid_until?: string | null;
+    catalog_priority?: number;
+  }
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    // Verificar propiedad del producto
+    const isOwner = await verifyProductOwnership(productId, storeId);
+    if (!isOwner) {
+      return {
+        success: false,
+        error: 'No tienes permiso para modificar este producto',
+      };
+    }
+
+    // Si se está activando el catálogo, verificar límite de 2 productos
+    if (settings.is_in_global_catalog === true) {
+      const activeCount = await countActiveCatalogProducts(storeId);
+
+      // Si el producto ya está activo, no contar este producto
+      const { data: currentProduct } = await supabase
+        .from('products')
+        .select('is_in_global_catalog, catalog_valid_from, catalog_valid_until')
+        .eq('id', productId)
+        .single();
+
+      const isCurrentlyActive =
+        currentProduct?.is_in_global_catalog === true &&
+        (!currentProduct.catalog_valid_from ||
+          new Date(currentProduct.catalog_valid_from) <= new Date()) &&
+        (!currentProduct.catalog_valid_until ||
+          new Date(currentProduct.catalog_valid_until) >= new Date());
+
+      const countToCheck = isCurrentlyActive ? activeCount - 1 : activeCount;
+
+      if (countToCheck >= 2) {
+        return {
+          success: false,
+          error: 'Ya tienes 2 productos activos en el Catálogo Mercadito. Desactiva uno antes de activar otro.',
+        };
+      }
+    }
+
+    // Actualizar producto
+    const { error: updateError } = await supabase
+      .from('products')
+      .update({
+        is_in_global_catalog: settings.is_in_global_catalog,
+        catalog_valid_from: settings.catalog_valid_from || null,
+        catalog_valid_until: settings.catalog_valid_until || null,
+        catalog_priority: settings.catalog_priority ?? 0,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', productId);
+
+    if (updateError) {
+      console.error('[ProductCatalogService] Error updating product:', updateError);
+      return {
+        success: false,
+        error: updateError.message || 'Error al actualizar el producto',
+      };
+    }
+
+    return { success: true };
+  } catch (error: any) {
+    console.error('[ProductCatalogService] Error:', error);
+    return {
+      success: false,
+      error: error.message || 'Error desconocido',
+    };
+  }
+}
+
+// ============================================
+// CLASE ORIGINAL (MANTENER PARA COMPATIBILIDAD)
+// ============================================
+
 class ProductCatalogService {
   /**
    * Sincroniza un producto a una plataforma específica
@@ -326,4 +546,3 @@ class ProductCatalogService {
 
 // Exportar instancia singleton
 export const productCatalog = new ProductCatalogService();
-
