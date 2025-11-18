@@ -346,6 +346,7 @@ export default function MarketingPage() {
   }, []);
 
   // Solo mostrar loading si es carga inicial Y está cargando autenticación Y no hay usuario
+  // PERO solo por máximo 2 segundos, después mostrar la página siempre
   if (initialLoad && authLoading && !user) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -356,6 +357,9 @@ export default function MarketingPage() {
       </div>
     );
   }
+
+  // IMPORTANTE: Si pasaron 2 segundos, mostrar la página SIEMPRE, incluso si authLoading es true
+  // Esto evita que la página se quede bloqueada
 
   // Verificar si realmente no hay sesión (dar más tiempo antes de redirigir)
   useEffect(() => {
@@ -486,8 +490,8 @@ export default function MarketingPage() {
         <div className="border-t border-gray-200"></div>
       </div>
 
-      {/* Filtro de tienda */}
-      {stores.length > 0 && (
+      {/* Filtro de tienda - Solo mostrar si hay más de una tienda */}
+      {stores.length > 1 && (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-6">
           <div className="bg-white rounded-lg shadow p-4">
             <label className="block text-sm font-medium text-gray-700 mb-2">
