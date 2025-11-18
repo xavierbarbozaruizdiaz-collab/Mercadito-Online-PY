@@ -72,7 +72,7 @@ class ProductServiceImpl implements ProductService {
 
       // Rate limiting para crear productos
       try {
-        const { rateLimiter, RATE_LIMITS } = await import('@/lib/utils/rateLimit');
+        const { rateLimiter } = await import('@/lib/utils/rateLimit');
         const limitCheck = await rateLimiter.checkLimit(user.id, 'PRODUCT_CREATE');
         
         if (!limitCheck.allowed) {
@@ -140,7 +140,7 @@ class ProductServiceImpl implements ProductService {
           });
           if (!newStore) throw new Error('No se pudo crear la tienda');
           storeId = newStore.id;
-        } catch (createStoreError: any) {
+        } catch {
           throw new Error('No se pudo crear o encontrar tu tienda. Contacta al administrador.');
         }
       } else {
@@ -743,7 +743,7 @@ class ProductServiceImpl implements ProductService {
     const filePath = `products/${productId}/${fileName}`;
 
     // Subir archivo a Supabase Storage
-    const { data: uploadData, error: uploadError } = await supabase.storage
+    const { error: uploadError } = await supabase.storage
       .from('product-images')
       .upload(filePath, file);
 

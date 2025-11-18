@@ -81,8 +81,6 @@ export async function getActiveAuctions(filters?: {
   seller_id?: string;
 }): Promise<AuctionProduct[]> {
   try {
-    const now = new Date().toISOString();
-    
         // Primero, obtener todas las subastas (sale_type = 'auction')
         // Solo incluir productos activos o pausados (no archivados/vendidos/eliminados)
         // Optimizado: solo seleccionar columnas necesarias
@@ -234,7 +232,6 @@ export async function getActiveAuctions(filters?: {
         }
         
         // Si tiene fecha de inicio
-        const startTime = new Date(startAt).getTime();
         const now = Date.now();
         
         // Si tiene fecha de fin, verificar que no haya terminado
@@ -613,7 +610,7 @@ export async function buyNow(
   buyerId: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const { data, error } = await (supabase as any).rpc('buy_now_auction', {
+    const { error } = await (supabase as any).rpc('buy_now_auction', {
       p_product_id: productId,
       p_buyer_id: buyerId,
     });

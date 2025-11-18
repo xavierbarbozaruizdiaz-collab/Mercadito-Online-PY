@@ -6,7 +6,7 @@
 import { supabase } from '@/lib/supabase/client';
 import { Database } from '@/types/database';
 import { validatePageLimit, validatePageNumber, calculateOffset } from '@/lib/utils/pagination';
-import { cache, getStoreCacheKey, getStoreProductsCacheKey, invalidateStoreCache } from '@/lib/utils/cache';
+import { cache, getStoreCacheKey, getStoreProductsCacheKey } from '@/lib/utils/cache';
 
 // ============================================
 // TIPOS

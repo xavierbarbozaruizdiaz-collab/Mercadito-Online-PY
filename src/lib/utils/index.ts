@@ -1,3 +1,4 @@
+/* eslint-disable no-useless-escape */
 // ============================================
 // MERCADITO ONLINE PY - UTILIDADES
 // Funciones de utilidad para el e-commerce
@@ -21,7 +22,7 @@ export function cn(...inputs: ClassValue[]) {
 export function formatCurrency(amount: number, currency: string = 'PYG'): string {
   return new Intl.NumberFormat('es-PY', {
     style: 'currency',
-    currency: currency,
+    currency,
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(amount);
@@ -54,20 +55,20 @@ export function formatRelativeTime(date: string | Date): string {
   const targetDate = new Date(date);
   const diffInSeconds = Math.floor((now.getTime() - targetDate.getTime()) / 1000);
 
-  if (diffInSeconds < 60) {
-    return 'hace un momento';
-  } else if (diffInSeconds < 3600) {
+  if (diffInSeconds < 60) return 'hace un momento';
+  if (diffInSeconds < 3600) {
     const minutes = Math.floor(diffInSeconds / 60);
     return `hace ${minutes} minuto${minutes > 1 ? 's' : ''}`;
-  } else if (diffInSeconds < 86400) {
+  }
+  if (diffInSeconds < 86400) {
     const hours = Math.floor(diffInSeconds / 3600);
     return `hace ${hours} hora${hours > 1 ? 's' : ''}`;
-  } else if (diffInSeconds < 2592000) {
+  }
+  if (diffInSeconds < 2592000) {
     const days = Math.floor(diffInSeconds / 86400);
     return `hace ${days} día${days > 1 ? 's' : ''}`;
-  } else {
-    return formatDate(date);
   }
+  return formatDate(date);
 }
 
 // ============================================
@@ -80,23 +81,22 @@ export function isValidEmail(email: string): boolean {
 }
 
 export function isValidPhone(phone: string): boolean {
-  const phoneRegex = /^[\+]?[0-9\s\-\(\)]{10,}$/;
+  const phoneRegex = /^[+]?[\d\s()-]{10,}$/;
   return phoneRegex.test(phone);
 }
 
 /**
  * Formatea un número de teléfono de Paraguay para usar en enlaces de WhatsApp.
  * Convierte números locales (098...) a formato internacional (59598...).
- * 
+ *
  * @param phone - Número de teléfono en cualquier formato (0981234567, +595981234567, etc.)
  * @returns URL completa de WhatsApp (https://wa.me/595981234567) o null si es inválido
- * 
+ *
  * @example
  * formatPhoneForWhatsApp('0981988714') // 'https://wa.me/595981988714'
  * formatPhoneForWhatsApp('+595981988714') // 'https://wa.me/595981988714'
  * formatPhoneForWhatsApp('595981988714') // 'https://wa.me/595981988714'
  */
-<<<<<<< HEAD
 export function formatPhoneForWhatsApp(raw: string | null | undefined): string | null {
   if (!raw) return null;
 
@@ -122,49 +122,6 @@ export function formatPhoneForWhatsApp(raw: string | null | undefined): string |
   }
 
   return null;
-=======
-export function formatPhoneForWhatsApp(input: unknown): string | null {
-  try {
-    const raw = String(input ?? '').trim();
-    if (!raw) return null;
-
-    // Mantener solo dígitos
-    let clean = raw.replace(/\D/g, '');
-
-    // Si empieza con 595 → usa tal cual
-    if (clean.startsWith('595')) {
-      // Validar que la parte local (sin 595) tenga >= 9 dígitos
-      const localPart = clean.slice(3);
-      if (localPart.length < 9) {
-        console.warn('[WA] telefono invalido:', raw, clean, 'parte local:', localPart.length, 'dígitos');
-        return null;
-      }
-      return clean;
-    }
-
-    // Si empieza con 0 → remove sólo el primer 0 y NO recortes más
-    if (clean.startsWith('0')) {
-      clean = clean.slice(1);
-      // Validar que tenga >= 9 dígitos después de quitar el 0
-      if (clean.length < 9) {
-        console.warn('[WA] telefono invalido:', raw, clean, 'solo', clean.length, 'dígitos después de quitar 0');
-        return null;
-      }
-      return '595' + clean;
-    }
-
-    // Si no empieza con 595 → prefix 595
-    // Validar que tenga >= 9 dígitos antes de agregar 595
-    if (clean.length < 9) {
-      console.warn('[WA] telefono invalido:', raw, clean, 'solo', clean.length, 'dígitos');
-      return null;
-    }
-    return '595' + clean;
-  } catch (e) {
-    console.error('[WA] Error formateando número:', e);
-    return null;
-  }
->>>>>>> origin/main
 }
 
 export function isValidUrl(url: string): boolean {
@@ -206,7 +163,7 @@ export function capitalizeFirst(text: string): string {
 }
 
 export function capitalizeWords(text: string): string {
-  return text.replace(/\w\S*/g, (txt) => 
+  return text.replace(/\w\S*/g, (txt) =>
     txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase()
   );
 }
@@ -217,11 +174,11 @@ export function capitalizeWords(text: string): string {
 
 export function formatFileSize(bytes: number): string {
   if (bytes === 0) return '0 Bytes';
-  
+
   const k = 1024;
   const sizes = ['Bytes', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  
+
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
@@ -251,7 +208,7 @@ export function sortBy<T>(array: T[], key: keyof T, order: 'asc' | 'desc' = 'asc
   return [...array].sort((a, b) => {
     const aVal = a[key];
     const bVal = b[key];
-    
+
     if (aVal < bVal) return order === 'asc' ? -1 : 1;
     if (aVal > bVal) return order === 'asc' ? 1 : -1;
     return 0;
@@ -260,7 +217,7 @@ export function sortBy<T>(array: T[], key: keyof T, order: 'asc' | 'desc' = 'asc
 
 export function uniqueBy<T>(array: T[], key: keyof T): T[] {
   const seen = new Set();
-  return array.filter(item => {
+  return array.filter((item) => {
     const value = item[key];
     if (seen.has(value)) return false;
     seen.add(value);
@@ -272,21 +229,15 @@ export function uniqueBy<T>(array: T[], key: keyof T): T[] {
 // MANIPULACIÓN DE OBJETOS
 // ============================================
 
-export function omit<T extends Record<string, any>, K extends keyof T>(
-  obj: T,
-  keys: K[]
-): Omit<T, K> {
+export function omit<T extends Record<string, any>, K extends keyof T>(obj: T, keys: K[]): Omit<T, K> {
   const result = { ...obj };
-  keys.forEach(key => delete result[key]);
+  keys.forEach((key) => delete result[key]);
   return result;
 }
 
-export function pick<T extends Record<string, any>, K extends keyof T>(
-  obj: T,
-  keys: K[]
-): Pick<T, K> {
+export function pick<T extends Record<string, any>, K extends keyof T>(obj: T, keys: K[]): Pick<T, K> {
   const result = {} as Pick<T, K>;
-  keys.forEach(key => {
+  keys.forEach((key) => {
     if (key in obj) {
       result[key] = obj[key];
     }
@@ -296,7 +247,7 @@ export function pick<T extends Record<string, any>, K extends keyof T>(
 
 export function deepMerge<T extends Record<string, any>>(target: T, source: Partial<T>): T {
   const result = { ...target };
-  
+
   for (const key in source) {
     if (source[key] !== undefined) {
       if (typeof source[key] === 'object' && source[key] !== null && !Array.isArray(source[key])) {
@@ -306,7 +257,7 @@ export function deepMerge<T extends Record<string, any>>(target: T, source: Part
       }
     }
   }
-  
+
   return result;
 }
 

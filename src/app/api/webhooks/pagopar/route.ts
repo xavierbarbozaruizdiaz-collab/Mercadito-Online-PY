@@ -1,138 +1,324 @@
 // ============================================
 // MERCADITO ONLINE PY - WEBHOOK PAGOPAR
-// Endpoint para recibir notificaciones de Pagopar cuando se paga una factura
+// Recibe notificaciones de Pagopar cuando se confirma un pago
 // ============================================
 
-import { NextRequest, NextResponse } from 'next/server';
-import { getPagoparInvoiceStatus } from '@/lib/services/pagoparService';
-import { supabase } from '@/lib/supabaseClient';
+import { NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 import { logger } from '@/lib/utils/logger';
+import type { Database } from '@/types/database';
 
-export async function POST(request: NextRequest) {
+// Cliente de Supabase con service role para bypass RLS
+function getSupabaseAdmin() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !supabaseServiceKey) {
+    throw new Error('SUPABASE_SERVICE_ROLE_KEY no está configurado');
+  }
+
+  return createClient<Database>(supabaseUrl, supabaseServiceKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+}
+
+// Estados de pago aprobados en Pagopar
+const APPROVED_PAYMENT_STATES = ['pagada', 'pagado', 'success', 'approved', 'completed', 'completado'];
+
+// Función auxiliar para determinar si el pago está aprobado
+function isPaymentApproved(paymentState: any): boolean {
+  if (!paymentState) return false;
+  
+  const stateStr = String(paymentState).toLowerCase().trim();
+  return APPROVED_PAYMENT_STATES.some(approved => stateStr === approved);
+}
+
+// Función auxiliar para extraer external_reference del payload de Pagopar
+function extractExternalReference(payload: any): string | null {
+  // Pagopar puede enviar external_reference en diferentes lugares del payload
+  // Intentamos varios campos posibles
+  return (
+    payload?.external_reference ||
+    payload?.referencia_externa ||
+    payload?.referencia ||
+    payload?.resultado?.external_reference ||
+    payload?.resultado?.referencia_externa ||
+    payload?.datos?.external_reference ||
+    payload?.datos?.referencia_externa ||
+    null
+  );
+}
+
+// Función auxiliar para extraer el estado del pago
+function extractPaymentState(payload: any): string | null {
+  return (
+    payload?.estado ||
+    payload?.status ||
+    payload?.resultado?.estado ||
+    payload?.resultado?.status ||
+    payload?.datos?.estado ||
+    payload?.datos?.status ||
+    null
+  );
+}
+
+// Función auxiliar para extraer id_factura o id_operacion
+function extractInvoiceId(payload: any): string | null {
+  return (
+    payload?.id_factura?.toString() ||
+    payload?.id_operacion?.toString() ||
+    payload?.operation_id?.toString() ||
+    payload?.resultado?.id_factura?.toString() ||
+    payload?.resultado?.id_operacion?.toString() ||
+    payload?.datos?.id_factura?.toString() ||
+    payload?.datos?.id_operacion?.toString() ||
+    null
+  );
+}
+
+// Función auxiliar para extraer el monto pagado
+function extractAmount(payload: any): number | null {
+  const amount = 
+    payload?.monto_pagado ||
+    payload?.monto ||
+    payload?.amount ||
+    payload?.resultado?.monto_pagado ||
+    payload?.resultado?.monto ||
+    payload?.datos?.monto_pagado ||
+    payload?.datos?.monto ||
+    null;
+  
+  return amount ? parseFloat(String(amount)) : null;
+}
+
+export async function POST(req: Request) {
+  let payload: any = null;
+  
   try {
-    // Verificar autorización (Pagopar envía un token o firma)
-    const authHeader = request.headers.get('authorization');
-    const pagoparSecret = process.env.PAGOPAR_WEBHOOK_SECRET;
-
-    // TODO: Implementar verificación de firma si Pagopar la proporciona
-    // if (pagoparSecret && authHeader !== `Bearer ${pagoparSecret}`) {
-    //   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    // }
-
-    const body = await request.json();
-    const { id_factura, estado, monto_pagado, fecha_pago, metodo_pago } = body;
-
-    if (!id_factura) {
-      return NextResponse.json(
-        { error: 'id_factura is required' },
-        { status: 400 }
-      );
+    const rawBody = await req.text();
+    
+    try {
+      payload = JSON.parse(rawBody);
+    } catch (parseError) {
+      logger.error('[Pagopar Webhook] body no es JSON válido', { rawBody, error: parseError });
+      // Devolver 200 para no romper comunicación con Pagopar
+      return NextResponse.json({ ok: true, error: 'Invalid JSON' }, { status: 200 });
     }
 
-    logger.info('Pagopar webhook received', {
-      id_factura,
-      estado,
-      monto_pagado,
-      fecha_pago,
+    // Log sanitizado del payload (sin datos sensibles)
+    logger.info('[Pagopar Webhook] payload recibido', {
+      hasPayload: !!payload,
+      hasResultado: !!payload?.resultado,
+      hasDatos: !!payload?.datos,
+      externalReference: extractExternalReference(payload),
+      paymentState: extractPaymentState(payload),
+      invoiceId: extractInvoiceId(payload),
     });
 
-    // Buscar orden por payment_reference
-    const { data: order, error: orderError } = await (supabase as any)
-      .from('orders')
-      .select('id, buyer_id, total_amount, status, payment_provider')
-      .eq('payment_reference', id_factura.toString())
-      .eq('payment_provider', 'pagopar')
-      .maybeSingle();
+    // Extraer datos del payload
+    const externalReference = extractExternalReference(payload);
+    const paymentState = extractPaymentState(payload);
+    const invoiceId = extractInvoiceId(payload);
+    const amount = extractAmount(payload);
 
-    if (orderError) {
-      logger.error('Error finding order for Pagopar webhook', orderError);
-      return NextResponse.json(
-        { error: 'Error processing webhook' },
-        { status: 500 }
-      );
+    // Si no hay external_reference, ignorar (no es una membresía u orden conocida)
+    if (!externalReference) {
+      logger.warn('[Pagopar Webhook] No se encontró external_reference en el payload', { payload });
+      return NextResponse.json({ ok: true, ignored: true, reason: 'No external_reference' }, { status: 200 });
     }
 
-    if (!order) {
-      logger.warn('Order not found for Pagopar invoice', { id_factura });
-      return NextResponse.json(
-        { error: 'Order not found' },
-        { status: 404 }
-      );
+    // Determinar si el pago está aprobado
+    const isApproved = isPaymentApproved(paymentState);
+    
+    logger.info('[Pagopar Webhook] Estado del pago', {
+      externalReference,
+      paymentState,
+      isApproved,
+      invoiceId,
+      amount,
+    });
+
+    // Si el pago NO está aprobado, ignorar
+    if (!isApproved) {
+      logger.info('[Pagopar Webhook] Pago no aprobado, ignorando', {
+        externalReference,
+        paymentState,
+      });
+      return NextResponse.json({ ok: true, ignored: true, reason: 'Payment not approved', state: paymentState }, { status: 200 });
     }
 
-    // Si la orden ya está pagada, no hacer nada
-    if (order.status === 'paid' || order.status === 'confirmed') {
-      logger.info('Order already paid, ignoring webhook', { orderId: order.id });
-      return NextResponse.json({ success: true, message: 'Order already paid' });
+    // Crear cliente de Supabase con service role
+    const supabase = getSupabaseAdmin();
+
+    // Buscar suscripción de membresía por external_reference (subscriptionId)
+    const { data: subscription, error: subscriptionError } = await supabase
+      .from('membership_subscriptions')
+      .select('id, user_id, plan_id, status, payment_status, subscription_type, amount_paid')
+      .eq('id', externalReference)
+      .single();
+
+    if (subscriptionError) {
+      // Si no es error de "no encontrado", podría ser una orden u otro tipo
+      if (subscriptionError.code !== 'PGRST116') {
+        logger.error('[Pagopar Webhook] Error buscando suscripción', {
+          externalReference,
+          error: subscriptionError,
+        });
+        // No fallar completamente, podría ser una orden
+        // Intentar buscar como orden
+      } else {
+        logger.info('[Pagopar Webhook] No se encontró suscripción, podría ser una orden', {
+          externalReference,
+        });
+      }
+      // Si hay error, no hay subscription, continuar para procesar como orden
+      // No procesar suscripción si hay error
     }
 
-    // Actualizar estado de la orden según el estado de Pagopar
-    if (estado === 'pagada' && monto_pagado >= order.total_amount) {
-      // Confirmar pago de la orden
-      await (supabase as any)
-        .from('orders')
-        .update({
-          status: 'confirmed',
-          payment_status: 'completed',
-          payment_confirmed_at: fecha_pago || new Date().toISOString(),
-          payment_method: metodo_pago || 'pagopar',
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', order.id);
+    // Si encontramos una suscripción de membresía, procesarla
+    // TypeScript necesita verificación explícita: subscriptionError debe ser null y subscription debe existir
+    if (!subscriptionError && subscription !== null) {
+      // Type assertion explícito para ayudar a TypeScript a inferir el tipo correcto
+      type SubscriptionRow = Database['public']['Tables']['membership_subscriptions']['Row'];
+      const sub = subscription as SubscriptionRow;
+      logger.info('[Pagopar Webhook] Suscripción encontrada', {
+        subscriptionId: sub.id,
+        userId: sub.user_id,
+        planId: sub.plan_id,
+        currentStatus: sub.status,
+        currentPaymentStatus: sub.payment_status,
+      });
 
-      // Crear notificación para el comprador
-      try {
-        await (supabase as any)
-          .from('notifications')
-          .insert({
-            user_id: order.buyer_id,
-            type: 'order',
-            title: 'Pago confirmado',
-            message: `Tu pago para la orden #${order.id.slice(0, 8)} ha sido confirmado`,
-            content: `El pago de ${monto_pagado?.toLocaleString('es-PY')} Gs. ha sido procesado exitosamente.`,
-            data: {
-              order_id: order.id,
-              amount: monto_pagado,
-            },
-          });
-      } catch (notifError) {
-        logger.warn('Error creating notification', notifError);
+      // Verificar si ya está activa y pagada (idempotencia)
+      if (sub.status === 'active' && sub.payment_status === 'completed') {
+        logger.info('[Pagopar Webhook] Suscripción ya está activa y pagada (idempotencia)', {
+          subscriptionId: sub.id,
+        });
+        return NextResponse.json({ ok: true, alreadyActive: true }, { status: 200 });
       }
 
-      logger.info('Order payment confirmed via Pagopar webhook', {
-        orderId: order.id,
-        invoiceId: id_factura,
-        amount: monto_pagado,
-      });
-    } else if (estado === 'vencida' || estado === 'cancelada') {
-      // Marcar como cancelada
-      await (supabase as any)
-        .from('orders')
+      // Obtener información del plan
+      const { data: plan, error: planError } = await supabase
+        .from('membership_plans')
+        .select('id, level, name, duration_days')
+        .eq('id', sub.plan_id)
+        .single();
+
+      if (planError || !plan) {
+        logger.error('[Pagopar Webhook] Plan no encontrado', {
+          subscriptionId: sub.id,
+          planId: sub.plan_id,
+          error: planError,
+        });
+        return NextResponse.json({ ok: false, error: 'Plan not found' }, { status: 500 });
+      }
+
+      // Type assertion explícito para ayudar a TypeScript a inferir el tipo correcto
+      type PlanRow = Database['public']['Tables']['membership_plans']['Row'];
+      const planRow = plan as PlanRow;
+
+      // Calcular fechas según tipo de suscripción
+      const now = new Date();
+      const durationDays = 
+        sub.subscription_type === 'yearly' 
+          ? (planRow.duration_days || 30) * 12
+          : planRow.duration_days || 30;
+      
+      const expiresAt = new Date(now);
+      expiresAt.setDate(expiresAt.getDate() + durationDays);
+
+      // Actualizar suscripción directamente (en lugar de crear una nueva)
+      type SubscriptionUpdate = Database['public']['Tables']['membership_subscriptions']['Update'];
+      const updateData: SubscriptionUpdate = {
+        status: 'active',
+        payment_status: 'completed',
+        payment_method: 'pagopar',
+        payment_provider: 'pagopar',
+        payment_reference: invoiceId || null,
+        amount_paid: amount || sub.amount_paid || 0,
+        starts_at: now.toISOString(),
+        expires_at: expiresAt.toISOString(),
+        paid_at: now.toISOString(),
+        updated_at: now.toISOString(),
+      };
+      const { error: updateError } = await (supabase
+        .from('membership_subscriptions') as any)
+        .update(updateData)
+        .eq('id', sub.id);
+
+      if (updateError) {
+        logger.error('[Pagopar Webhook] Error actualizando suscripción', {
+          subscriptionId: sub.id,
+          error: updateError,
+        });
+        return NextResponse.json({ ok: false, error: 'Failed to update subscription' }, { status: 500 });
+      }
+
+      // Actualizar perfil del usuario con la membresía
+      // Nota: profiles no tiene columna updated_at según el schema actual
+      const { error: profileError } = await (supabase
+        .from('profiles') as any)
         .update({
-          status: 'cancelled',
-          payment_status: 'failed',
-          updated_at: new Date().toISOString(),
+          membership_level: planRow.level,
+          membership_expires_at: expiresAt.toISOString(),
         })
-        .eq('id', order.id);
+        .eq('id', sub.user_id);
+
+      if (profileError) {
+        logger.error('[Pagopar Webhook] Error actualizando perfil', {
+          userId: sub.user_id,
+          error: profileError,
+        });
+        // No fallar completamente, la suscripción ya está actualizada
+      }
+
+      logger.info('[Pagopar Webhook] Membresía activada exitosamente', {
+        subscriptionId: sub.id,
+        userId: sub.user_id,
+        planId: sub.plan_id,
+        planLevel: planRow.level,
+        expiresAt: expiresAt.toISOString(),
+      });
+
+      // Siempre responder OK para no romper comunicación con Pagopar
+      return NextResponse.json({ 
+        ok: true, 
+        activated: true,
+        subscriptionId: sub.id,
+      }, { status: 200 });
     }
 
-    return NextResponse.json({ success: true });
-  } catch (error: any) {
-    logger.error('Error processing Pagopar webhook', error);
-    return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
-    );
+    // Si no encontramos suscripción, podría ser una orden (flujo existente)
+    // Mantener compatibilidad con el flujo anterior
+    logger.info('[Pagopar Webhook] No es una membresía, podría ser una orden', {
+      externalReference,
+    });
+
+    // TODO: Aquí se podría agregar lógica para procesar órdenes si es necesario
+    // Por ahora, solo procesamos membresías
+
+    return NextResponse.json({ ok: true, ignored: true, reason: 'Not a membership subscription' }, { status: 200 });
+    
+  } catch (err: any) {
+    logger.error('[Pagopar Webhook] error inesperado', {
+      error: err,
+      message: err?.message,
+      stack: err?.stack,
+      payload: payload ? 'presente' : 'ausente',
+    });
+    
+    // Siempre responder 200 para no romper comunicación con Pagopar
+    // Pero incluir el error en la respuesta para debugging
+    return NextResponse.json({ 
+      ok: false, 
+      error: err?.message || 'Internal server error' 
+    }, { status: 200 });
   }
 }
 
-// GET para verificación (si Pagopar requiere)
 export async function GET() {
   return NextResponse.json({ status: 'ok', service: 'Pagopar webhook' });
 }
-
-
-
-
-
-

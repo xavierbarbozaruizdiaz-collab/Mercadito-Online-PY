@@ -367,7 +367,7 @@ export class SearchService {
   }
 
   // Obtener búsquedas recientes del usuario
-  static async getRecentSearches(userId: string): Promise<SearchSuggestion[]> {
+  static async getRecentSearches(_userId: string): Promise<SearchSuggestion[]> {
     try {
       // En una implementación real, esto vendría de una tabla de búsquedas del usuario
       const recent: SearchSuggestion[] = [

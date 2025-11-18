@@ -5,7 +5,21 @@ import { Resend } from 'resend';
 import { getBaseEmailTemplate } from '@/lib/templates/email/baseTemplate';
 import { getOrderConfirmationTemplate, type OrderConfirmationData } from '@/lib/templates/email/orderConfirmation';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Cliente Resend lazy para evitar errores en build cuando falta la API key
+let resendClient: Resend | null = null;
+
+function getResendClient(): Resend | null {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    return null;
+  }
+
+  if (!resendClient) {
+    resendClient = new Resend(apiKey);
+  }
+
+  return resendClient;
+}
 
 export interface EmailOptions {
   to: string | string[];
@@ -23,14 +37,16 @@ export class EmailService {
    * Envía un email genérico
    */
   static async sendEmail(options: EmailOptions): Promise<{ id: string } | null> {
-    if (!process.env.RESEND_API_KEY) {
+    const client = getResendClient();
+
+    if (!client) {
       // Warnings se mantienen para debugging de configuración
       console.warn('RESEND_API_KEY no configurada. Email no enviado:', options.to);
       return null;
     }
 
     try {
-      const { data, error } = await resend.emails.send({
+      const { data, error } = await client.emails.send({
         from: options.from || this.defaultFrom,
         to: Array.isArray(options.to) ? options.to : [options.to],
         subject: options.subject,
@@ -222,24 +238,11 @@ export class EmailService {
       action_url?: string;
     }
   ): Promise<{ sent: number; failed: number }> {
-    if (!process.env.RESEND_API_KEY) {
+    const client = getResendClient();
+    if (!client) {
       console.warn('RESEND_API_KEY no configurada. Emails no enviados.');
       return { sent: 0, failed: recipients.length };
     }
-
-    const typeColors = {
-      promotion: '#10b981',
-      system: '#3b82f6',
-      announcement: '#8b5cf6',
-      urgent: '#dc2626',
-    };
-
-    const typeIcons = {
-      promotion: '🎉',
-      system: '⚙️',
-      announcement: '📢',
-      urgent: '🚨',
-    };
 
     let sent = 0;
     let failed = 0;
@@ -258,7 +261,7 @@ export class EmailService {
       try {
         // Resend permite enviar múltiples emails en una sola llamada
         const promises = emails.map((email) =>
-          resend.emails.send({
+          client.emails.send({
             from: this.defaultFrom,
             to: email.to,
             subject: email.subject,

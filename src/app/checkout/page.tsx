@@ -649,7 +649,7 @@ function CheckoutContent() {
 
       // Enviar email de confirmación (en segundo plano, no bloquea)
       const buyerEmail = session.session.user.email;
-      if (buyerEmail) {
+      if (buyerEmail && paymentMethod !== 'pagopar') {
         fetch('/api/email/order-confirmation', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -763,6 +763,10 @@ function CheckoutContent() {
           });
 
           const pagoparData = await pagoparResponse.json();
+
+          if (!pagoparResponse.ok) {
+            throw new Error(pagoparData.error || 'Error al crear factura en Pagopar');
+          }
 
           if (pagoparData.success && pagoparData.invoice?.link_pago) {
             // Guardar orderId en localStorage para cuando Pagopar redirija de vuelta

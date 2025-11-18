@@ -26,11 +26,23 @@ DECLARE
   v_wholesale_price DECIMAL(10,2);
   v_applied_wholesale BOOLEAN := FALSE;
   v_wholesale_discount DECIMAL(10,2) := 0;
+  v_order_item_id UUID;
   cart_item RECORD;
+  v_initial_status TEXT;
 BEGIN
+  -- Determinar estado inicial según método de pago
+  v_initial_status := CASE
+    WHEN COALESCE(p_payment_method, '') ILIKE 'pagopar' THEN 'pending_payment'
+    WHEN COALESCE(p_payment_method, '') ILIKE 'transfer' THEN 'cod_pending'
+    WHEN COALESCE(p_payment_method, '') ILIKE 'cash' THEN 'cod_pending'
+    WHEN COALESCE(p_payment_method, '') ILIKE 'bank_transfer' THEN 'cod_pending'
+    WHEN COALESCE(p_payment_method, '') ILIKE 'cod' THEN 'cod_pending'
+    ELSE 'pending'
+  END;
+  
   -- Crear la orden
-  INSERT INTO public.orders (buyer_id, shipping_address, payment_method, notes, total_amount)
-  VALUES (p_buyer_id, p_shipping_address, p_payment_method, p_notes, 0)
+  INSERT INTO public.orders (buyer_id, shipping_address, payment_method, notes, total_amount, status)
+  VALUES (p_buyer_id, p_shipping_address, p_payment_method, p_notes, 0, v_initial_status)
   RETURNING id INTO v_order_id;
 
   -- Procesar items del carrito con precios reales
@@ -120,44 +132,47 @@ BEGIN
         v_item_total,
         v_applied_wholesale,
         v_wholesale_discount
-      );
+      )
+      RETURNING id INTO v_order_item_id;
       
       -- Insertar comisión (productos directos)
-      INSERT INTO public.platform_fees (
-        order_id,
-        order_item_id,
-        seller_id,
-        store_id,
-        transaction_type,
-        order_amount,
-        base_amount,
-        commission_amount,
-        commission_percent,
-        status,
-        payment_status
-      )
-      SELECT
-        v_order_id,
-        currval('order_items_id_seq'),
-        cart_item.seller_id,
-        cart_item.store_id,
-        'direct_sale',
-        v_item_total,
-        v_base_price * cart_item.quantity,
-        v_commission_amount,
-        v_commission_percent,
-        'pending',
-        'escrowed'
-      WHERE v_commission_amount > 0;
+      -- (Si deseamos reactivar la generación automática de comisiones, restaurar el bloque siguiente)
+      --
+      -- INSERT INTO public.platform_fees (
+      --   order_id,
+      --   order_item_id,
+      --   seller_id,
+      --   store_id,
+      --   transaction_type,
+      --   order_amount,
+      --   base_amount,
+      --   commission_amount,
+      --   commission_percent,
+      --   status,
+      --   payment_status
+      -- )
+      -- SELECT
+      --   v_order_id,
+      --   v_order_item_id,
+      --   cart_item.seller_id,
+      --   cart_item.store_id,
+      --   'direct_sale',
+      --   v_item_total,
+      --   v_base_price * cart_item.quantity,
+      --   v_commission_amount,
+      --   v_commission_percent,
+      --   'pending',
+      --   'escrowed'
+      -- WHERE v_commission_amount > 0;
       
       -- Actualizar balance del vendedor
-      INSERT INTO public.seller_balance (seller_id, store_id, pending_balance)
-      VALUES (cart_item.seller_id, cart_item.store_id, v_base_price * cart_item.quantity)
-      ON CONFLICT (seller_id) 
-      DO UPDATE SET 
-        pending_balance = seller_balance.pending_balance + (v_base_price * cart_item.quantity),
-        total_earnings = seller_balance.total_earnings + (v_base_price * cart_item.quantity),
-        updated_at = NOW();
+      -- INSERT INTO public.seller_balance (seller_id, store_id, pending_balance)
+      -- VALUES (cart_item.seller_id, cart_item.store_id, v_base_price * cart_item.quantity)
+      -- ON CONFLICT (seller_id) 
+      -- DO UPDATE SET 
+      --   pending_balance = seller_balance.pending_balance + (v_base_price * cart_item.quantity),
+      --   total_earnings = seller_balance.total_earnings + (v_base_price * cart_item.quantity),
+      --   updated_at = NOW();
       
     -- Para subastas: comisiones ya calculadas al finalizar
     -- Solo crear el order_item (las comisiones se manejan en el flujo de subastas)
@@ -165,7 +180,8 @@ BEGIN
       v_item_total := cart_item.quantity * cart_item.price;
       
       INSERT INTO public.order_items (order_id, product_id, seller_id, quantity, unit_price, total_price)
-      VALUES (v_order_id, cart_item.product_id, cart_item.seller_id, cart_item.quantity, cart_item.price, v_item_total);
+      VALUES (v_order_id, cart_item.product_id, cart_item.seller_id, cart_item.quantity, cart_item.price, v_item_total)
+      RETURNING id INTO v_order_item_id;
     END IF;
     
     v_total_amount := v_total_amount + v_item_total;

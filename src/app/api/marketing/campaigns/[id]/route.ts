@@ -6,12 +6,24 @@
 // ============================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import type { Database } from '@/types/database';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+function getSupabaseServer(): SupabaseClient<Database> | null {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !serviceKey) {
+    return null;
+  }
+
+  return createClient<Database>(supabaseUrl, serviceKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  });
+}
 
 // GET - Obtener campaña por ID
 export async function GET(
@@ -19,6 +31,18 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const supabase = getSupabaseServer();
+
+    if (!supabase) {
+      return NextResponse.json(
+        {
+          campaign: null,
+          warning: 'Supabase no está configurado (NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY ausentes)',
+        },
+        { status: 200 }
+      );
+    }
+
     const { id } = await params;
 
     const { data, error } = await supabase
@@ -46,8 +70,20 @@ export async function PATCH(
     const { id } = await params;
     const body = await request.json();
 
-    const { data, error } = await supabase
-      .from('marketing_campaigns')
+    const supabase = getSupabaseServer();
+
+    if (!supabase) {
+      return NextResponse.json(
+        {
+          campaign: null,
+          warning: 'Supabase no está configurado (NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY ausentes)',
+        },
+        { status: 200 }
+      );
+    }
+
+    const { data, error } = await (supabase
+      .from('marketing_campaigns') as any)
       .update(body)
       .eq('id', id)
       .select()
@@ -69,6 +105,18 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const supabase = getSupabaseServer();
+
+    if (!supabase) {
+      return NextResponse.json(
+        {
+          success: false,
+          warning: 'Supabase no está configurado (NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY ausentes)',
+        },
+        { status: 200 }
+      );
+    }
+
     const { id } = await params;
 
     const { error } = await supabase

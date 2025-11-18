@@ -75,7 +75,7 @@ export interface PagoparInvoiceStatus {
 
 function getConfig(): PagoparConfig {
   // Pagopar usa "Token Público" y "Token Privado"
-  const publicToken = process.env.PAGOPAR_PUBLIC_TOKEN || process.env.PAGOPAR_PUBLIC_KEY;
+  const publicToken = process.env.NEXT_PUBLIC_PAGOPAR_PUBLIC_TOKEN || process.env.PAGOPAR_PUBLIC_TOKEN || process.env.PAGOPAR_PUBLIC_KEY;
   const privateToken = process.env.PAGOPAR_PRIVATE_TOKEN || process.env.PAGOPAR_PRIVATE_KEY;
   const environment = (process.env.PAGOPAR_ENVIRONMENT || 'sandbox') as 'sandbox' | 'production';
 
@@ -95,7 +95,6 @@ function getConfig(): PagoparConfig {
 // ============================================
 
 function getApiUrl(endpoint: string): string {
-  const config = getConfig();
   // Pagopar usa la misma URL para sandbox y producción, pero diferentes tokens
   const baseUrl = 'https://api.pagopar.com/api';
   
@@ -111,7 +110,6 @@ function getApiUrl(endpoint: string): string {
  */
 export async function createPagoparToken(): Promise<PagoparToken> {
   try {
-    const config = getConfig();
     
     const response = await fetch(getApiUrl('token'), {
       method: 'POST',
@@ -119,8 +117,8 @@ export async function createPagoparToken(): Promise<PagoparToken> {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        public_key: config.publicToken,
-        private_key: config.privateToken,
+        public_key: getConfig().publicToken,
+        private_key: getConfig().privateToken,
       }),
     });
 
@@ -150,12 +148,11 @@ export async function createPagoparInvoice(
   try {
     // Primero obtener token
     const token = await createPagoparToken();
-    const config = getConfig();
 
     const invoicePayload: PagoparInvoice = {
       ...invoiceData,
       token: token.token,
-      public_key: config.publicToken,
+      public_key: getConfig().publicToken,
     };
 
     const response = await fetch(getApiUrl('facturacion'), {
@@ -196,7 +193,6 @@ export async function getPagoparInvoiceStatus(
 ): Promise<PagoparInvoiceStatus['datos']> {
   try {
     const token = await createPagoparToken();
-    const config = getConfig();
 
     const response = await fetch(getApiUrl(`facturacion/${idFactura}`), {
       method: 'GET',

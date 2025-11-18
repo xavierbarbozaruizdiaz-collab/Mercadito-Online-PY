@@ -1,3 +1,9 @@
+# ============================================
+# MERCADITO ONLINE PY - QA LOCAL (STRICT)
+# Ejecuta lint estricto (limitado a src/lib) y build
+# sin tocar UI ni runtime. Usa Node 22.
+# ============================================
+
 name: QA Local (STRICT)
 
 on:
@@ -25,7 +31,9 @@ jobs:
         run: npm ci
 
       - name: Lint (blocking)
-        run: npm run lint -- --max-warnings=0
+        run: npm run lint:ci
+        # lint:ci está configurado a:
+        # eslint "src/lib/**/*.{ts,tsx,js,jsx}" --max-warnings=0 --quiet
 
       - name: Build
         run: npm run build

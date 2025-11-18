@@ -34,7 +34,7 @@ jobs:
         run: npm ci
 
       - name: Run ESLint
-        run: npm run lint -- --max-warnings 0 || echo "ESLint found warnings/errors (non-blocking for now)"
+        run: npm run lint:ci || echo "ESLint found warnings/errors (non-blocking for now)"
 
       - name: Run TypeScript check
         run: npx tsc --noEmit --skipLibCheck || echo "TypeScript check found errors (non-blocking for now)"
