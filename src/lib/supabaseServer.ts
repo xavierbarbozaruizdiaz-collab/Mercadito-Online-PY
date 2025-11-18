@@ -5,7 +5,7 @@
 // ============================================
 
 import { createClient } from '@supabase/supabase-js';
-import { Database } from '@/types/database';
+import type { Database } from '@/types/database';
 
 // Usar variables de servidor si existen, sino fallback a NEXT_PUBLIC_*.
 // En entornos como CI, donde estas variables pueden no estar configuradas,
