@@ -77,6 +77,7 @@ interface Store {
 
 export default function MarketingPage() {
   const { user, loading: authLoading } = useAuth();
+  const toast = useToast();
   const [campaigns, setCampaigns] = useState<MarketingCampaign[]>([]);
   const [stores, setStores] = useState<Store[]>([]);
   const [selectedStore, setSelectedStore] = useState<string | null>(null);
@@ -264,24 +265,25 @@ export default function MarketingPage() {
 
       // Si la ruta no existe (404), mostrar mensaje amigable
       if (response.status === 404) {
-        alert('La funcionalidad de sincronización de catálogo aún no está disponible.');
+        toast.error('La funcionalidad de sincronización de catálogo aún no está disponible.');
         return;
       }
 
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || 'Error sincronizando catálogo');
+        throw new Error(result.error || result.message || 'Error sincronizando catálogo');
       }
 
-      alert('Sincronización de catálogo iniciada. Esto puede tardar unos minutos.');
+      toast.success('Sincronización de catálogo iniciada. Esto puede tardar unos minutos.');
     } catch (err) {
       logger.error('Error syncing catalog', err);
       // Si es un error de red o 404, mostrar mensaje más amigable
       if (err instanceof TypeError || (err as any).message?.includes('fetch')) {
-        alert('No se pudo conectar con el servidor. Verifica tu conexión.');
+        toast.error('No se pudo conectar con el servidor. Verifica tu conexión.');
       } else {
-        alert('Error al sincronizar catálogo: ' + (err as Error).message);
+        const errorMessage = err instanceof Error ? err.message : 'Error desconocido';
+        toast.error(`Error al sincronizar catálogo: ${errorMessage}`);
       }
     } finally {
       setSyncingCatalog(false);
@@ -322,13 +324,14 @@ export default function MarketingPage() {
     };
   }
 
-  // Mostrar loading mientras se carga la autenticación o los datos
-  if (authLoading || (loading && campaigns.length === 0 && !error)) {
+  // Mostrar loading SOLO si está cargando la autenticación inicialmente
+  // NO bloquear si solo están cargando las campañas (los catálogos deben mostrarse siempre)
+  if (authLoading && !user) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Cargando campañas...</p>
+          <p className="text-gray-600">Cargando...</p>
         </div>
       </div>
     );
