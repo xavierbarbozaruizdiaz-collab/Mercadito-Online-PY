@@ -5,6 +5,7 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { supabase } from '@/lib/supabase/client';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { logger } from '@/lib/utils/logger';
+import { useToast } from '@/lib/hooks/useToast';
 import {
   Plus,
   TrendingUp,
