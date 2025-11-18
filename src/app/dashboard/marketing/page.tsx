@@ -85,13 +85,23 @@ export default function MarketingPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [syncingCatalog, setSyncingCatalog] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showRedirect, setShowRedirect] = useState(false);
 
-  // Verificar autenticación
+  // Verificar autenticación (solo redirigir si realmente no hay sesión después de un tiempo razonable)
   useEffect(() => {
-    if (!authLoading && !user) {
-      // Si no hay usuario después de cargar, redirigir
-      window.location.href = '/auth/sign-in';
-    }
+    // Dar más tiempo para que la sesión se cargue antes de redirigir
+    const timeoutId = setTimeout(() => {
+      if (!authLoading && !user) {
+        // Verificar sesión directamente antes de redirigir
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          if (!session) {
+            window.location.href = '/auth/sign-in';
+          }
+        });
+      }
+    }, 2000); // Esperar 2 segundos antes de verificar
+
+    return () => clearTimeout(timeoutId);
   }, [authLoading, user]);
 
   // Cargar tiendas del usuario
@@ -324,8 +334,29 @@ export default function MarketingPage() {
     );
   }
 
-  // Si no hay usuario después de cargar, mostrar mensaje
-  if (!authLoading && !user) {
+  // Verificar si realmente no hay sesión (dar más tiempo antes de redirigir)
+  useEffect(() => {
+    if (!authLoading && !user) {
+      // Esperar un poco más antes de verificar sesión
+      const timer = setTimeout(() => {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          if (!session) {
+            setShowRedirect(true);
+            setTimeout(() => {
+              window.location.href = '/auth/sign-in';
+            }, 1000);
+          }
+        });
+      }, 3000); // Esperar 3 segundos más
+      
+      return () => clearTimeout(timer);
+    } else {
+      // Si hay usuario, asegurar que no se muestre el redirect
+      setShowRedirect(false);
+    }
+  }, [authLoading, user]);
+
+  if (showRedirect) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
