@@ -205,6 +205,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <nav className="flex gap-4">
           <Link href="/admin" className="font-semibold">Panel Admin</Link>
           <Link href="/admin/categories" className="underline">Categorías</Link>
+          <Link href="/admin/marketing/catalogo-vitrina" className="underline">Catálogo Vitrina</Link>
         </nav>
         <Link href="/" className="underline text-sm">← Volver</Link>
       </header>

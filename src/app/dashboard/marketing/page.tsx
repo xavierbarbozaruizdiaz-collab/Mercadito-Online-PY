@@ -23,7 +23,9 @@ import {
   XCircle,
   AlertCircle,
   ExternalLink,
-  Settings
+  Settings,
+  Package,
+  Star
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -362,6 +364,72 @@ export default function MarketingPage() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Sección de Catálogos */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-8">
+        <div className="mb-4">
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Catálogos</h2>
+          <p className="text-gray-600 text-sm">Gestiona tus catálogos de productos para publicidad y feeds externos</p>
+        </div>
+        <div className="grid md:grid-cols-2 gap-6">
+          {/* Tarjeta: Mis Catálogos de Anuncios */}
+          <Link
+            href="/dashboard/marketing/catalogos-anuncios"
+            className="bg-white rounded-lg shadow hover:shadow-lg transition-shadow p-6 border border-gray-200 hover:border-blue-300"
+          >
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-blue-100 rounded-lg">
+                  <Package className="w-6 h-6 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Mis Catálogos de Anuncios</h3>
+                  <p className="text-sm text-gray-600 mt-1">Catálogos personalizados por tienda</p>
+                </div>
+              </div>
+              <ExternalLink className="w-5 h-5 text-gray-400 flex-shrink-0" />
+            </div>
+            <p className="text-sm text-gray-600 mb-4">
+              Crea y gestiona catálogos personalizados de productos para usar en campañas de publicidad (Meta, TikTok, Google). Cada catálogo puede tener filtros específicos o selección manual de productos.
+            </p>
+            <div className="flex items-center text-blue-600 font-medium text-sm">
+              Ver Catálogos
+              <ExternalLink className="w-4 h-4 ml-2" />
+            </div>
+          </Link>
+
+          {/* Tarjeta: Catálogo Mercadito */}
+          <Link
+            href="/dashboard/marketing/catalogo-mercadito"
+            className="bg-white rounded-lg shadow hover:shadow-lg transition-shadow p-6 border border-gray-200 hover:border-blue-300"
+          >
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-purple-100 rounded-lg">
+                  <Star className="w-6 h-6 text-purple-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Catálogo Mercadito</h3>
+                  <p className="text-sm text-gray-600 mt-1">Vitrina principal del marketplace</p>
+                </div>
+              </div>
+              <ExternalLink className="w-5 h-5 text-gray-400 flex-shrink-0" />
+            </div>
+            <p className="text-sm text-gray-600 mb-4">
+              Destaca hasta 2 productos en la vitrina principal de Mercadito. Estos productos aparecerán en la página de "Catálogo General" visible para todos los usuarios.
+            </p>
+            <div className="flex items-center text-blue-600 font-medium text-sm">
+              Gestionar Catálogo
+              <ExternalLink className="w-4 h-4 ml-2" />
+            </div>
+          </Link>
+        </div>
+      </div>
+
+      {/* Separador */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-6">
+        <div className="border-t border-gray-200"></div>
       </div>
 
       {/* Filtro de tienda */}
