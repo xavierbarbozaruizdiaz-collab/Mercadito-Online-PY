@@ -5,9 +5,10 @@
 
 import { MetadataRoute } from 'next';
 import { supabase } from '@/lib/supabaseClient';
+import { SITE_URL } from '@/lib/config/site';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = 'https://mercadito-online-py.vercel.app';
+  const baseUrl = SITE_URL;
   
   // Páginas estáticas
   const staticPages = [

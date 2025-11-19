@@ -14,6 +14,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Gavel, Ticket } from "lucide-react";
 import Logo from "@/components/Logo";
 import Footer from "@/components/Footer";
+import { SITE_URL } from "@/lib/config/site";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -55,7 +56,7 @@ export const metadata: Metadata = {
     address: false,
     telephone: false,
   },
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://mercadito-online-py.vercel.app'),
+  metadataBase: new URL(SITE_URL),
   alternates: {
     canonical: '/',
     languages: {
@@ -65,7 +66,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website',
     locale: 'es_PY',
-    url: process.env.NEXT_PUBLIC_SITE_URL || 'https://mercadito-online-py.vercel.app',
+    url: SITE_URL,
     siteName: 'Mercadito Online PY',
     title: 'Mercadito Online PY - Marketplace de Paraguay',
     description: 'El mejor marketplace de Paraguay. Compra y vende productos nuevos y usados de forma segura.',

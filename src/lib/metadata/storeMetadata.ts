@@ -5,6 +5,7 @@
 
 import { Metadata } from 'next';
 import { supabase } from '@/lib/supabaseClient';
+import { SITE_URL } from '@/lib/config/site';
 
 export async function generateStoreMetadata(slug: string): Promise<Metadata> {
   try {
@@ -65,7 +66,7 @@ export async function generateStoreMetadata(slug: string): Promise<Metadata> {
         images: store.logo_url ? [store.logo_url] : [],
       },
       alternates: {
-        canonical: `https://mercadito-online-py.vercel.app/store/${slug}`,
+        canonical: `${SITE_URL}/store/${slug}`,
       },
     };
   } catch (error) {

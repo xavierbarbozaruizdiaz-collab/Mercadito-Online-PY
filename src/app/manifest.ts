@@ -4,6 +4,7 @@
 // ============================================
 
 import { MetadataRoute } from 'next';
+import { SITE_URL } from '@/lib/config/site';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
@@ -92,7 +93,7 @@ export default function manifest(): MetadataRoute.Manifest {
     related_applications: [
       {
         platform: 'webapp',
-        url: 'https://mercadito-online-py.vercel.app/manifest.json',
+        url: `${SITE_URL}/manifest.json`,
       },
     ],
 

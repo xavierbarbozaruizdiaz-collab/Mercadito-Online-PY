@@ -13,6 +13,7 @@ import ProductPageClient from './ProductPageClient';
 import Breadcrumbs from '@/components/Breadcrumbs';
 import { Metadata } from 'next';
 import { generateProductStructuredData, generateBreadcrumbStructuredData } from '@/lib/structuredData';
+import { SITE_URL } from '@/lib/config/site';
 
 type Product = {
   id: string;
@@ -100,7 +101,7 @@ export async function generateMetadata(
         images: productData.cover_url ? [productData.cover_url] : [],
       },
       alternates: {
-        canonical: `https://mercadito-online-py.vercel.app/products/${id}`,
+        canonical: `${SITE_URL}/products/${id}`,
       },
     };
   } catch (error) {
@@ -267,15 +268,15 @@ export default async function ProductPage(
     availability: 'InStock',
     seller: {
       name: 'Vendedor Verificado',
-      url: `https://mercadito-online-py.vercel.app/store/seller-${p.seller_id}`,
+      url: `${SITE_URL}/store/seller-${p.seller_id}`,
     },
     category: category?.name || 'General',
   });
 
   const breadcrumbStructuredData = generateBreadcrumbStructuredData([
-    { name: 'Inicio', url: 'https://mercadito-online-py.vercel.app/' },
-    { name: category?.name || 'Productos', url: `https://mercadito-online-py.vercel.app/search?category=${category?.id || ''}` },
-    { name: p.title, url: `https://mercadito-online-py.vercel.app/products/${p.id}` },
+    { name: 'Inicio', url: `${SITE_URL}/` },
+    { name: category?.name || 'Productos', url: `${SITE_URL}/search?category=${category?.id || ''}` },
+    { name: p.title, url: `${SITE_URL}/products/${p.id}` },
   ]);
 
   return (

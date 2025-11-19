@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getGlobalCatalogProductsForWeb } from '@/lib/services/globalCatalogService';
+import { SITE_URL } from '@/lib/config/site';
 
 // ============================================
 // TIPOS
@@ -47,8 +48,8 @@ function getBaseUrl(): string {
     return `https://${process.env.VERCEL_BRANCH_URL}`;
   }
   
-  // Fallback final (producción)
-  return 'https://mercadito-online-py.vercel.app';
+  // Fallback final (usa SITE_URL configurado: producción o desarrollo)
+  return SITE_URL;
 }
 
 // ============================================
