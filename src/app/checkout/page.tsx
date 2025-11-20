@@ -117,8 +117,8 @@ function CheckoutContent() {
       
       if (!auction) {
         logger.warn('Subasta no encontrada en checkout', { auctionProductId });
-        toast.error('Subasta no encontrada');
-        router.push('/');
+        toast.error('Subasta no encontrada o ya no está disponible');
+        router.push('/auctions');
         return;
       }
 
@@ -130,11 +130,28 @@ function CheckoutContent() {
         return;
       }
 
+      // Verificar que la subasta terminó
       if (auction.auction_status !== 'ended') {
         logger.warn('Intento de checkout de subasta no finalizada', { 
           auctionProductId, 
-          status: auction.auction_status 
+          status: auction.auction_status
         });
+        toast.error('Esta subasta aún no ha finalizado. Solo puedes pagar subastas que ya terminaron.');
+        router.push(`/auctions/${auctionProductId}`);
+        return;
+      }
+      
+      // Verificar que el usuario es el ganador
+      if (auction.winner_id !== session.session.user.id) {
+        logger.warn('Intento de checkout de subasta ganada por otro usuario', { 
+          auctionProductId,
+          winnerId: auction.winner_id,
+          userId: session.session.user.id
+        });
+        toast.error('No eres el ganador de esta subasta.');
+        router.push(`/auctions/${auctionProductId}`);
+        return;
+      }
         toast.error('Esta subasta aún no ha finalizado');
         router.push(`/auctions/${auctionProductId}`);
         return;
@@ -156,26 +173,57 @@ function CheckoutContent() {
         try {
           const { calculateAuctionCommissions } = await import('@/lib/services/commissionService');
           
-          // Obtener store_id
-          const { data: storeData } = await (supabase as any)
-            .from('stores')
-            .select('id')
-            .eq('seller_id', auction.seller_id)
-            .maybeSingle();
+          // Validar que current_bid es válido
+          const currentBid = Number(auction.current_bid) || 0;
+          if (currentBid <= 0) {
+            logger.warn('current_bid inválido o cero', { 
+              auctionId: auction.id, 
+              current_bid: auction.current_bid 
+            });
+            throw new Error('Precio de subasta inválido');
+          }
           
-          const storeId = storeData?.id || null;
+          // Obtener store_id
+          let storeId: string | null = null;
+          try {
+            const { data: storeData, error: storeError } = await (supabase as any)
+              .from('stores')
+              .select('id')
+              .eq('seller_id', auction.seller_id)
+              .maybeSingle();
+            
+            if (!storeError && storeData) {
+              storeId = storeData.id;
+            }
+          } catch (storeErr) {
+            logger.warn('Error obteniendo store_id, continuando sin store', { 
+              sellerId: auction.seller_id,
+              error: storeErr 
+            });
+            // Continuar sin store_id (no es crítico)
+          }
+          
           const calculated = await calculateAuctionCommissions(
-            auction.current_bid || 0,
+            currentBid,
             auction.seller_id || '',
             storeId || undefined
           );
           
-          const currentBid = auction.current_bid || 0;
+          // Validar que los cálculos son válidos
+          if (!calculated || calculated.buyer_total_paid <= 0) {
+            logger.error('Cálculo de comisiones retornó valores inválidos', {
+              calculated,
+              currentBid,
+              auctionId: auction.id
+            });
+            throw new Error('Error en cálculo de comisiones');
+          }
+          
           setAuctionCommissions({
-            buyer_commission_percent: currentBid > 0 ? calculated.buyer_commission_amount / currentBid * 100 : 0,
+            buyer_commission_percent: currentBid > 0 ? (calculated.buyer_commission_amount / currentBid * 100) : 0,
             buyer_commission_amount: calculated.buyer_commission_amount,
             buyer_total_paid: calculated.buyer_total_paid,
-            seller_commission_percent: currentBid > 0 ? calculated.seller_commission_amount / currentBid * 100 : 0,
+            seller_commission_percent: currentBid > 0 ? (calculated.seller_commission_amount / currentBid * 100) : 0,
             seller_commission_amount: calculated.seller_commission_amount,
             seller_earnings: calculated.seller_earnings,
           });
@@ -197,8 +245,29 @@ function CheckoutContent() {
           setAuctionProduct(auction);
           setCartItems(auctionAsCartItem as CartItem[]);
         } catch (commError: any) {
-          logger.error('Error calculating auction commissions', commError, { auctionId: auction.id });
-          // Fallback: usar precio sin comisión
+          logger.error('Error calculating auction commissions', commError, { 
+            auctionId: auction.id,
+            current_bid: auction.current_bid,
+            seller_id: auction.seller_id,
+            errorMessage: commError?.message,
+            errorStack: commError?.stack
+          });
+          
+          // Fallback: usar precio sin comisión pero mostrar advertencia
+          const fallbackPrice = Number(auction.current_bid) || Number(auction.price) || 0;
+          
+          if (fallbackPrice <= 0) {
+            logger.error('No se puede calcular precio: current_bid y price son inválidos', {
+              auctionId: auction.id,
+              current_bid: auction.current_bid,
+              price: auction.price
+            });
+            toast.error('Error al calcular el precio. Por favor, recarga la página e intenta de nuevo.');
+            setLoading(false);
+            return;
+          }
+          
+          // Usar precio sin comisión como último recurso
           const auctionAsCartItem = [{
             id: `auction-${auction.id}`,
             product_id: auction.id,
@@ -206,12 +275,16 @@ function CheckoutContent() {
             product: {
               id: auction.id,
               title: auction.title,
-              price: auction.current_bid || auction.price,
+              price: fallbackPrice,
               image_url: auction.image_url || null,
             }
           }];
+          
           setAuctionProduct(auction);
           setCartItems(auctionAsCartItem as CartItem[]);
+          
+          // Mostrar advertencia pero permitir continuar
+          toast.warning('No se pudieron calcular las comisiones. Se usará el precio base de la subasta.');
         }
       } else {
         // Sin precio, usar precio base

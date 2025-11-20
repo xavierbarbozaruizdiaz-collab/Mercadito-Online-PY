@@ -295,8 +295,13 @@ export default function AuctionDetailPage() {
         setServerTime(Date.now());
       }
       
+      // Usar versión optimizada con caché y queries consolidadas
       const [auctionData, statsData] = await Promise.all([
-        getAuctionById(productId),
+        getAuctionById(productId, { 
+          useCache: true, 
+          includeSellerInfo: true, 
+          includeImages: true 
+        }),
         getAuctionStats(productId),
       ]);
 
@@ -453,7 +458,21 @@ export default function AuctionDetailPage() {
                 message = `Puja rechazada: ${data.reason || 'Motivo desconocido'}`;
                 break;
               case 'TIMER_EXTENDED':
-                message = `⏱️ Tiempo extendido ${data.extension_seconds || 0}s`;
+                // Mostrar mensaje más claro sobre bonus time
+                if (data.reason) {
+                  // Límite alcanzado
+                  if (data.reason === 'max_duration_reached') {
+                    message = `⏱️ Bonus time deshabilitado: duración máxima alcanzada`;
+                  } else if (data.reason === 'max_extensions_reached') {
+                    message = `⏱️ Bonus time deshabilitado: máximo de extensiones alcanzado (${data.max_extensions || 50})`;
+                  } else {
+                    message = `⏱️ Bonus time: ${data.reason}`;
+                  }
+                } else {
+                  // Extensión exitosa
+                  const extensionSeconds = data.extension_seconds || data.window_seconds || 0;
+                  message = `⏰ Bonus time activado: +${extensionSeconds}s`;
+                }
                 break;
               case 'LOT_CLOSED':
                 message = `🏁 Subasta finalizada. Ganador: ${formatCurrency(data.winning_bid || 0)}`;
@@ -568,14 +587,22 @@ export default function AuctionDetailPage() {
   const currentBid = auction.current_bid || auction.price;
   
   // Calcular tiempo para el timer usando tiempo sincronizado del servidor
+  // Usar getSyncedNow() para obtener tiempo sincronizado actualizado
   let endAtMs = 0;
   let startAtMs = 0;
-  const serverNowMs = serverTime;
+  
+  // Obtener tiempo sincronizado actual (se actualiza automáticamente)
+  const { getSyncedNow } = require('@/lib/utils/timeSync');
+  const syncedNowMs = getSyncedNow();
   
   // Para subastas activas, mostrar tiempo hasta el fin
   if (auction.auction_end_at && !isEnded) {
     const endDate = new Date(auction.auction_end_at);
     endAtMs = endDate.getTime();
+    // Si ya pasó el tiempo, no mostrar
+    if (endAtMs <= syncedNowMs) {
+      endAtMs = 0;
+    }
   }
   
   // Para subastas programadas, mostrar tiempo hasta el inicio
@@ -583,8 +610,8 @@ export default function AuctionDetailPage() {
   if (auction.auction_start_at && (isScheduled || (!isActive && !isEnded))) {
     const startDate = new Date(auction.auction_start_at);
     startAtMs = startDate.getTime();
-    // Solo mostrar si la fecha es en el futuro
-    if (startAtMs <= serverNowMs) {
+    // Solo mostrar si la fecha es en el futuro (usando tiempo sincronizado)
+    if (startAtMs <= syncedNowMs) {
       startAtMs = 0; // Ya pasó, no mostrar
     }
   }
@@ -796,7 +823,7 @@ export default function AuctionDetailPage() {
                       <div className="relative">
                         <AuctionTimer
                           endAtMs={endAtMs}
-                          serverNowMs={serverNowMs}
+                          serverNowMs={syncedNowMs}
                           variant="full"
                           size="lg"
                           lastBidAtMs={lastBidTime}
@@ -824,7 +851,7 @@ export default function AuctionDetailPage() {
                     ) : startAtMs > 0 ? (
                       <AuctionTimer
                         endAtMs={startAtMs}
-                        serverNowMs={serverNowMs}
+                        serverNowMs={syncedNowMs}
                         variant="full"
                         size="lg"
                         onExpire={() => {
@@ -886,7 +913,10 @@ export default function AuctionDetailPage() {
                       </p>
                       <div className="mt-4 flex gap-2 justify-center">
                         <Button
-                          onClick={() => window.location.href = `/checkout?auction=${productId}`}
+                          onClick={() => {
+                            const checkoutUrl = `/checkout?auction=${productId}`;
+                            window.location.href = checkoutUrl;
+                          }}
                           className="bg-white text-emerald-600 hover:bg-emerald-50 font-bold"
                         >
                           💳 Pagar Ahora
@@ -1010,6 +1040,8 @@ export default function AuctionDetailPage() {
                       sellerId={auction.seller_id}
                       onBidPlaced={handleBidPlaced}
                       onBuyNow={handleBuyNow}
+                      auctionEndAt={auction.auction_end_at}
+                      isAuctionEnded={isEnded}
                     />
                   </div>
 
@@ -1044,14 +1076,32 @@ export default function AuctionDetailPage() {
                 <div className="flex justify-between">
                   <span className="text-sm text-gray-600">Estado:</span>
                   <Badge variant={isActive ? 'success' : isEnded ? 'secondary' : 'warning'} size="sm">
-                    {isActive ? 'Activa' : isEnded ? 'Finalizada' : 'Programada'}
+                    {(() => {
+                      // Calcular estado real usando tiempo sincronizado
+                      if (isEnded) return 'Finalizada';
+                      if (isActive) return 'En vivo';
+                      if (isScheduled) return 'Programada';
+                      // Si no tiene fecha de inicio pero tiene fecha de fin pasada, está finalizada
+                      if (auction.auction_end_at) {
+                        const endDate = new Date(auction.auction_end_at).getTime();
+                        if (endDate <= syncedNowMs) return 'Finalizada';
+                      }
+                      return 'Programada';
+                    })()}
                   </Badge>
                 </div>
                 {auction.auction_start_at && (
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-600">Inicio:</span>
                     <span className="text-sm font-medium">
-                      {new Date(auction.auction_start_at).toLocaleString('es-PY')}
+                      {new Date(auction.auction_start_at).toLocaleString('es-PY', {
+                        timeZone: 'America/Asuncion',
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
                     </span>
                   </div>
                 )}
@@ -1059,7 +1109,14 @@ export default function AuctionDetailPage() {
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-600">Finaliza:</span>
                     <span className="text-sm font-medium">
-                      {new Date(auction.auction_end_at).toLocaleString('es-PY')}
+                      {new Date(auction.auction_end_at).toLocaleString('es-PY', {
+                        timeZone: 'America/Asuncion',
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
                     </span>
                   </div>
                 )}
