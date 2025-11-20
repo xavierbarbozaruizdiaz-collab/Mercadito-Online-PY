@@ -152,21 +152,6 @@ function CheckoutContent() {
         router.push(`/auctions/${auctionProductId}`);
         return;
       }
-        toast.error('Esta subasta aún no ha finalizado');
-        router.push(`/auctions/${auctionProductId}`);
-        return;
-      }
-
-      if (auction.winner_id !== session.session.user.id) {
-        logger.warn('Intento de checkout de subasta no ganada', { 
-          auctionProductId, 
-          winnerId: auction.winner_id,
-          userId: session.session.user.id 
-        });
-        toast.error('No eres el ganador de esta subasta');
-        router.push(`/auctions/${auctionProductId}`);
-        return;
-      }
 
       // Calcular comisiones de la subasta
       if (auction.current_bid && auction.seller_id) {

@@ -65,6 +65,7 @@
     "@sentry/nextjs": "^10.22.0",
     "@supabase/auth-helpers-nextjs": "^0.10.0",
     "@supabase/supabase-js": "^2.76.1",
+    "@upstash/redis": "^1.35.6",
     "browser-image-compression": "^2.0.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
