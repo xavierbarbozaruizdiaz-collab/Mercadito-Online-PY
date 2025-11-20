@@ -16,6 +16,7 @@ import { Button } from '@/components/ui';
 import { ArrowLeft, Gavel, User, MapPin, Calendar, Clock, ChevronLeft, ChevronRight, Share2, Flag, TrendingUp } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import ProductImageGallery from '@/components/ProductImageGallery';
+import { getSyncedNow } from '@/lib/utils/timeSync';
 
 export default function AuctionDetailPage() {
   const params = useParams();
@@ -592,7 +593,6 @@ export default function AuctionDetailPage() {
   let startAtMs = 0;
   
   // Obtener tiempo sincronizado actual (se actualiza automáticamente)
-  const { getSyncedNow } = require('@/lib/utils/timeSync');
   const syncedNowMs = getSyncedNow();
   
   // Para subastas activas, mostrar tiempo hasta el fin
