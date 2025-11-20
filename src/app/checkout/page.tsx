@@ -269,7 +269,13 @@ function CheckoutContent() {
           setCartItems(auctionAsCartItem as CartItem[]);
           
           // Mostrar advertencia pero permitir continuar
-          toast.warning('No se pudieron calcular las comisiones. Se usará el precio base de la subasta.');
+          toast('No se pudieron calcular las comisiones. Se usará el precio base de la subasta.', {
+            icon: '⚠️',
+            duration: 5000,
+            style: {
+              borderLeft: '4px solid #f59e0b',
+            },
+          });
         }
       } else {
         // Sin precio, usar precio base
