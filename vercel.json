@@ -24,9 +24,10 @@
   "regions": ["iad1"],
   "framework": "nextjs",
   "outputDirectory": ".next",
-  "installCommand": "rm -rf node_modules package-lock.json && npm install",
+  "installCommand": "npm ci",
   "buildCommand": "npm run build",
   "devCommand": "npm run dev",
+  "nodeVersion": "22.x",
   "crons": [
     {
       "path": "/api/cron/backup-database",

@@ -41,7 +41,8 @@
     "qa:local": "bash scripts/lpms-local-qa.sh",
     "qa:local:fast": "bash scripts/lpms-local-qa-skip-lh.sh",
     "verify:icons": "node scripts/verify-icons.mjs",
-    "predeploy:check": "node scripts/predeploy-check.mjs"
+    "predeploy:check": "node scripts/predeploy-check.mjs",
+    "qa:local:deploy": "npm run lint && npm run build"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx}": [
