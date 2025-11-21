@@ -23,7 +23,7 @@
   "regions": ["iad1"],
   "framework": "nextjs",
   "outputDirectory": ".next",
-  "installCommand": "npm ci",
+  "installCommand": "npm install",
   "buildCommand": "npm run build",
   "devCommand": "npm run dev",
   "crons": [
