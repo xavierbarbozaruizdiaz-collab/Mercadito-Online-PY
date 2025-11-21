@@ -1,6 +1,5 @@
 {
   "version": 2,
-  "name": "mercadito-online-py",
   "routes": [
     {
       "src": "/api/(.*)",
@@ -27,7 +26,6 @@
   "installCommand": "npm ci",
   "buildCommand": "npm run build",
   "devCommand": "npm run dev",
-  "nodeVersion": "22.x",
   "crons": [
     {
       "path": "/api/cron/backup-database",
