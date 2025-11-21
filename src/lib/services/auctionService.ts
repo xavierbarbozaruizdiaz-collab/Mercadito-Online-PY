@@ -377,24 +377,91 @@ async function checkAndUpdateAuctionStatus(productId: string): Promise<void> {
 }
 
 /**
- * Obtiene una subasta por ID con todos los detalles
+ * Obtiene una subasta por ID con todos los detalles (OPTIMIZADO)
+ * Usa caché Redis para datos estáticos y consolida queries
  * Actualiza automáticamente el estado si es necesario
  */
-export async function getAuctionById(productId: string): Promise<AuctionProduct | null> {
+export async function getAuctionById(
+  productId: string,
+  options?: { useCache?: boolean; includeSellerInfo?: boolean; includeImages?: boolean }
+): Promise<AuctionProduct | null> {
+  const { useCache = true, includeSellerInfo = false, includeImages = false } = options || {};
+
   try {
+    // Intentar obtener datos estáticos desde caché
+    if (useCache) {
+      try {
+        const { getCachedAuctionStaticData } = await import('@/lib/redis/cache');
+        const cachedStatic = await getCachedAuctionStaticData(productId);
+        
+        if (cachedStatic) {
+          // Obtener solo datos dinámicos (más rápido)
+          const { data: dynamicData, error: dynamicError } = await supabase
+            .from('products')
+            .select('current_bid, winner_id, auction_status, auction_end_at, total_bids, auction_version')
+            .eq('id', productId)
+            .single();
+
+          if (!dynamicError && dynamicData) {
+            // Combinar datos estáticos (caché) con dinámicos (DB)
+            const combined = {
+              ...cachedStatic,
+              ...dynamicData,
+              image_url: cachedStatic.image_url,
+            };
+            
+            logger.debug('[Auction Service] Usando caché para datos estáticos', { productId });
+            return combined as AuctionProduct;
+          }
+        }
+      } catch (cacheError) {
+        // Si falla el caché, continuar con query normal
+        logger.warn('[Auction Service] Error accediendo caché, usando query normal', cacheError);
+      }
+    }
+
+    // Si no hay caché o falló, hacer query completa
     // Primero verificar y actualizar estado si es necesario
     await checkAndUpdateAuctionStatus(productId);
     
-    const { data, error } = await supabase
+    // Query consolidada: obtener producto + información relacionada en una sola llamada
+    // NOTA: No hacemos join con profiles porque products.seller_id referencia auth.users, no profiles
+    // Si se necesita información del vendedor, hacer consulta separada
+    const query = supabase
       .from('products')
-      .select('id, title, description, price, image_url:cover_url, condition, sale_type, auction_status, auction_start_at, auction_end_at, current_bid, min_bid_increment, buy_now_price, reserve_price, winner_id, total_bids, seller_id, status, category_id, created_at, attributes')
+      .select(`
+        id, 
+        title, 
+        description, 
+        price, 
+        cover_url,
+        condition, 
+        sale_type, 
+        auction_status, 
+        auction_start_at, 
+        auction_end_at, 
+        current_bid, 
+        min_bid_increment, 
+        buy_now_price, 
+        reserve_price, 
+        winner_id, 
+        total_bids, 
+        seller_id, 
+        status, 
+        category_id, 
+        created_at, 
+        attributes,
+        auction_version,
+        store_id
+        ${includeImages ? ', product_images(url, idx)' : ''}
+      `)
       .eq('id', productId)
       .eq('sale_type', 'auction')
-      // Excluir productos sin seller_id (productos huérfanos)
       .not('seller_id', 'is', null)
-      // Solo incluir productos activos o pausados (no archivados/vendidos)
       .or('status.is.null,status.eq.active,status.eq.paused')
       .single();
+
+    const { data, error } = await query;
 
     if (error) {
       if (error.code === 'PGRST116') {
@@ -425,9 +492,65 @@ export async function getAuctionById(productId: string): Promise<AuctionProduct 
         logger.debug('Subasta excluida - sin seller_id', { productId });
         return null;
       }
+
+      // Normalizar datos
+      const normalized: any = {
+        ...product,
+        image_url: product.cover_url || product.image_url,
+      };
+
+      // Si se necesita información del vendedor, hacer consulta separada
+      // (no podemos hacer join porque products.seller_id referencia auth.users, no profiles)
+      if (includeSellerInfo && product.seller_id) {
+        try {
+          const { data: sellerProfile, error: sellerError } = await supabase
+            .from('profiles')
+            .select('id, first_name, last_name, email')
+            .eq('id', product.seller_id)
+            .single();
+          
+          if (!sellerError && sellerProfile) {
+            normalized.seller_info = sellerProfile;
+          }
+        } catch (err) {
+          // Si falla, continuar sin información del vendedor
+          logger.warn('Error fetching seller profile', err);
+        }
+      }
+
+      // Si se incluyeron imágenes, normalizarlas
+      if (includeImages && product.product_images) {
+        normalized.images = (Array.isArray(product.product_images) ? product.product_images : [])
+          .sort((a: any, b: any) => (a.idx || 0) - (b.idx || 0))
+          .map((img: any) => img.url)
+          .filter(Boolean);
+      }
+
+      // Guardar datos estáticos en caché para próximas requests
+      if (useCache) {
+        try {
+          const { setCachedAuctionStaticData, separateAuctionData } = await import('@/lib/redis/cache');
+          const { static: staticData } = separateAuctionData(normalized);
+          
+          // Agregar seller_info e images si están disponibles
+          if (normalized.seller_info) {
+            staticData.seller_info = normalized.seller_info;
+          }
+          if (normalized.images) {
+            staticData.images = normalized.images;
+          }
+          
+          await setCachedAuctionStaticData(productId, staticData, 45); // 45 segundos TTL
+        } catch (cacheError) {
+          // No crítico si falla el caché
+          logger.warn('[Auction Service] Error guardando en caché', cacheError);
+        }
+      }
+
+      return normalized as AuctionProduct;
     }
 
-    return data as AuctionProduct;
+    return null;
   } catch (error) {
     logger.error('Error fetching auction', error, { productId });
     throw error;
@@ -501,99 +624,103 @@ export async function getBidsForAuction(
 
 /**
  * Coloca una puja en una subasta
+ * 
+ * NOTA: Ahora usa el endpoint /api/auctions/[id]/bid que incluye:
+ * - Locks distribuidos con Redis
+ * - Rate limiting distribuido
+ * - Validaciones exhaustivas
+ * - Manejo robusto de condiciones de carrera
  */
 export async function placeBid(
   productId: string,
   bidderId: string,
-  amount: number
-): Promise<{ bid_id: string; success: boolean; error?: string; version?: number; end_at?: string; server_timestamp?: string; is_duplicate?: boolean }> {
+  amount: number,
+  idempotencyKey?: string
+): Promise<{ 
+  bid_id: string; 
+  success: boolean; 
+  error?: string; 
+  error_code?: string; 
+  version?: number; 
+  end_at?: string; 
+  server_timestamp?: string; 
+  is_duplicate?: boolean; 
+  retry_after?: number;
+  // Información de bonus time (anti-sniping)
+  bonus_applied?: boolean;
+  bonus_new_end_time?: string;
+  bonus_extension_seconds?: number;
+}> {
   try {
-    // Rate limiting para pujas
-    try {
-      const { rateLimiter } = await import('@/lib/utils/rateLimit');
-      const limitCheck = await rateLimiter.checkLimit(bidderId, 'BID_PLACE');
-      
-      if (!limitCheck.allowed) {
-        logger.warn('Rate limit excedido para puja', { bidderId, productId, amount, retryAfter: limitCheck.retryAfter });
-        return {
-          bid_id: '',
-          success: false,
-          error: `Has alcanzado el límite de pujas. Intenta de nuevo en ${limitCheck.retryAfter || 60} segundos.`,
-        };
-      }
-    } catch (rateLimitError: any) {
-      // Si el rate limiter falla, loguear pero continuar (degradación elegante)
-      logger.warn('Rate limiter no disponible, continuando sin limitación', rateLimitError);
-    }
+    // Generar idempotency key si no se proporciona
+    const finalIdempotencyKey = idempotencyKey || crypto.randomUUID();
 
-    // Usar lock para prevenir condiciones de carrera (adicional al idempotency key)
-    const { lockManager, getAuctionLockKey } = await import('@/lib/utils/locks');
-    const lockKey = getAuctionLockKey(productId);
-    
-    const result = await lockManager.withLock(
-      lockKey,
-      async () => {
-        // Generar idempotency key para prevenir pujas duplicadas
-        const idempotencyKey = crypto.randomUUID();
-        const clientSentAt = new Date().toISOString();
-        
-        const { data, error } = await (supabase as any).rpc('place_bid', {
-          p_product_id: productId,
-          p_bidder_id: bidderId,
-          p_amount: amount,
-          p_idempotency_key: idempotencyKey,
-          p_client_sent_at: clientSentAt,
-        });
-
-        if (error) {
-          throw error;
-        }
-
-        return data;
+    // Llamar al nuevo endpoint que maneja locks y rate limiting
+    const response = await fetch(`/api/auctions/${productId}/bid`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
       },
-      10000 // 10 segundos de timeout para el lock
-    );
+      body: JSON.stringify({
+        bidAmount: amount,
+        idempotencyKey: finalIdempotencyKey,
+      }),
+    });
 
-    if (!result.success) {
-      if (result.error) {
-        logger.error('Error placing bid', result.error, { productId, bidderId, amount });
-        return {
-          bid_id: '',
-          success: false,
-          error: result.error.message || 'Error al colocar la puja',
-        };
-      }
-      // Si no se pudo adquirir el lock (otro proceso está procesando)
-      logger.warn('No se pudo adquirir lock para puja', { productId, bidderId });
+    const data = await response.json();
+
+    // Si la respuesta no es exitosa, retornar error
+    if (!response.ok || !data.success) {
+      logger.warn('Puja rechazada por el servidor', {
+        productId,
+        bidderId,
+        amount,
+        status: response.status,
+        error: data.error,
+        retryAfter: data.retry_after,
+      });
+
       return {
-        bid_id: '',
-        success: false,
-        error: 'La subasta está siendo procesada. Intenta de nuevo en un momento.',
-      };
-    }
-
-    const data = result.result;
-
-    // La nueva función retorna JSONB con más información
-    if (typeof data === 'object' && data !== null && 'bid_id' in data) {
-      // Nueva respuesta con más datos
-      return {
-        success: data.success || true,
         bid_id: data.bid_id || '',
-        version: data.version,
-        end_at: data.end_at,
-        server_timestamp: data.server_timestamp,
-        is_duplicate: data.is_duplicate || false,
+        success: false,
+        error: data.error || 'Error al colocar la puja',
+        error_code: data.error_code, // Pasar código de error (ej: "AUCTION_ENDED")
+        retry_after: data.retry_after,
       };
     }
 
-    // Compatibilidad con respuesta antigua (solo UUID)
+    // Puja exitosa
+    logger.info('Puja colocada exitosamente', {
+      productId,
+      bidderId,
+      amount,
+      bidId: data.bid_id,
+      currentBid: data.current_bid,
+    });
+
     return {
-      bid_id: typeof data === 'string' ? data : '',
+      bid_id: data.bid_id || '',
       success: true,
+      version: data.version,
+      end_at: data.auction_end_at,
+      is_duplicate: false,
+      // Información de bonus time
+      bonus_applied: data.bonus_applied || false,
+      bonus_new_end_time: data.bonus_new_end_time,
+      bonus_extension_seconds: data.bonus_extension_seconds,
     };
   } catch (error: any) {
     logger.error('Error placing bid', error, { productId, bidderId, amount });
+    
+    // Si es error de red, dar mensaje más claro
+    if (error.message?.includes('fetch') || error.message?.includes('network')) {
+      return {
+        bid_id: '',
+        success: false,
+        error: 'Error de conexión. Verifica tu internet e intenta de nuevo.',
+      };
+    }
+
     return {
       bid_id: '',
       success: false,
