@@ -358,6 +358,8 @@ export async function getProductStats(): Promise<ProductStats> {
 export async function getTopSellingProducts(limit: number = 10): Promise<ProductAdmin[]> {
   // TODO: Implementar con datos reales de orders
   // Por ahora retornar productos aprobados ordenados por created_at
+  // NOTA: No podemos hacer join con profiles porque products.seller_id referencia auth.users, no profiles
+  // Obtener solo seller_id y hacer consulta separada si se necesita información del vendedor
   const { data, error } = await supabase
     .from('products')
     .select(`
@@ -365,7 +367,7 @@ export async function getTopSellingProducts(limit: number = 10): Promise<Product
       title,
       price,
       cover_url,
-      seller:profiles!products_seller_id_fkey(id, email, first_name, last_name)
+      seller_id
     `)
     .eq('approval_status', 'approved')
     .eq('status', 'active')
@@ -386,6 +388,8 @@ export async function getTopSellingProducts(limit: number = 10): Promise<Product
 export async function getProductsWithoutSales(limit: number = 20): Promise<ProductAdmin[]> {
   // TODO: Implementar con datos reales de orders
   // Por ahora retornar productos aprobados activos
+  // NOTA: No podemos hacer join con profiles porque products.seller_id referencia auth.users, no profiles
+  // Obtener solo seller_id y hacer consulta separada si se necesita información del vendedor
   const { data, error } = await supabase
     .from('products')
     .select(`
@@ -394,7 +398,7 @@ export async function getProductsWithoutSales(limit: number = 20): Promise<Produ
       price,
       cover_url,
       created_at,
-      seller:profiles!products_seller_id_fkey(id, email, first_name, last_name)
+      seller_id
     `)
     .eq('approval_status', 'approved')
     .eq('status', 'active')
