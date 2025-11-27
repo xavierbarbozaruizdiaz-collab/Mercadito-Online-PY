@@ -29,53 +29,35 @@ export default async function FooterWrapper() {
     if (error) {
       console.error('[FooterWrapper] Error fetching settings:', error);
     } else if (data && data.length > 0) {
-      console.log('[FooterWrapper] Settings data received:', data);
       data.forEach((s: any) => {
-        // El valor está almacenado como JSONB
-        // Supabase puede devolverlo de diferentes formas:
-        // 1. Como string JSON: '"contacto@email.com"'
-        // 2. Como string directo: 'contacto@email.com'
-        // 3. Ya parseado: 'contacto@email.com'
-        let parsedValue = s.value;
-        
-        // Si es null o undefined, saltar
-        if (parsedValue == null) {
-          console.log(`[FooterWrapper] Skipping ${s.key}: value is null/undefined`);
-          return;
-        }
-        
-        console.log(`[FooterWrapper] Processing ${s.key}:`, { type: typeof parsedValue, value: parsedValue });
-        
-        // Si es un string, intentar parsearlo como JSON
-        if (typeof parsedValue === 'string') {
-          // Si el string parece ser un JSON string (empieza y termina con comillas)
-          if (parsedValue.startsWith('"') && parsedValue.endsWith('"')) {
+        // Función helper para parsear valores JSONB
+        const parseValue = (val: any): string | null => {
+          if (val == null) return null;
+          if (typeof val !== 'string') return String(val);
+          
+          // Si es un string JSON con comillas, parsearlo
+          if (val.startsWith('"') && val.endsWith('"')) {
             try {
-              parsedValue = JSON.parse(parsedValue);
-              console.log(`[FooterWrapper] Parsed ${s.key} from JSON string:`, parsedValue);
+              return JSON.parse(val);
             } catch {
               // Si falla, quitar las comillas manualmente
-              parsedValue = parsedValue.slice(1, -1);
-              console.log(`[FooterWrapper] Manually removed quotes from ${s.key}:`, parsedValue);
+              return val.slice(1, -1);
             }
           }
-          // Si no tiene comillas, usar el valor directamente
-        }
+          return val;
+        };
+        
+        const parsedValue = parseValue(s.value);
         
         // Asignar el valor parseado según la clave
-        if (s.key === 'contact_email' && typeof parsedValue === 'string' && parsedValue.trim()) {
+        if (s.key === 'contact_email' && parsedValue && typeof parsedValue === 'string') {
           contactEmail = parsedValue.trim();
-          console.log(`[FooterWrapper] Set contactEmail to:`, contactEmail);
-        } else if (s.key === 'contact_phone' && typeof parsedValue === 'string' && parsedValue.trim()) {
+        } else if (s.key === 'contact_phone' && parsedValue && typeof parsedValue === 'string') {
           contactPhone = parsedValue.trim();
-          console.log(`[FooterWrapper] Set contactPhone to:`, contactPhone);
-        } else if (s.key === 'location' && typeof parsedValue === 'string' && parsedValue.trim()) {
+        } else if (s.key === 'location' && parsedValue && typeof parsedValue === 'string') {
           location = parsedValue.trim();
-          console.log(`[FooterWrapper] Set location to:`, location);
         }
       });
-    } else {
-      console.log('[FooterWrapper] No settings data found, using defaults');
     }
   } catch (error) {
     // Si hay error, usar valores por defecto
@@ -90,4 +72,5 @@ export default async function FooterWrapper() {
     />
   );
 }
+
 

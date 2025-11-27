@@ -14,6 +14,35 @@ export type SiteSetting = {
 };
 
 /**
+ * Parsea un valor JSONB que puede estar en diferentes formatos
+ */
+function parseJsonbValue(value: any): any {
+  if (value == null) return value;
+  
+  // Si ya es un objeto/array/número/boolean, devolverlo directamente
+  if (typeof value !== 'string') {
+    return value;
+  }
+  
+  // Si es un string, intentar parsearlo
+  try {
+    // Si parece ser un JSON string (empieza y termina con comillas)
+    if (value.startsWith('"') && value.endsWith('"')) {
+      return JSON.parse(value);
+    }
+    // Si parece ser JSON (objeto o array)
+    if (value.startsWith('{') || value.startsWith('[')) {
+      return JSON.parse(value);
+    }
+    // Si no, devolver el string directamente
+    return value;
+  } catch {
+    // Si falla el parse, devolver el valor original
+    return value;
+  }
+}
+
+/**
  * Obtiene todas las configuraciones
  */
 export async function getAllSettings(): Promise<Record<string, any>> {
@@ -29,7 +58,7 @@ export async function getAllSettings(): Promise<Record<string, any>> {
 
   const settings: Record<string, any> = {};
   (data || []).forEach((s: any) => {
-    settings[s.key] = s.value;
+    settings[s.key] = parseJsonbValue(s.value);
   });
 
   return settings;
@@ -49,29 +78,22 @@ export async function getSetting(key: string, defaultValue: any = null): Promise
     return defaultValue;
   }
 
-  return (data as any).value;
+  return parseJsonbValue((data as any).value);
 }
 
 /**
  * Actualiza una configuración
  */
 export async function updateSetting(key: string, value: any, adminId: string): Promise<void> {
-  // Para JSONB, los strings deben guardarse como JSON strings (con comillas)
-  // Los números, arrays y objetos se guardan directamente
-  let jsonbValue: any;
-  if (typeof value === 'string') {
-    // Guardar como JSON string (con comillas)
-    jsonbValue = JSON.stringify(value);
-  } else {
-    // Para otros tipos, guardar directamente (JSONB los maneja)
-    jsonbValue = value;
-  }
-
+  // Supabase JSONB maneja automáticamente la serialización
+  // NO hacer JSON.stringify() manualmente - causa doble encoding
+  // Simplemente pasar el valor directamente y Supabase lo convierte a JSONB
+  
   // Using 'as any' to bypass Supabase strict type constraint for updates
   const { error } = await (supabase as any)
     .from('site_settings')
     .update({
-      value: jsonbValue,
+      value: value, // Supabase maneja la conversión a JSONB automáticamente
       updated_by: adminId,
       updated_at: new Date().toISOString(),
     })
@@ -84,7 +106,7 @@ export async function updateSetting(key: string, value: any, adminId: string): P
       .from('site_settings')
       .insert({
         key,
-        value: jsonbValue,
+        value: value, // Supabase maneja la conversión a JSONB automáticamente
       });
 
     if (insertError) {

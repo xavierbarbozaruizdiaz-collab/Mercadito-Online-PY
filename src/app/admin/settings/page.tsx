@@ -29,15 +29,34 @@ export default function SiteSettingsPage() {
       const allSettings = await getAllSettings();
       setSettings(allSettings);
 
+      // Asegurar que los valores sean strings simples, no objetos JSON
+      const cleanValue = (val: any): string => {
+        if (val == null) return '';
+        if (typeof val === 'string') {
+          // Si es un string JSON con comillas, parsearlo
+          if (val.startsWith('"') && val.endsWith('"')) {
+            try {
+              return JSON.parse(val);
+            } catch {
+              return val.replace(/^"|"$/g, '');
+            }
+          }
+          return val;
+        }
+        return String(val);
+      };
+
       setFormData({
-        site_name: allSettings.site_name || 'Mercadito Online PY',
-        primary_color: allSettings.primary_color || '#3b82f6',
-        secondary_color: allSettings.secondary_color || '#8b5cf6',
-        contact_email: allSettings.contact_email || '',
-        contact_phone: allSettings.contact_phone || '',
+        site_name: cleanValue(allSettings.site_name) || 'Mercadito Online PY',
+        primary_color: cleanValue(allSettings.primary_color) || '#3b82f6',
+        secondary_color: cleanValue(allSettings.secondary_color) || '#8b5cf6',
+        contact_email: cleanValue(allSettings.contact_email) || '',
+        contact_phone: cleanValue(allSettings.contact_phone) || '',
         shipping_cost: String(allSettings.shipping_cost || 0),
         free_shipping_threshold: String(allSettings.free_shipping_threshold || 0),
-        payment_methods: allSettings.payment_methods || ['cash', 'transfer'],
+        payment_methods: Array.isArray(allSettings.payment_methods) 
+          ? allSettings.payment_methods 
+          : ['cash', 'transfer'],
       });
     } catch (error) {
       console.error('Error loading settings:', error);
