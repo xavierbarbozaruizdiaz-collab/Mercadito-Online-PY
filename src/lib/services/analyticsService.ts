@@ -79,14 +79,9 @@ class AnalyticsService {
         .from('analytics_events')
         .insert(event);
 
-      // También enviar a Google Analytics si está configurado
-      if (typeof window !== 'undefined' && (window as any).gtag) {
-        (window as any).gtag('event', eventType, {
-          event_category: eventData.category || 'general',
-          event_label: eventData.label || '',
-          value: eventData.value || 0,
-        });
-      }
+      // NOTA: No llamamos gtag() directamente.
+      // Si necesitas tracking a GA4, usa track() de @/lib/tracking/dataLayer.
+      // GTM manejará la distribución a GA4.
     } catch (error) {
       console.error('Error tracking event:', error);
     }

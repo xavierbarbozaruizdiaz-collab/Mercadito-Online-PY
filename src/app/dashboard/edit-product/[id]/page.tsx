@@ -5,6 +5,8 @@ import imageCompression from 'browser-image-compression';
 import { supabase, getSessionWithTimeout } from '@/lib/supabaseClient';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
+import { logger } from '@/lib/utils/logger';
+import { Trash2 } from 'lucide-react';
 
 const MAX_IMAGES = 10;
 
@@ -50,6 +52,7 @@ export default function EditProduct() {
   const [hoveredImage, setHoveredImage] = useState<number | null>(null);
 
   const [categories, setCategories] = useState<Category[]>([]);
+  const [deleting, setDeleting] = useState(false);
 
   // Cargar datos del producto
   useEffect(() => {
@@ -519,6 +522,117 @@ export default function EditProduct() {
       showMsg('error', '❌ ' + (err?.message ?? 'Error al actualizar'));
     } finally {
       setLoading(false);
+    }
+  }
+
+  // Función para eliminar producto
+  async function handleDeleteProduct() {
+    if (!confirm('¿Estás seguro de que quieres eliminar este producto? Esta acción no se puede deshacer.')) {
+      return;
+    }
+
+    setDeleting(true);
+    
+    try {
+      logger.debug('Eliminando producto', { productId });
+      
+      // Verificar que el producto existe y que el usuario es el dueño
+      const { data: session } = await supabase.auth.getSession();
+      if (!session?.session?.user?.id) {
+        throw new Error('No hay sesión activa');
+      }
+      
+      const userId = session.session.user.id;
+      
+      // Verificar que el producto existe y pertenece al usuario
+      const { data: productToDelete, error: checkError } = await supabase
+        .from('products')
+        .select('id, seller_id, title')
+        .eq('id', productId)
+        .single();
+      
+      if (checkError || !productToDelete) {
+        logger.error('Producto no encontrado o error al verificar', checkError, { productId });
+        throw new Error('Producto no encontrado');
+      }
+      
+      if (productToDelete.seller_id !== userId) {
+        throw new Error('No tienes permiso para eliminar este producto');
+      }
+      
+      // Obtener imágenes del producto para eliminarlas del storage
+      const { data: images } = await supabase
+        .from('product_images')
+        .select('url')
+        .eq('product_id', productId);
+
+      // Eliminar producto
+      let deleteError: any = null;
+      let count: number | null = null;
+      
+      try {
+        const deleteResult = await supabase
+          .from('products')
+          .delete({ count: 'exact' })
+          .eq('id', productId);
+        
+        deleteError = deleteResult.error;
+        count = deleteResult.count;
+        
+        // Si count es 0 o null, intentar usar función SQL que evita problemas de RLS
+        if ((count === 0 || count === null) && !deleteError) {
+          logger.warn('DELETE retornó count: 0. Intentando con función SQL', { productId });
+          
+          const { data: rpcResult, error: rpcError } = await (supabase as any)
+            .rpc('delete_user_product', { product_id_to_delete: productId });
+          
+          if (rpcError) {
+            logger.error('Error al usar función SQL', rpcError, { productId });
+          } else if (rpcResult === true) {
+            logger.info('Producto eliminado usando función SQL', { productId });
+            count = 1;
+          }
+        }
+      } catch (err: any) {
+        deleteError = err;
+        logger.error('Error capturado en DELETE', err, { productId });
+      }
+
+      if (deleteError) {
+        throw deleteError;
+      }
+
+      // Eliminar imágenes del storage
+      if (images && images.length > 0) {
+        const filePaths = images.map((img: any) => {
+          const url = img.url;
+          const match = url.match(/products\/([^\/]+)\/(.+)$/);
+          return match ? `${match[1]}/${match[2]}` : null;
+        }).filter(Boolean);
+        
+        if (filePaths.length > 0) {
+          const { error: storageError } = await supabase.storage
+            .from('product-images')
+            .remove(filePaths);
+
+          if (storageError) {
+            logger.error('Error al eliminar imágenes del storage', storageError, { productId, filePaths });
+          }
+        }
+      }
+
+      showMsg('success', '✅ Producto eliminado exitosamente. Redirigiendo...');
+      
+      // Redirigir al dashboard después de un breve delay
+      setTimeout(() => {
+        router.push('/dashboard');
+      }, 1500);
+      
+    } catch (err: any) {
+      logger.error('Error completo al eliminar producto', err, { productId });
+      showMsg('error', '❌ Error al eliminar producto: ' + (err.message || 'Error desconocido'));
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -1058,18 +1172,34 @@ export default function EditProduct() {
           )}
         </div>
 
-        {/* Submit */}
-        <button
-          type="submit"
-          disabled={loading || !isFormValid}
-          className={`px-6 py-3 rounded font-medium transition-colors ${
-            isFormValid && !loading
-              ? 'bg-black text-white hover:bg-gray-800'
-              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-          }`}
-        >
-          {loading ? 'Actualizando…' : isFormValid ? 'Actualizar producto' : 'Completa todos los campos'}
-        </button>
+        {/* Submit y Eliminar */}
+        <div className="flex gap-4 items-center">
+          <button
+            type="submit"
+            disabled={loading || !isFormValid}
+            className={`px-6 py-3 rounded font-medium transition-colors ${
+              isFormValid && !loading
+                ? 'bg-black text-white hover:bg-gray-800'
+                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+            }`}
+          >
+            {loading ? 'Actualizando…' : isFormValid ? 'Actualizar producto' : 'Completa todos los campos'}
+          </button>
+          
+          <button
+            type="button"
+            onClick={handleDeleteProduct}
+            disabled={deleting || loading}
+            className={`px-6 py-3 rounded font-medium transition-colors flex items-center gap-2 ${
+              deleting || loading
+                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                : 'bg-red-600 text-white hover:bg-red-700'
+            }`}
+          >
+            <Trash2 className="w-4 h-4" />
+            {deleting ? 'Eliminando…' : 'Eliminar producto'}
+          </button>
+        </div>
       </form>
     </main>
   );

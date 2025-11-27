@@ -13,7 +13,8 @@ export default function AdminDashboardPage() {
         {/* Navegación rápida */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <Link 
-            href="/admin/stores" 
+            href="/admin/stores"
+            prefetch={false}
             className="bg-white p-6 rounded-lg shadow-sm border hover:shadow-md transition-shadow"
           >
             <div className="flex items-center">
@@ -30,7 +31,8 @@ export default function AdminDashboardPage() {
           </Link>
 
           <Link 
-            href="/admin/users" 
+            href="/admin/users"
+            prefetch={false}
             className="bg-white p-6 rounded-lg shadow-sm border hover:shadow-md transition-shadow"
           >
             <div className="flex items-center">
@@ -47,7 +49,8 @@ export default function AdminDashboardPage() {
           </Link>
 
           <Link 
-            href="/dashboard/admin/hero" 
+            href="/dashboard/admin/hero"
+            prefetch={false}
             className="bg-white p-6 rounded-lg shadow-sm border hover:shadow-md transition-shadow"
           >
             <div className="flex items-center">
@@ -64,7 +67,8 @@ export default function AdminDashboardPage() {
           </Link>
 
           <Link 
-            href="/admin/categories" 
+            href="/admin/categories"
+            prefetch={false}
             className="bg-white p-6 rounded-lg shadow-sm border hover:shadow-md transition-shadow"
           >
             <div className="flex items-center">
@@ -81,7 +85,8 @@ export default function AdminDashboardPage() {
           </Link>
 
           <Link 
-            href="/admin/products" 
+            href="/admin/products"
+            prefetch={false}
             className="bg-white p-6 rounded-lg shadow-sm border hover:shadow-md transition-shadow"
           >
             <div className="flex items-center">
@@ -98,7 +103,8 @@ export default function AdminDashboardPage() {
           </Link>
 
           <Link 
-            href="/admin/orders" 
+            href="/admin/orders"
+            prefetch={false}
             className="bg-white p-6 rounded-lg shadow-sm border hover:shadow-md transition-shadow"
           >
             <div className="flex items-center">
@@ -115,7 +121,8 @@ export default function AdminDashboardPage() {
           </Link>
 
           <Link 
-            href="/admin/settings" 
+            href="/admin/settings"
+            prefetch={false}
             className="bg-white p-6 rounded-lg shadow-sm border hover:shadow-md transition-shadow"
           >
             <div className="flex items-center">
@@ -133,7 +140,8 @@ export default function AdminDashboardPage() {
           </Link>
 
           <Link 
-            href="/admin/reports" 
+            href="/admin/reports"
+            prefetch={false}
             className="bg-white p-6 rounded-lg shadow-sm border hover:shadow-md transition-shadow"
           >
             <div className="flex items-center">
@@ -150,7 +158,8 @@ export default function AdminDashboardPage() {
           </Link>
 
           <Link 
-            href="/admin/logs" 
+            href="/admin/logs"
+            prefetch={false}
             className="bg-white p-6 rounded-lg shadow-sm border hover:shadow-md transition-shadow"
           >
             <div className="flex items-center">
@@ -167,7 +176,8 @@ export default function AdminDashboardPage() {
           </Link>
 
           <Link 
-            href="/admin/pages" 
+            href="/admin/pages"
+            prefetch={false}
             className="bg-white p-6 rounded-lg shadow-sm border hover:shadow-md transition-shadow"
           >
             <div className="flex items-center">
@@ -184,7 +194,8 @@ export default function AdminDashboardPage() {
           </Link>
 
           <Link 
-            href="/admin/notifications" 
+            href="/admin/notifications"
+            prefetch={false}
             className="bg-white p-6 rounded-lg shadow-sm border hover:shadow-md transition-shadow"
           >
             <div className="flex items-center">
@@ -196,6 +207,24 @@ export default function AdminDashboardPage() {
               <div className="ml-4">
                 <h3 className="text-lg font-semibold text-gray-900">Notificaciones Masivas</h3>
                 <p className="text-sm text-gray-600">Enviar a usuarios</p>
+              </div>
+            </div>
+          </Link>
+
+          <Link 
+            href="/admin/memberships"
+            prefetch={false}
+            className="bg-white p-6 rounded-lg shadow-sm border hover:shadow-md transition-shadow"
+          >
+            <div className="flex items-center">
+              <div className="p-2 bg-emerald-100 rounded-lg">
+                <svg className="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                </svg>
+              </div>
+              <div className="ml-4">
+                <h3 className="text-lg font-semibold text-gray-900">Membresías</h3>
+                <p className="text-sm text-gray-600">Gestionar planes y suscripciones</p>
               </div>
             </div>
           </Link>

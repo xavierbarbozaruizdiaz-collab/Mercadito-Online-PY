@@ -6,8 +6,10 @@ import Link from 'next/link';
 import { supabase } from '@/lib/supabaseClient';
 import SearchBar from '@/components/SearchBar';
 import AuctionTimer from '@/components/auction/AuctionTimer';
-import { Clock, Users, Gavel } from 'lucide-react';
+import { Clock, Users, Gavel, ShoppingBag } from 'lucide-react';
 import { ProductListSkeleton } from '@/components/ui/Skeleton';
+import { Button } from '@/components/ui';
+import SourcingSearchModal from '@/components/SourcingSearchModal';
 
 type Product = { 
   id: string; 
@@ -73,6 +75,7 @@ export default function ProductsListClient() {
     sortBy: 'date_desc'
   });
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [sourcingModalOpen, setSourcingModalOpen] = useState(false);
   const [vehicleFields, setVehicleFields] = useState({
     marca: '',
     modelo: '',
@@ -750,6 +753,17 @@ export default function ProductsListClient() {
               />
             </div>
             
+            {/* Botón ¿Qué querés comprar? */}
+            <Button
+              onClick={() => setSourcingModalOpen(true)}
+              variant="outline"
+              className="flex items-center gap-2 whitespace-nowrap"
+            >
+              <ShoppingBag className="w-4 h-4" />
+              <span className="hidden sm:inline">¿Qué querés comprar?</span>
+              <span className="sm:hidden">¿Qué buscás?</span>
+            </Button>
+            
             {/* Botón Filtros */}
             <div className="flex items-center justify-between gap-2 sm:flex-shrink-0">
               <button
@@ -1135,6 +1149,12 @@ export default function ProductsListClient() {
           </div>
         </>
       )}
+
+      {/* Modal de búsqueda sourcing */}
+      <SourcingSearchModal
+        isOpen={sourcingModalOpen}
+        onClose={() => setSourcingModalOpen(false)}
+      />
     </div>
   );
 }

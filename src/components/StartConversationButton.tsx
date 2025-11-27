@@ -1,15 +1,12 @@
 // ============================================
-// MERCADITO ONLINE PY - START CONVERSATION BUTTON
-// Botón para iniciar conversación desde un producto
+// MERCADITO ONLINE PY - WHATSAPP CONTACT BUTTON
+// Botón para contactar al vendedor vía WhatsApp
 // ============================================
 
 'use client';
 
-import { useState } from 'react';
-import { useAuth } from '@/lib/hooks/useAuth';
-import { useChat } from '@/lib/hooks/useChat';
 import { Product } from '@/types';
-import { MessageCircle, Loader2 } from 'lucide-react';
+import { MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui';
 
 // ============================================
@@ -20,8 +17,46 @@ interface StartConversationButtonProps {
   product: Product;
   sellerId: string;
   sellerName?: string;
-  onConversationStarted?: (conversationId: string) => void;
+  sellerPhone?: string | null;
+  storePhone?: string | null;
   className?: string;
+}
+
+// ============================================
+// FUNCIONES AUXILIARES
+// ============================================
+
+/**
+ * Formatea un número de teléfono para WhatsApp
+ * Elimina espacios, guiones y otros caracteres especiales
+ */
+function formatPhoneForWhatsApp(phone: string): string {
+  // Eliminar todos los caracteres que no sean números o +
+  let cleaned = phone.replace(/[^\d+]/g, '');
+  
+  // Si no empieza con +, agregar código de Paraguay (595)
+  if (!cleaned.startsWith('+')) {
+    // Si empieza con 595, agregar +
+    if (cleaned.startsWith('595')) {
+      cleaned = '+' + cleaned;
+    } else if (cleaned.startsWith('0')) {
+      // Si empieza con 0, reemplazar por +595
+      cleaned = '+595' + cleaned.substring(1);
+    } else {
+      // Agregar +595 al inicio
+      cleaned = '+595' + cleaned;
+    }
+  }
+  
+  return cleaned;
+}
+
+/**
+ * Genera el mensaje predefinido para WhatsApp
+ */
+function generateWhatsAppMessage(product: Product): string {
+  const message = `Hola! Me interesa el producto: ${product.title}\n\n¿Todavía está disponible?`;
+  return encodeURIComponent(message);
 }
 
 // ============================================
@@ -32,84 +67,52 @@ export default function StartConversationButton({
   product,
   sellerId,
   sellerName,
-  onConversationStarted,
+  sellerPhone,
+  storePhone,
   className = '',
 }: StartConversationButtonProps) {
-  const { user } = useAuth();
-  const { createNewConversation } = useChat();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const handleStartConversation = async () => {
-    if (!user) {
-      setError('Debes iniciar sesión para chatear');
+  const handleOpenWhatsApp = () => {
+    // Priorizar el teléfono de la tienda, luego el del vendedor
+    const phone = storePhone || sellerPhone;
+    
+    if (!phone) {
+      alert('El vendedor no tiene un número de teléfono configurado. Por favor, contacta al vendedor por otro medio.');
       return;
     }
-
-    if (user.id === sellerId) {
-      setError('No puedes chatear contigo mismo');
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
 
     try {
-      const conversation = await createNewConversation({
-        buyer_id: user.id,
-        seller_id: sellerId,
-        product_id: product.id,
-        store_id: product.store_id,
-        subject: `Consulta sobre: ${product.title}`,
-      });
-
-      if (conversation) {
-        onConversationStarted?.(conversation.id);
-      } else {
-        setError('No se pudo crear la conversación');
-      }
-    } catch (err) {
-      setError('Error al iniciar la conversación');
-      console.error('Error starting conversation:', err);
-    } finally {
-      setLoading(false);
+      const formattedPhone = formatPhoneForWhatsApp(phone);
+      const message = generateWhatsAppMessage(product);
+      const whatsappUrl = `https://wa.me/${formattedPhone.replace('+', '')}?text=${message}`;
+      
+      // Abrir WhatsApp en una nueva pestaña
+      window.open(whatsappUrl, '_blank');
+    } catch (error) {
+      console.error('Error opening WhatsApp:', error);
+      alert('Error al abrir WhatsApp. Por favor, verifica que el número de teléfono sea válido.');
     }
   };
 
-  if (!user) {
-    return (
-      <Button
-        variant="outline"
-        className={`w-full ${className}`}
-        disabled
-      >
-        <MessageCircle className="w-4 h-4 mr-2" />
-        Inicia sesión para chatear
-      </Button>
-    );
-  }
-
-  if (user.id === sellerId) {
-    return null; // No mostrar el botón si es el propio vendedor
-  }
+  const phone = storePhone || sellerPhone;
+  const hasPhone = !!phone;
 
   return (
-    <div className="space-y-2">
+    <div className="w-full space-y-2">
       <Button
-        onClick={handleStartConversation}
-        disabled={loading}
-        className={`w-full ${className}`}
+        onClick={handleOpenWhatsApp}
+        disabled={!hasPhone}
+        className={`w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-4 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center shadow-sm hover:shadow-md ${className}`}
       >
-        {loading ? (
-          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-        ) : (
-          <MessageCircle className="w-4 h-4 mr-2" />
-        )}
-        {loading ? 'Iniciando chat...' : 'Chatear con el vendedor'}
+        <MessageCircle className="w-4 h-4 mr-2" />
+        <span>{hasPhone ? 'Chatear con el vendedor' : 'Sin número de contacto'}</span>
       </Button>
       
-      {error && (
-        <p className="text-sm text-red-600 text-center">{error}</p>
+      {!hasPhone && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-2">
+          <p className="text-xs sm:text-sm text-yellow-700 text-center font-medium">
+            El vendedor no tiene WhatsApp configurado
+          </p>
+        </div>
       )}
     </div>
   );

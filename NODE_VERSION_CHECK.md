@@ -29,3 +29,10 @@ El build ya funcionó con Node 22, pero el proyecto especifica Node 20.x en `pac
 
 
 
+
+
+
+
+
+
+

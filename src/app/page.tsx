@@ -35,6 +35,8 @@ type HeroSlide = {
   gradient_to?: string | null;
   storage_path?: string | null;
   public_url?: string | null;
+  link_url?: string | null;
+  show_title?: boolean | null;
   sort_order: number;
   created_at?: string | null;
 };
@@ -74,7 +76,7 @@ export default async function Home() {
       const { data, error } = await supabase
         .from('hero_slides')
         .select(
-          'id, title, subtitle, cta_primary_label, cta_primary_href, bg_type, image_url, gradient_from, gradient_to, is_active, sort_order, created_at'
+          'id, title, subtitle, cta_primary_label, cta_primary_href, cta_secondary_label, cta_secondary_href, bg_type, image_url, bg_image_url, gradient_from, gradient_to, storage_path, link_url, show_title, is_active, sort_order, created_at'
         )
         .eq('is_active', true)
         .order('sort_order', { ascending: true });
@@ -94,7 +96,8 @@ export default async function Home() {
           return 0;
         });
         
-        const getPublicUrl = (path: string | null | undefined): string | null => {
+        // Función helper para construir URL pública desde storage_path (Server Component)
+        const getPublicUrlFromPath = (path: string | null | undefined): string | null => {
           if (!path) return null;
           try {
             const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://hqdatzhliaordlsqtjea.supabase.co';
@@ -109,25 +112,40 @@ export default async function Home() {
         slides = sortedData.map((s: any) => {
           const bgType = (s.bg_type || 'gradient') as 'gradient' | 'image';
           
+          // Construir URL de imagen: prioridad: bg_image_url > public_url desde storage_path > image_url
+          let imageUrl: string | null = null;
+          if (bgType === 'image') {
+            if (s.bg_image_url) {
+              imageUrl = s.bg_image_url;
+            } else if (s.storage_path) {
+              // Construir URL pública desde storage_path
+              imageUrl = getPublicUrlFromPath(s.storage_path);
+            } else if (s.image_url) {
+              imageUrl = s.image_url;
+            }
+          }
+          
           return {
             id: s.id as string,
             title: (s.title ?? null) as string | null,
             subtitle: (s.subtitle ?? null) as string | null,
             cta_primary_label: (s.cta_primary_label ?? null) as string | null,
             cta_primary_href: (s.cta_primary_href ?? null) as string | null,
-            cta_secondary_label: null, // No se selecciona en la query
-            cta_secondary_href: null, // No se selecciona en la query
+            cta_secondary_label: (s.cta_secondary_label ?? null) as string | null,
+            cta_secondary_href: (s.cta_secondary_href ?? null) as string | null,
             bg_type: bgType,
             // Para gradient: usar gradient_from/gradient_to
             bg_gradient_from: bgType === 'gradient' ? (s.gradient_from ?? '#6d28d9') : null,
             bg_gradient_to: bgType === 'gradient' ? (s.gradient_to ?? '#2563eb') : null,
-            // Para image: usar image_url
-            bg_image_url: bgType === 'image' ? (s.image_url ?? null) : null,
+            // Para image: usar la URL construida
+            bg_image_url: imageUrl,
             image_url: s.image_url ?? null,
             gradient_from: s.gradient_from ?? null,
             gradient_to: s.gradient_to ?? null,
-            storage_path: null, // No se selecciona en la query
-            public_url: null, // Se calcula si hay storage_path
+            storage_path: (s.storage_path ?? null) as string | null,
+            public_url: s.storage_path ? getPublicUrlFromPath(s.storage_path) : null,
+            link_url: (s.link_url ?? null) as string | null,
+            show_title: s.show_title !== undefined ? (s.show_title ?? true) : true, // Por defecto true
             sort_order: (s.sort_order as number) ?? 0,
             created_at: s.created_at ?? null,
             // Añadir position para compatibilidad con HeroSlider

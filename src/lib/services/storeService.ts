@@ -48,6 +48,9 @@ export interface StoreStats {
  * @param storeSlug El slug de la tienda.
  * @param includeInactive Si es true, incluye tiendas inactivas (útil para admin).
  * @returns La tienda con su información completa.
+ * 
+ * NOTA: Las tiendas fallback (is_fallback_store = true) se incluyen normalmente
+ * si están activas. El flag is_fallback_store NO afecta la visibilidad de la tienda.
  */
 export async function getStoreBySlug(storeSlug: string, includeInactive: boolean = false): Promise<Store | null> {
   try {
@@ -58,6 +61,8 @@ export async function getStoreBySlug(storeSlug: string, includeInactive: boolean
       .eq('slug', storeSlug);
     
     // Solo filtrar por is_active si no se incluyen inactivas
+    // IMPORTANTE: No excluir tiendas fallback - solo filtrar por is_active
+    // Las tiendas pausadas se filtran después de obtener los datos
     if (!includeInactive) {
       query = query.eq('is_active', true);
     }
@@ -76,6 +81,11 @@ export async function getStoreBySlug(storeSlug: string, includeInactive: boolean
         logger.error('Error fetching store by slug', error, { storeSlug });
       }
       return null;
+    }
+
+    // Verificar que la tienda no esté pausada
+    if (data && (data as any).settings?.is_paused === true) {
+      return null; // Tienda pausada, no mostrar
     }
 
     const result = data as Store;
@@ -264,6 +274,9 @@ export async function getStoreStats(storeId: string): Promise<StoreStats | null>
  * Obtiene todas las tiendas con filtros y paginación.
  * @param options Opciones de filtros y paginación.
  * @returns Las tiendas que coinciden con los filtros.
+ * 
+ * NOTA: Las tiendas fallback (is_fallback_store = true) se incluyen normalmente
+ * si están activas. El flag is_fallback_store NO afecta la visibilidad de la tienda.
  */
 export async function getStores(
   options: {
@@ -287,6 +300,8 @@ export async function getStores(
     .select('*, profiles(id, first_name, last_name, email, avatar_url)', { count: 'exact' });
 
   // Aplicar filtros
+  // IMPORTANTE: Solo filtrar por is_active, NO excluir tiendas fallback
+  // Excluir tiendas pausadas (settings.is_paused = true)
   if (options.active_only !== false) {
     query = query.eq('is_active', true);
   }
@@ -322,11 +337,16 @@ export async function getStores(
     return { stores: [], total: 0, total_pages: 0 };
   }
 
-  const total = count || 0;
+  // Filtrar tiendas pausadas (settings.is_paused = true)
+  const filteredStores = (data || []).filter((store: any) => {
+    return !store.settings?.is_paused;
+  });
+
+  const total = filteredStores.length;
   const total_pages = Math.ceil(total / limit);
 
   return {
-    stores: data || [],
+    stores: filteredStores,
     total,
     total_pages,
   };

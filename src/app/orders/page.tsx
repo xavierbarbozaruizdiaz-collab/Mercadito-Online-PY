@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import Link from 'next/link';
+import { PackageSearch, ShoppingCart, Clock, CheckCircle, XCircle, Search, AlertCircle } from 'lucide-react';
 
 type Order = {
   id: string;
@@ -22,13 +23,28 @@ type Order = {
   }[];
 };
 
+type SourcingOrder = {
+  id: string;
+  raw_query: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+};
+
 export default function UserOrdersPage() {
+  const [activeTab, setActiveTab] = useState<'orders' | 'sourcing'>('orders');
   const [orders, setOrders] = useState<Order[]>([]);
+  const [sourcingOrders, setSourcingOrders] = useState<SourcingOrder[]>([]);
   const [loading, setLoading] = useState(true);
+  const [sourcingLoading, setSourcingLoading] = useState(false);
 
   useEffect(() => {
-    loadOrders();
-  }, []);
+    if (activeTab === 'orders') {
+      loadOrders();
+    } else {
+      loadSourcingOrders();
+    }
+  }, [activeTab]);
 
   async function loadOrders() {
     try {
@@ -133,6 +149,80 @@ export default function UserOrdersPage() {
     }
   }
 
+  async function loadSourcingOrders() {
+    try {
+      setSourcingLoading(true);
+
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData?.session?.user?.id) {
+        setSourcingLoading(false);
+        return;
+      }
+
+      // Obtener el token de sesión para enviarlo en el header
+      const session = sessionData?.session;
+      
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+
+      const response = await fetch('/api/assistant/sourcing-orders?mode=user', {
+        headers,
+        credentials: 'include',
+      });
+      
+      if (!response.ok) {
+        throw new Error('Error al cargar pedidos por conseguir');
+      }
+
+      const result = await response.json();
+      setSourcingOrders(result.data || []);
+
+    } catch (err) {
+      console.error('Error cargando sourcing_orders:', err);
+      setSourcingOrders([]);
+    } finally {
+      setSourcingLoading(false);
+    }
+  }
+
+  function getSourcingStatusColor(status: string) {
+    switch (status) {
+      case 'pending_sourcing': return 'bg-yellow-100 text-yellow-800 border border-yellow-200';
+      case 'sourcing': return 'bg-blue-100 text-blue-800 border border-blue-200';
+      case 'found': return 'bg-purple-100 text-purple-800 border border-purple-200';
+      case 'completed': return 'bg-green-100 text-green-800 border border-green-200';
+      case 'cancelled': return 'bg-red-100 text-red-800 border border-red-200';
+      default: return 'bg-gray-100 text-gray-800 border border-gray-200';
+    }
+  }
+
+  function getSourcingStatusText(status: string) {
+    switch (status) {
+      case 'pending_sourcing': return 'Pendiente';
+      case 'sourcing': return 'Buscando';
+      case 'found': return 'Encontrado';
+      case 'completed': return 'Completado';
+      case 'cancelled': return 'Cancelado';
+      default: return status;
+    }
+  }
+
+  function getSourcingStatusIcon(status: string) {
+    switch (status) {
+      case 'pending_sourcing': return <Clock className="w-4 h-4" />;
+      case 'sourcing': return <Search className="w-4 h-4" />;
+      case 'found': return <PackageSearch className="w-4 h-4" />;
+      case 'completed': return <CheckCircle className="w-4 h-4" />;
+      case 'cancelled': return <XCircle className="w-4 h-4" />;
+      default: return <AlertCircle className="w-4 h-4" />;
+    }
+  }
+
   function getStatusColor(status: string) {
     switch (status) {
       case 'pending': return 'bg-yellow-100 text-yellow-800 border border-yellow-200';
@@ -155,7 +245,9 @@ export default function UserOrdersPage() {
     }
   }
 
-  if (loading) {
+  const isLoading = loading || (activeTab === 'sourcing' && sourcingLoading);
+
+  if (isLoading) {
     return (
       <main className="min-h-screen bg-gray-50">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -195,9 +287,40 @@ export default function UserOrdersPage() {
               Volver al dashboard
             </Link>
           </div>
+
+          {/* Tabs */}
+          <div className="flex gap-2 border-b border-gray-200">
+            <button
+              onClick={() => setActiveTab('orders')}
+              className={`px-6 py-3 font-medium text-sm transition-colors border-b-2 ${
+                activeTab === 'orders'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <ShoppingCart className="w-4 h-4" />
+                <span>Pedidos ({orders.length})</span>
+              </div>
+            </button>
+            <button
+              onClick={() => setActiveTab('sourcing')}
+              className={`px-6 py-3 font-medium text-sm transition-colors border-b-2 ${
+                activeTab === 'sourcing'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <PackageSearch className="w-4 h-4" />
+                <span>Por conseguir ({sourcingOrders.length})</span>
+              </div>
+            </button>
+          </div>
         </div>
 
-        {orders.length === 0 ? (
+        {activeTab === 'orders' ? (
+          orders.length === 0 ? (
           <div className="bg-white rounded-2xl shadow-lg p-12 sm:p-16 text-center border border-gray-200">
             <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -297,6 +420,101 @@ export default function UserOrdersPage() {
               </div>
             ))}
           </div>
+        )
+        ) : (
+          /* Tab de Pedidos por conseguir */
+          sourcingOrders.length === 0 ? (
+            <div className="bg-white rounded-2xl shadow-lg p-12 sm:p-16 text-center border border-gray-200">
+              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <PackageSearch className="w-8 h-8 text-blue-600" />
+              </div>
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3">No tienes pedidos por conseguir</h2>
+              <p className="text-gray-600 mb-8 max-w-md mx-auto">
+                Cuando crees un pedido "por conseguir" desde el botón "¿Qué querés comprar?", aparecerá aquí
+              </p>
+              <Link
+                href="/"
+                className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-bold hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl"
+              >
+                <PackageSearch className="w-5 h-5" />
+                Buscar productos
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {sourcingOrders.map((order) => (
+                <div key={order.id} className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden hover:shadow-xl transition-shadow">
+                  {/* Header del pedido */}
+                  <div className="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 border-b border-gray-200">
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                          <PackageSearch className="w-6 h-6 text-blue-600" />
+                        </div>
+                        <div>
+                          <h3 className="text-lg sm:text-xl font-bold text-gray-900">
+                            Pedido por conseguir
+                          </h3>
+                          <p className="text-sm text-gray-600 mt-1">
+                            {new Date(order.created_at).toLocaleDateString('es-PY', {
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex flex-col sm:items-end gap-2">
+                        <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold ${getSourcingStatusColor(order.status)}`}>
+                          {getSourcingStatusIcon(order.status)}
+                          {getSourcingStatusText(order.status)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Contenido del pedido */}
+                  <div className="p-6">
+                    <div className="mb-4">
+                      <label className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-2 block">Búsqueda</label>
+                      <p className="text-lg font-medium text-gray-900 bg-gray-50 p-4 rounded-lg border border-gray-200">
+                        {order.raw_query}
+                      </p>
+                    </div>
+
+                    <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                      <p className="text-sm text-blue-800">
+                        <strong>Estado actual:</strong> Tu pedido está en: <strong>{getSourcingStatusText(order.status)}</strong>
+                      </p>
+                      {order.status === 'pending_sourcing' && (
+                        <p className="text-xs text-blue-600 mt-2">La tienda recibió tu pedido y lo revisará pronto.</p>
+                      )}
+                      {order.status === 'sourcing' && (
+                        <p className="text-xs text-blue-600 mt-2">La tienda está buscando el producto que solicitaste.</p>
+                      )}
+                      {order.status === 'found' && (
+                        <p className="text-xs text-blue-600 mt-2">¡El producto fue encontrado! La tienda te contactará pronto.</p>
+                      )}
+                      {order.status === 'completed' && (
+                        <p className="text-xs text-blue-600 mt-2">Este pedido fue completado exitosamente.</p>
+                      )}
+                      {order.status === 'cancelled' && (
+                        <p className="text-xs text-blue-600 mt-2">Este pedido fue cancelado.</p>
+                      )}
+                    </div>
+
+                    {order.updated_at !== order.created_at && (
+                      <p className="text-xs text-gray-500 mt-4">
+                        Última actualización: {new Date(order.updated_at).toLocaleString('es-PY')}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )
         )}
       </div>
     </main>

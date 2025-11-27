@@ -5,8 +5,7 @@ import { supabase } from '@/lib/supabaseClient';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useFacebookPixel } from '@/lib/services/facebookPixelService';
-import { useGoogleAnalytics } from '@/lib/services/googleAnalyticsService';
-import { trackPurchase } from '@/lib/analytics';
+import { trackPurchase } from '@/lib/tracking/dataLayer';
 
 type Order = {
   id: string;
@@ -34,7 +33,6 @@ function CheckoutSuccessContent() {
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const facebookPixel = useFacebookPixel();
-  const googleAnalytics = useGoogleAnalytics();
 
   useEffect(() => {
     if (orderId) {
@@ -88,19 +86,6 @@ function CheckoutSuccessContent() {
           currency: 'PYG',
         });
 
-        googleAnalytics.trackPurchase({
-          transactionId: orderData.id,
-          products: orderData.order_items.map(item => ({
-            id: item.product.id,
-            name: item.product.title,
-            category: '',
-            price: item.unit_price,
-            quantity: item.quantity,
-          })),
-          total: orderData.total_amount,
-          currency: 'PYG',
-        });
-
         // Track purchase con GTM
         trackPurchase(
           orderData.id,
@@ -110,7 +95,8 @@ function CheckoutSuccessContent() {
             price: item.unit_price,
             quantity: item.quantity,
           })),
-          orderData.total_amount
+          orderData.total_amount,
+          'PYG'
         );
       }
     } catch (err) {

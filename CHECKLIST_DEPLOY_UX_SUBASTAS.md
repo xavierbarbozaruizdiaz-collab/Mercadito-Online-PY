@@ -199,3 +199,8 @@ git push origin main --force
 **Deployado por**: _______________  
 **Estado**: ⏳ Pendiente / ✅ Completado
 
+
+
+
+
+

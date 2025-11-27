@@ -9,6 +9,7 @@ import { SITE_URL } from '@/lib/config/site';
 
 export async function generateStoreMetadata(slug: string): Promise<Metadata> {
   try {
+    // IMPORTANTE: Las tiendas fallback se incluyen normalmente si están activas
     const { data: store } = await (supabase as any)
       .from('stores')
       .select(`
@@ -23,13 +24,21 @@ export async function generateStoreMetadata(slug: string): Promise<Metadata> {
         created_at
       `)
       .eq('slug', slug)
-      .eq('is_active', true)
+      .eq('is_active', true) // Solo filtrar por is_active, NO excluir tiendas fallback
       .single();
 
     if (!store) {
       return {
         title: 'Tienda no encontrada | Mercadito Online PY',
         description: 'La tienda que buscas no está disponible.',
+      };
+    }
+
+    // Verificar que la tienda no esté pausada
+    if (store.settings?.is_paused === true) {
+      return {
+        title: 'Tienda no disponible | Mercadito Online PY',
+        description: 'La tienda está temporalmente pausada.',
       };
     }
 

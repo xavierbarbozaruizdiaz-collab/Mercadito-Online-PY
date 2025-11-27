@@ -1,3 +1,12 @@
+/**
+ * @deprecated Este servicio está deprecado.
+ * NO cargues Facebook Pixel directamente. GTM debe cargarlo.
+ * NO uses fbq() directamente. Usa track() de @/lib/tracking/dataLayer.
+ * 
+ * Este archivo se mantiene temporalmente para compatibilidad,
+ * pero será removido en futuras versiones.
+ */
+
 // ============================================
 // FACEBOOK PIXEL SERVICE
 // Tracking completo de eventos para Facebook Pixel

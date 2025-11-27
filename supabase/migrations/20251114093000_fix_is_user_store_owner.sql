@@ -35,3 +35,10 @@ COMMENT ON FUNCTION is_user_store_owner IS 'Verifica si el usuario tiene una tie
 
 
 
+
+
+
+
+
+
+

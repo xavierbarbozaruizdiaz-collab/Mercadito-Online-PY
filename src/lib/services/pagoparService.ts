@@ -122,13 +122,46 @@ export async function createPagoparToken(): Promise<PagoparToken> {
       }),
     });
 
+    // Leer el body como texto ANTES de verificar response.ok
+    // Esto nos permite ver la respuesta exacta de Pagopar incluso si hay error
+    const responseBodyText = await response.text();
+
+    // Log detallado de la respuesta (solo si hay error o para debug)
     if (!response.ok) {
-      throw new Error(`Pagopar API error: ${response.status} ${response.statusText}`);
+      logger.error('[pagopar][create-token] response error', {
+        status: response.status,
+        statusText: response.statusText,
+        body: responseBodyText,
+        url: getApiUrl('token'),
+      });
+      
+      // Intentar parsear el body como JSON para obtener errores más detallados
+      let errorMessage = `Pagopar API error: ${response.status} ${response.statusText}`;
+      try {
+        const errorData = JSON.parse(responseBodyText);
+        if (errorData.errores && Array.isArray(errorData.errores)) {
+          errorMessage = `Pagopar API error: ${errorData.errores.join(', ')}`;
+        } else if (errorData.mensaje) {
+          errorMessage = `Pagopar API error: ${errorData.mensaje}`;
+        }
+      } catch (parseError) {
+        // Si no es JSON válido, usar el texto crudo
+        errorMessage = `Pagopar API error: ${response.status} ${response.statusText} - ${responseBodyText.substring(0, 200)}`;
+      }
+      
+      throw new Error(errorMessage);
     }
 
-    const data: PagoparCreateTokenResponse = await response.json();
+    // Si response.ok es true, parsear el body como JSON
+    const data: PagoparCreateTokenResponse = JSON.parse(responseBodyText);
 
     if (!data.resultado || !data.datos) {
+      logger.error('[pagopar][create-token] invalid response structure', {
+        resultado: data.resultado,
+        hasDatos: !!data.datos,
+        errores: data.errores,
+        body: responseBodyText,
+      });
       throw new Error(data.errores?.join(', ') || 'Error al crear token Pagopar');
     }
 

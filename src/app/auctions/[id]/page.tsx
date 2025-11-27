@@ -589,11 +589,10 @@ export default function AuctionDetailPage() {
   
   // Calcular tiempo para el timer usando tiempo sincronizado del servidor
   // Usar getSyncedNow() para obtener tiempo sincronizado actualizado
+  // Calcular dentro del render para que se actualice en cada renderizado
+  const syncedNowMs = getSyncedNow();
   let endAtMs = 0;
   let startAtMs = 0;
-  
-  // Obtener tiempo sincronizado actual (se actualiza automáticamente)
-  const syncedNowMs = getSyncedNow();
   
   // Para subastas activas, mostrar tiempo hasta el fin
   if (auction.auction_end_at && !isEnded) {

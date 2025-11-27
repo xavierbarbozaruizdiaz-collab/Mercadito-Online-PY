@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { 
   SearchService, 
@@ -124,13 +124,24 @@ export function useSearch(options: UseSearchOptions = {}): UseSearchReturn {
   // Debounce para búsquedas
   const [debounceTimer, setDebounceTimer] = useState<NodeJS.Timeout | null>(null);
 
+  // Ref para evitar loops infinitos al actualizar URL
+  // Inicializar con la URL actual para evitar actualizaciones innecesarias al montar
+  const getCurrentUrl = () => {
+    const currentParams = new URLSearchParams();
+    searchParams.forEach((value, key) => {
+      currentParams.set(key, value);
+    });
+    return currentParams.toString() ? `?${currentParams.toString()}` : '';
+  };
+  const lastUrlRef = useRef<string>(getCurrentUrl());
+
   // Actualizar filtros
   const setFilters = useCallback((newFilters: Partial<SearchFilters>) => {
     setFiltersState(prev => ({ ...prev, ...newFilters }));
     setPagination(prev => ({ ...prev, page: 1 }));
   }, []);
 
-  // Actualizar URL cuando cambien los filtros
+  // Actualizar URL cuando cambien los filtros (solo si es diferente a la URL actual)
   useEffect(() => {
     const params = new URLSearchParams();
     
@@ -146,7 +157,13 @@ export function useSearch(options: UseSearchOptions = {}): UseSearchReturn {
     if (pagination.page > 1) params.set('page', pagination.page.toString());
 
     const newUrl = params.toString() ? `?${params.toString()}` : '';
-    router.replace(`/search${newUrl}`, { scroll: false });
+    
+    // Solo actualizar si la URL es diferente a la última que generamos
+    if (newUrl !== lastUrlRef.current) {
+      lastUrlRef.current = newUrl;
+      router.replace(`/search${newUrl}`, { scroll: false });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters, pagination.page, router]);
 
   // Búsqueda de productos

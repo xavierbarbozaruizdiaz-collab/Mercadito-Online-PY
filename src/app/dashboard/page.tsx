@@ -106,6 +106,7 @@ export default function Dashboard() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [statsPanelOpen, setStatsPanelOpen] = useState(false);
   const [storeId, setStoreId] = useState<string | null>(null);
+  const [isStoreOwner, setIsStoreOwner] = useState<boolean | null>(null);
   const toast = useToast();
 
   useEffect(() => {
@@ -377,6 +378,95 @@ export default function Dashboard() {
         
         // Cargar subastas finalizadas por separado
         setFinishedAuctions(endedAuctions);
+        
+        // Verificar si el usuario es dueño de tienda
+        let userIsStoreOwner = false;
+        if (userRole === 'seller' && session.session.user.id) {
+          try {
+            const { data: storeOwnerCheck } = await (supabase as any).rpc(
+              'is_user_store_owner',
+              { p_user_id: session.session.user.id }
+            );
+            userIsStoreOwner = storeOwnerCheck === true;
+            setIsStoreOwner(userIsStoreOwner);
+          } catch (storeOwnerError) {
+            logger.warn('Error verificando si es dueño de tienda', storeOwnerError);
+            setIsStoreOwner(false);
+          }
+        } else {
+          setIsStoreOwner(false);
+        }
+        
+        // Si es dueño de tienda y tiene productos pausados, reactivarlos automáticamente
+        if (userIsStoreOwner && paused.length > 0) {
+          try {
+            logger.info('Usuario es dueño de tienda con productos pausados, reactivando automáticamente', {
+              pausedCount: paused.length,
+              userId: session.session.user.id
+            });
+            
+            const { reactivatePausedProductsOnRenewal } = await import('@/lib/services/productExpirationService');
+            const result = await reactivatePausedProductsOnRenewal(session.session.user.id);
+            
+            if (result.products_reactivated > 0) {
+              logger.info('Productos reactivados automáticamente para dueño de tienda', {
+                reactivated: result.products_reactivated,
+                message: result.message
+              });
+              
+              // Recargar productos después de reactivar
+              const { data: refreshedProducts } = await supabase
+                .from('products')
+                .select('id, title, price, image_url:cover_url, created_at, sale_type, auction_status, auction_end_at, status')
+                .eq('seller_id', session.session.user.id)
+                .order('created_at', { ascending: false });
+              
+              if (refreshedProducts) {
+                const refreshedData = refreshedProducts as Product[];
+                const refreshedActive: Product[] = [];
+                const refreshedEnded: Product[] = [];
+                const refreshedPaused: Product[] = [];
+                
+                refreshedData.forEach(product => {
+                  if (product.status === 'paused') {
+                    refreshedPaused.push(product);
+                    return;
+                  }
+                  
+                  if (product.sale_type === 'auction') {
+                    const isEnded = product.auction_status === 'ended' || 
+                                   product.auction_status === 'cancelled' ||
+                                   (product.auction_end_at && new Date(product.auction_end_at) <= now);
+                    if (isEnded) {
+                      refreshedEnded.push(product);
+                    } else {
+                      refreshedActive.push(product);
+                    }
+                  } else {
+                    refreshedActive.push(product);
+                  }
+                });
+                
+                setPausedProducts(refreshedPaused);
+                setFinishedAuctions(refreshedEnded);
+                setAllProducts(refreshedActive);
+                setProducts(refreshedActive);
+                
+                // Actualizar productos de vitrina
+                if (userRole === 'seller') {
+                  const showcaseItems = refreshedData.filter(p => p.in_showcase === true && p.status === 'active');
+                  setShowcaseProducts(showcaseItems.sort((a, b) => (a.showcase_position || 0) - (b.showcase_position || 0)));
+                }
+                
+                toast.success(`✅ ${result.products_reactivated} producto(s) reactivado(s) automáticamente`);
+                return; // Salir temprano ya que recargamos todo
+              }
+            }
+          } catch (reactivateError) {
+            logger.error('Error reactivando productos automáticamente para dueño de tienda', reactivateError);
+            // Continuar normalmente aunque falle la reactivación
+          }
+        }
         
         // Cargar productos pausados por separado
         setPausedProducts(paused);
@@ -791,6 +881,7 @@ export default function Dashboard() {
   }
 
   async function deleteProduct(productId: string) {
+    // Permitir eliminar productos pausados sin restricciones adicionales
     if (!confirm('¿Estás seguro de que quieres eliminar este producto? Esta acción no se puede deshacer.')) {
       return;
     }
@@ -1727,8 +1818,8 @@ export default function Dashboard() {
               </Link>
             </div>
           )}
-          {/* Banner de productos pausados */}
-          {pausedProducts.length > 0 && filterType !== 'paused' && (
+          {/* Banner de productos pausados - Solo mostrar si NO es dueño de tienda */}
+          {pausedProducts.length > 0 && filterType !== 'paused' && !isStoreOwner && (
             <div className="mb-6 bg-orange-900/30 border border-orange-700 rounded-lg p-4">
               <div className="flex items-start gap-3">
                 <div className="text-orange-400 text-xl">⏸️</div>

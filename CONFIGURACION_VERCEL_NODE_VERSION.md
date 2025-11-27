@@ -63,3 +63,7 @@ El archivo `.vercel/project.json` muestra `"nodeVersion": "20.x"` porque fue cre
 
 **Última actualización**: 2024
 
+
+
+
+

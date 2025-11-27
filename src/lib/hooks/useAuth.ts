@@ -5,6 +5,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase, getCurrentUser, AuthUser } from '@/lib/supabase/client';
+import { multiTabSync } from '@/lib/utils/multiTabSync';
 
 // ============================================
 // HOOK PRINCIPAL DE AUTENTICACIÓN
@@ -69,18 +70,79 @@ export function useAuth() {
 
   // Escuchar cambios en la autenticación
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-          await loadUser();
-        } else if (event === 'SIGNED_OUT') {
-          setUser(null);
-          setLoading(false);
-        }
-      }
-    );
+    let mounted = true;
+    let subscription: any = null;
 
-    return () => subscription.unsubscribe();
+    try {
+      const { data } = supabase.auth.onAuthStateChange(
+        async (event, session) => {
+          if (!mounted) return;
+
+          try {
+            if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+              await loadUser();
+              // Notificar a otras pestañas
+              multiTabSync.emit('auth_state_changed', { event: 'SIGNED_IN', userId: session?.user?.id });
+            } else if (event === 'SIGNED_OUT') {
+              setUser(null);
+              setLoading(false);
+              // Notificar a otras pestañas
+              multiTabSync.emit('auth_state_changed', { event: 'SIGNED_OUT' });
+            } else if (event === 'USER_UPDATED') {
+              // Sincronizar cuando el usuario se actualiza en otra pestaña
+              await loadUser();
+            }
+          } catch (err) {
+            console.error('Error en onAuthStateChange:', err);
+            // No propagar el error para evitar que rompa otras pestañas
+          }
+        }
+      );
+
+      subscription = data.subscription;
+
+      // Escuchar cambios de otras pestañas usando multiTabSync
+      const unsubscribeMultiTab = multiTabSync.on('auth_state_changed', async (data) => {
+        if (!mounted) return;
+        
+        try {
+          if (data.event === 'SIGNED_OUT') {
+            setUser(null);
+            setLoading(false);
+          } else if (data.event === 'SIGNED_IN') {
+            // Solo recargar si es el mismo usuario
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session?.user?.id === data.userId) {
+              await loadUser();
+            }
+          }
+        } catch (err) {
+          console.warn('Error handling multi-tab auth sync:', err);
+        }
+      });
+
+      return () => {
+        mounted = false;
+        try {
+          if (subscription) {
+            subscription.unsubscribe();
+          }
+          if (unsubscribeMultiTab) {
+            unsubscribeMultiTab();
+          }
+        } catch (err) {
+          console.warn('Error cleaning up auth listeners:', err);
+        }
+      };
+    } catch (err) {
+      console.error('Error setting up auth listener:', err);
+      return () => {
+        mounted = false;
+        if (subscription) {
+          subscription.unsubscribe();
+        }
+      };
+    }
   }, [loadUser]);
 
   // Función para cerrar sesión

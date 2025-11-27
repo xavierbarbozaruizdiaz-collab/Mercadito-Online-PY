@@ -56,11 +56,22 @@ export async function getSetting(key: string, defaultValue: any = null): Promise
  * Actualiza una configuración
  */
 export async function updateSetting(key: string, value: any, adminId: string): Promise<void> {
+  // Para JSONB, los strings deben guardarse como JSON strings (con comillas)
+  // Los números, arrays y objetos se guardan directamente
+  let jsonbValue: any;
+  if (typeof value === 'string') {
+    // Guardar como JSON string (con comillas)
+    jsonbValue = JSON.stringify(value);
+  } else {
+    // Para otros tipos, guardar directamente (JSONB los maneja)
+    jsonbValue = value;
+  }
+
   // Using 'as any' to bypass Supabase strict type constraint for updates
   const { error } = await (supabase as any)
     .from('site_settings')
     .update({
-      value: typeof value === 'string' ? JSON.parse(`"${value}"`) : value,
+      value: jsonbValue,
       updated_by: adminId,
       updated_at: new Date().toISOString(),
     })
@@ -73,7 +84,7 @@ export async function updateSetting(key: string, value: any, adminId: string): P
       .from('site_settings')
       .insert({
         key,
-        value: typeof value === 'string' ? JSON.parse(`"${value}"`) : value,
+        value: jsonbValue,
       });
 
     if (insertError) {

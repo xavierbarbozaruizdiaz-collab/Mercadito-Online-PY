@@ -78,6 +78,23 @@ export interface SearchSuggestion {
   count?: number;
   category?: string;
   location?: string;
+  // Datos completos del producto (si type === 'product')
+  product?: {
+    id: string;
+    title: string;
+    price: number;
+    compare_price?: number;
+    image_url?: string;
+    condition: string;
+    sale_type: string;
+    store: {
+      name: string;
+      slug: string;
+    };
+    category?: {
+      name: string;
+    };
+  };
 }
 
 // ============================================
@@ -182,6 +199,8 @@ export class SearchService {
   }
 
   // Buscar tiendas
+  // NOTA: Las tiendas fallback (is_fallback_store = true) se incluyen normalmente
+  // si están activas. El flag is_fallback_store NO afecta la visibilidad de la tienda.
   static async searchStores(filters: SearchFilters): Promise<SearchResult<StoreSearchResult>> {
     try {
       let query = supabase
@@ -198,6 +217,8 @@ export class SearchService {
           created_at,
           updated_at
         `)
+        // IMPORTANTE: Solo filtrar por is_active, NO excluir tiendas fallback
+        // Las tiendas pausadas se filtran después de obtener los datos
         .eq('is_active', true);
 
       // Aplicar filtros
@@ -226,11 +247,16 @@ export class SearchService {
 
       if (error) throw error;
 
-      const total = count || 0;
+      // Filtrar tiendas pausadas (settings.is_paused = true)
+      const filteredData = (data || []).filter((store: any) => {
+        return !store.settings?.is_paused;
+      });
+
+      const total = filteredData.length;
       const totalPages = Math.ceil(total / limit);
 
       return {
-        data: data || [],
+        data: filteredData,
         pagination: {
           page,
           limit,
@@ -249,15 +275,42 @@ export class SearchService {
     try {
       if (query.length < 2) return [];
 
-      // Buscar productos que coincidan
+      // Buscar productos que coincidan (con mismos criterios que searchProducts)
       const { data: products, error: productsError } = await supabase
         .from('products')
-        .select('title, category:categories(name)')
+        .select(`
+          id,
+          title,
+          price,
+          compare_price,
+          condition,
+          sale_type,
+          cover_url,
+          category:categories(
+            id,
+            name
+          ),
+          store:stores(
+            id,
+            name,
+            slug,
+            is_active
+          )
+        `)
         .ilike('title', `%${query}%`)
-        .eq('status', 'active')
-        .limit(5);
+        .or('status.is.null,status.eq.active')
+        .limit(8);
+      
+      // Filtrar productos con tienda activa en el cliente (más flexible que !inner)
+      const filteredProducts = products?.filter((p: any) => {
+        if (!p.store || !p.store.is_active) return false;
+        return true;
+      }) || [];
 
-      if (productsError) throw productsError;
+      if (productsError) {
+        console.error('Error loading product suggestions:', productsError);
+        // Continuar sin productos si hay error
+      }
 
       // Buscar categorías que coincidan
       const { data: categories, error: categoriesError } = await supabase
@@ -281,13 +334,29 @@ export class SearchService {
 
       const suggestions: SearchSuggestion[] = [];
 
-      // Agregar productos
-      products?.forEach((product, index) => {
+      // Agregar productos con datos completos
+      filteredProducts.forEach((product: any) => {
         suggestions.push({
-          id: `product-${index}`,
-          text: (product as any).title,
+          id: product.id || `product-${product.title}`,
+          text: product.title,
           type: 'product',
-          category: (product as any).category?.name,
+          category: product.category?.name,
+          product: {
+            id: product.id,
+            title: product.title,
+            price: product.price,
+            compare_price: product.compare_price,
+            image_url: product.cover_url,
+            condition: product.condition,
+            sale_type: product.sale_type,
+            store: {
+              name: product.store?.name || 'Tienda',
+              slug: product.store?.slug || '',
+            },
+            category: product.category ? {
+              name: product.category.name,
+            } : undefined,
+          },
         });
       });
 

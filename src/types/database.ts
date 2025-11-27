@@ -59,6 +59,56 @@ export interface Database {
           updated_at?: string;
         };
       };
+      sourcing_orders: {
+        Row: {
+          id: string;
+          user_id: string;
+          assigned_store_id: string;
+          raw_query: string;
+          normalized: Record<string, any>;
+          status: string;
+          source: string;
+          channel: string | null;
+          language: string;
+          agent_source: string | null;
+          agent_session_id: string | null;
+          agent_metadata: Record<string, any>;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          assigned_store_id: string;
+          raw_query: string;
+          normalized?: Record<string, any>;
+          status?: string;
+          source?: string;
+          channel?: string | null;
+          language?: string;
+          agent_source?: string | null;
+          agent_session_id?: string | null;
+          agent_metadata?: Record<string, any>;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          assigned_store_id?: string;
+          raw_query?: string;
+          normalized?: Record<string, any>;
+          status?: string;
+          source?: string;
+          channel?: string | null;
+          language?: string;
+          agent_source?: string | null;
+          agent_session_id?: string | null;
+          agent_metadata?: Record<string, any>;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
       stores: {
         Row: {
           id: string;
@@ -74,6 +124,7 @@ export interface Database {
           social_links: Record<string, string> | null;
           settings: Record<string, any>;
           is_active: boolean;
+          is_fallback_store: boolean;
           fb_pixel_id?: string | null;
           ga_measurement_id?: string | null;
           gtm_id?: string | null;
@@ -94,6 +145,7 @@ export interface Database {
           social_links?: Record<string, string> | null;
           settings?: Record<string, any>;
           is_active?: boolean;
+          is_fallback_store?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -111,6 +163,7 @@ export interface Database {
           social_links?: Record<string, string> | null;
           settings?: Record<string, any>;
           is_active?: boolean;
+          is_fallback_store?: boolean;
           fb_pixel_id?: string | null;
           ga_measurement_id?: string | null;
           gtm_id?: string | null;

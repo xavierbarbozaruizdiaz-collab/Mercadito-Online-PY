@@ -86,5 +86,3 @@ export async function forceSync(): Promise<number> {
   return await getServerTime();
 }
 
-// Exportaciones explícitas para asegurar compatibilidad con el build de Vercel
-export type { };

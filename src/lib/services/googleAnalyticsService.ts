@@ -1,3 +1,13 @@
+/**
+ * @deprecated Este servicio está deprecado.
+ * NO uses gtag() directamente. GTM es la única fuente de verdad.
+ * 
+ * Para tracking de eventos, usa track() de @/lib/tracking/dataLayer.
+ * 
+ * Este archivo se mantiene temporalmente para compatibilidad,
+ * pero será removido en futuras versiones.
+ */
+
 // ============================================
 // GOOGLE ANALYTICS 4 SERVICE
 // Implementación completa de GA4

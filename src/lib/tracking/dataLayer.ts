@@ -199,29 +199,6 @@ export function trackLose(
   });
 }
 
-/**
- * Trackea compra completada
- */
-export function trackPurchase(
-  orderId: string,
-  total: number,
-  items?: Array<{
-    item_id: string;
-    item_name: string;
-    price: number;
-    quantity: number;
-    category?: string;
-  }>,
-  extra: Record<string, any> = {}
-): void {
-  track('purchase', {
-    transaction_id: orderId,
-    value: total,
-    currency: 'PYG',
-    items: items || [],
-    ...extra,
-  });
-}
 
 /**
  * Trackea activación de membresía
@@ -248,6 +225,167 @@ export function trackMembershipActivated(
     ...extra,
   });
 }
+
+// ============================================
+// HELPERS PARA E-COMMERCE (GA4)
+// Estos helpers envían eventos con formato GA4 ecommerce
+// ============================================
+
+/**
+ * Trackea vista de producto (view_item) - Formato GA4 ecommerce
+ */
+export function trackViewItem(item: {
+  item_id: string;
+  item_name: string;
+  price?: number;
+  quantity?: number;
+  item_category?: string;
+  item_brand?: string;
+  currency?: string;
+}): void {
+  // Usar track() pero con evento 'view_item' directamente en dataLayer
+  const dl = getDataLayer();
+  if (!dl) return;
+
+  dl.push({
+    event: 'view_item',
+    ecommerce: {
+      currency: item.currency || 'PYG',
+      value: item.price ?? 0,
+      items: [
+        {
+          item_id: item.item_id,
+          item_name: item.item_name,
+          price: item.price ?? 0,
+          quantity: item.quantity ?? 1,
+          item_category: item.item_category,
+          item_brand: item.item_brand,
+        },
+      ],
+    },
+  });
+
+  if (process.env.NEXT_PUBLIC_TRACKING_DEBUG === 'true') {
+    console.log('[TRACK] view_item', item);
+  }
+}
+
+/**
+ * Trackea agregar al carrito (add_to_cart) - Formato GA4 ecommerce
+ */
+export function trackAddToCart(item: {
+  item_id: string;
+  item_name: string;
+  price: number;
+  quantity?: number;
+  item_category?: string;
+  item_brand?: string;
+  currency?: string;
+}): void {
+  const dl = getDataLayer();
+  if (!dl) return;
+
+  dl.push({
+    event: 'add_to_cart',
+    ecommerce: {
+      currency: item.currency || 'PYG',
+      value: (item.price ?? 0) * (item.quantity ?? 1),
+      items: [
+        {
+          item_id: item.item_id,
+          item_name: item.item_name,
+          price: item.price,
+          quantity: item.quantity ?? 1,
+          item_category: item.item_category,
+          item_brand: item.item_brand,
+        },
+      ],
+    },
+  });
+
+  if (process.env.NEXT_PUBLIC_TRACKING_DEBUG === 'true') {
+    console.log('[TRACK] add_to_cart', item);
+  }
+}
+
+/**
+ * Trackea inicio de checkout (begin_checkout) - Formato GA4 ecommerce
+ */
+export function trackBeginCheckout(items: Array<{
+  item_id: string;
+  item_name: string;
+  price: number;
+  quantity: number;
+  item_category?: string;
+  item_brand?: string;
+}>, total: number, currency?: string): void {
+  const dl = getDataLayer();
+  if (!dl) return;
+
+  dl.push({
+    event: 'begin_checkout',
+    ecommerce: {
+      currency: currency || 'PYG',
+      value: total,
+      items: items.map(item => ({
+        item_id: item.item_id,
+        item_name: item.item_name,
+        price: item.price,
+        quantity: item.quantity,
+        item_category: item.item_category,
+        item_brand: item.item_brand,
+      })),
+    },
+  });
+
+  if (process.env.NEXT_PUBLIC_TRACKING_DEBUG === 'true') {
+    console.log('[TRACK] begin_checkout', { items, total, currency });
+  }
+}
+
+/**
+ * Trackea compra completada (purchase) - Formato GA4 ecommerce
+ * NOTA: Sobrescribe la función anterior con el formato correcto
+ */
+export function trackPurchase(orderId: string, items: Array<{
+  item_id: string;
+  item_name: string;
+  price: number;
+  quantity: number;
+  item_category?: string;
+  item_brand?: string;
+}>, total: number, currency?: string): void {
+  const dl = getDataLayer();
+  if (!dl) return;
+
+  dl.push({
+    event: 'purchase',
+    ecommerce: {
+      transaction_id: orderId,
+      currency: currency || 'PYG',
+      value: total,
+      items: items.map(item => ({
+        item_id: item.item_id,
+        item_name: item.item_name,
+        price: item.price,
+        quantity: item.quantity,
+        item_category: item.item_category,
+        item_brand: item.item_brand,
+      })),
+    },
+  });
+
+  if (process.env.NEXT_PUBLIC_TRACKING_DEBUG === 'true') {
+    console.log('[TRACK] purchase', { orderId, items, total, currency });
+  }
+}
+
+
+
+
+
+
+
 
 
 

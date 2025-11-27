@@ -1,0 +1,1742 @@
+================================================================================
+LPMS – RECOLECCIÓN DE DATOS PARA ASISTENTE MERCADITO ONLINE PY
+INFORMACIÓN COMPLETA DEL SISTEMA (SOLO TEXTO - NO CÓDIGO)
+================================================================================
+
+Fecha de generación: 2024
+Base: Análisis completo del código fuente del proyecto
+
+================================================================================
+1. GENERAL SITE INFO
+================================================================================
+
+NOMBRE OFICIAL DEL SITIO:
+Mercadito Online PY
+
+NOMBRES ALTERNATIVOS:
+- Mercadito PY (nombre corto)
+- Mercadito Online PY - Marketplace de Paraguay
+
+DOMINIOS:
+- Dominio de producción: https://mercaditonlinepy.com
+- Dominio Vercel: https://mercadito-online-py.vercel.app (usado como fallback)
+- Dominio de desarrollo: http://localhost:3000
+
+DESCRIPCIÓN CORTA:
+Tu marketplace de confianza en Paraguay
+
+DESCRIPCIÓN LARGA:
+El mejor marketplace de Paraguay. Compra y vende productos nuevos y usados de forma segura. Encuentra las mejores ofertas en tecnología, hogar, deportes y más.
+
+BRANDING Y TEXTOS DE MARCA:
+- Eslogan: "Tu marketplace de confianza en Paraguay"
+- Idioma: Español (Paraguay) - es-PY
+- Moneda: Guaraníes paraguayos (PYG)
+- País objetivo: Paraguay (PY)
+
+CONFIGURACIONES GLOBALES:
+- Framework: Next.js 16 con App Router
+- Base de datos: Supabase (PostgreSQL)
+- Autenticación: Supabase Auth
+- Almacenamiento: Supabase Storage
+- Tiempo real: Supabase Realtime
+- Hosting recomendado: Vercel
+- Tipo de aplicación: Progressive Web App (PWA)
+- Theme color: #3b82f6 (azul)
+- Background color: #ffffff (blanco)
+
+METADATOS SEO:
+- Title template: "%s | Mercadito Online PY"
+- Default title: "Mercadito Online PY - Marketplace de Paraguay"
+- Default description: "El mejor marketplace de Paraguay. Compra y vende productos nuevos y usados de forma segura."
+- Keywords principales: marketplace, Paraguay, comprar, vender, productos, usados, nuevos, tecnología, hogar, deportes, automóviles, ropa, accesorios
+- Open Graph locale: es_PY
+- Twitter card: summary_large_image
+- Autor: Mercadito Online PY
+
+REDES SOCIALES:
+- Twitter: @mercaditopy
+- Facebook: Configurado para Meta
+- Instagram: Configurado
+- LinkedIn: Configurado
+
+================================================================================
+2. BUYER_FEATURES
+================================================================================
+
+FUNCIONALIDADES DEL COMPRADOR:
+
+1. NAVEGACIÓN Y BÚSQUEDA:
+- Buscar productos por título o descripción
+- Filtrar por categoría
+- Filtrar por rango de precio (min/max)
+- Filtrar por condición (nuevo, usado, usado como nuevo)
+- Filtrar por tipo de venta (directo, subasta, negociable)
+- Filtrar por ubicación
+- Filtrar por tags
+- Ordenar resultados por: fecha de creación, precio, relevancia
+- Ver productos destacados
+- Ver productos recientes
+- Ver sugerencias de búsqueda
+- Trending products
+
+2. VISUALIZACIÓN DE PRODUCTOS:
+- Ver detalles completos del producto
+- Ver múltiples imágenes del producto
+- Ver información del vendedor/tienda
+- Ver calificación y reseñas del vendedor
+- Ver ubicación del vendedor
+- Ver productos relacionados
+- Ver historial de precios (si está disponible)
+
+3. GESTIÓN DE CARRITO:
+- Agregar productos al carrito
+- Ver carrito con productos
+- Actualizar cantidades
+- Eliminar productos del carrito
+- Ver totales y comisiones aplicadas
+- Verificar disponibilidad de stock
+- No puede agregar sus propios productos al carrito
+
+4. CHECKOUT Y COMPRA:
+- Proceso de checkout
+- Seleccionar dirección de envío
+- Ver resumen de la orden
+- Ver cálculo de comisiones (para productos directos)
+- Ver total a pagar
+- Seleccionar método de pago:
+  * Stripe
+  * PayPal
+  * Pagopar (método local de Paraguay)
+  * Pago contra entrega
+  * Transferencia bancaria
+  * Criptomonedas (opcional)
+- Confirmar orden
+- Recibir confirmación de compra
+
+5. ÓRDENES:
+- Ver historial de órdenes
+- Ver detalles de cada orden
+- Ver estado de la orden: pending, pending_payment, paid, processing, shipped, delivered, cancelled, failed
+- Rastrear envío (si aplica)
+- Ver facturas/comprobantes
+- Cancelar orden (si está permitido)
+- Solicitar reembolso (si aplica)
+
+6. SUBASTAS:
+- Ver subastas activas
+- Ver subastas programadas
+- Ver tiempo restante
+- Ver puja actual
+- Ver historial de pujas
+- Pujar en subastas (requiere membresía activa)
+- Ver límite de puja según membresía
+- Compra inmediata (Buy Now) si está disponible
+- Verificar estado de la subasta en tiempo real
+- Recibir notificaciones de pujas superadas
+- Ver mis pujas
+
+7. COMUNICACIÓN:
+- Chatear con vendedores
+- Mensajería en tiempo real
+- Notificaciones push (si está habilitado)
+- Notificaciones por email
+- Notificaciones por WhatsApp (si está configurado)
+
+8. PERFIL Y PREFERENCIAS:
+- Ver perfil personal
+- Editar información personal
+- Agregar direcciones de envío
+- Ver favoritos
+- Ver wishlist
+- Ver historial de búsquedas
+- Configurar preferencias de notificaciones
+- Cambiar contraseña
+
+9. RESEÑAS Y VALORACIONES:
+- Dejar reseñas después de comprar
+- Calificar productos
+- Calificar vendedores/tiendas
+- Ver reseñas de otros compradores
+
+10. MEMBRESÍAS (PARA PUJAS):
+- Ver planes de membresía disponibles
+- Ver beneficios de cada plan
+- Suscribirse a membresía (Bronce, Plata, Oro)
+- Ver estado de membresía
+- Renovar membresía
+- Ver límites de puja según membresía
+
+================================================================================
+3. SELLER_FEATURES
+================================================================================
+
+FUNCIONALIDADES DEL VENDEDOR:
+
+1. GESTIÓN DE PRODUCTOS:
+- Crear productos nuevos
+- Editar productos existentes
+- Eliminar productos (soft delete)
+- Duplicar productos
+- Actualizar stock
+- Activar/desactivar productos (pausar)
+- Archivar productos
+- Marcar productos como destacados (si está permitido)
+- Gestionar variantes de productos
+- Subir múltiples imágenes por producto
+- Reordenar imágenes
+- Establecer imagen de portada
+- Agregar descripciones SEO
+- Establecer SKU y código de barras
+- Gestionar peso y dimensiones
+- Agregar tags
+
+2. LÍMITES DE PUBLICACIÓN (SEGÚN MEMBRESÍA):
+- Usuarios sin membresía (free): No pueden publicar
+- Plan Bronce: Hasta 5 productos activos, precio máximo 2.5M Gs
+- Plan Plata: Hasta 10 productos activos, precio máximo 10M Gs
+- Plan Oro: Productos ilimitados, precio ilimitado
+- Dueños de tienda: Sin límites de productos ni precio
+- El sistema valida límites antes de permitir publicación
+- El sistema sugiere upgrade si se excede el límite
+
+3. TIPOS DE VENTA:
+- Venta directa (fixed): Precio fijo con comisión incluida en el precio mostrado
+- Subasta (auction): Producto en subasta con fecha de inicio y fin
+- Negociable (negotiable): Precio a negociar
+
+4. COMISIONES:
+- Para productos directos: La comisión se calcula y se incluye en el precio mostrado
+- Precio base: Lo que el vendedor recibe
+- Precio mostrado: Precio base + comisión
+- Comisión por defecto: 10% (configurable por admin)
+- Para subastas: Comisión del vendedor se calcula al finalizar (por defecto 5%)
+
+5. TIENDAS:
+- Crear tienda (se puede crear automáticamente al publicar primer producto)
+- Editar información de la tienda
+- Configurar logo y banner
+- Agregar descripción
+- Configurar ubicación
+- Agregar información de contacto
+- Configurar redes sociales
+- Ver estadísticas de la tienda
+- Gestión de productos de la tienda
+- Ver reseñas de la tienda
+- Tiendas activas no tienen límites de publicación
+
+6. DASHBOARD DEL VENDEDOR:
+- Ver estadísticas generales:
+  * Total de productos
+  * Productos activos
+  * Total de órdenes
+  * Órdenes pendientes
+  * Ingresos totales
+  * Ingresos mensuales
+  * Total de clientes
+- Ver productos:
+  * Todos los productos
+  * Productos activos
+  * Productos pausados
+  * Subastas activas
+  * Subastas finalizadas
+- Gestión rápida:
+  * Editar producto
+  * Pausar producto
+  * Activar producto
+  * Eliminar producto
+  * Ver producto públicamente
+- Ver órdenes:
+  * Todas las órdenes
+  * Órdenes pendientes
+  * Órdenes procesando
+  * Órdenes enviadas
+  * Órdenes completadas
+- Ver subastas:
+  * Subastas activas
+  * Subastas programadas
+  * Subastas finalizadas
+  * Subastas con ganador
+  * Ingresos por subastas
+- Ver analytics:
+  * Vistas de productos
+  * Conversión
+  * Productos más vendidos
+  * Tendencias
+- Alertas y notificaciones:
+  * Órdenes nuevas
+  * Mensajes nuevos
+  * Stock bajo
+  * Subastas finalizando
+
+7. GESTIÓN DE INVENTARIO:
+- Ver stock disponible
+- Actualizar cantidades
+- Habilitar/deshabilitar gestión de stock
+- Establecer umbral de stock bajo
+- Ver movimientos de inventario
+- Historial de cambios de stock
+
+8. ÓRDENES:
+- Ver todas las órdenes recibidas
+- Ver detalles de cada orden
+- Procesar órdenes
+- Marcar como enviado
+- Agregar número de seguimiento
+- Actualizar estado de envío
+- Ver información del comprador
+- Ver direcciones de envío
+- Confirmar recepción de pago
+- Generar facturas/comprobantes
+
+9. SUBASTAS:
+- Crear subastas
+- Configurar precio inicial
+- Configurar precio de reserva (opcional)
+- Configurar precio de compra inmediata (opcional)
+- Configurar fecha y hora de inicio
+- Configurar fecha y hora de fin
+- Configurar incremento mínimo de puja
+- Ver pujas recibidas
+- Ver historial de pujas
+- Ver ganador de la subasta
+- Confirmar venta al ganador
+- Cancelar subasta (si es necesario)
+
+10. COMUNICACIÓN:
+- Recibir mensajes de compradores
+- Responder mensajes
+- Mensajería en tiempo real
+- Notificaciones de nuevos mensajes
+- Notificaciones de preguntas sobre productos
+
+11. CATÁLOGOS DE ANUNCIOS:
+- Crear catálogos de publicidad para la tienda
+- Configurar múltiples catálogos (default, ofertas, nuevos, etc.)
+- Agregar productos a catálogos manualmente
+- Configurar filtros automáticos para catálogos
+- Ver URL del feed JSON del catálogo
+- Usar feeds para publicidad en Meta, TikTok, Google Shopping
+
+12. ESTADÍSTICAS Y ANALYTICS:
+- Ver vistas de productos
+- Ver conversiones
+- Ver productos más populares
+- Ver ingresos por período
+- Ver comparativas mensuales
+- Ver tendencias
+
+13. BALANCE Y PAGOS:
+- Ver balance pendiente (en escolta)
+- Ver balance disponible (listo para retiro)
+- Ver historial de ganancias
+- Ver comisiones pagadas
+- Solicitar retiro de fondos
+- Ver historial de retiros
+
+14. PERFIL:
+- Editar información personal
+- Agregar foto de perfil
+- Configurar biografía
+- Ver calificación como vendedor
+- Ver número de ventas
+- Ver número de reseñas
+
+================================================================================
+4. PRODUCT_FLOW
+================================================================================
+
+FLUJO DE PUBLICACIÓN DE PRODUCTOS:
+
+1. VALIDACIONES PREVIAS:
+- Usuario debe estar autenticado
+- Usuario debe tener membresía activa (Bronce, Plata, Oro) o ser dueño de tienda
+- Si no tiene membresía activa, no puede publicar
+- Si tiene membresía, verifica límites:
+  * Número máximo de productos activos
+  * Precio máximo permitido
+- Si es dueño de tienda, no hay límites
+- Rate limiting: Limita frecuencia de creación de productos
+
+2. VERIFICACIÓN DE TIENDA:
+- Si el usuario no tiene tienda, se crea automáticamente:
+  * Nombre: "Tienda de [nombre de usuario]"
+  * Slug: Generado automáticamente
+  * Descripción: "Tienda creada automáticamente"
+- Si tiene tienda, se usa la existente
+
+3. DATOS DEL PRODUCTO:
+- Título (requerido)
+- Descripción
+- Precio (requerido)
+- Precio de comparación (opcional)
+- Categoría (requerido)
+- Condición: nuevo, usado, usado como nuevo, reacondicionado
+- Tipo de venta: fixed, auction, negotiable
+- SKU (opcional)
+- Código de barras (opcional)
+- Peso (opcional)
+- Dimensiones (opcional)
+- Tags (array)
+- Título SEO (opcional)
+- Descripción SEO (opcional)
+
+4. CÁLCULO DE PRECIO Y COMISIÓN (Solo para productos directos - fixed):
+- Se obtiene el porcentaje de comisión:
+  * Prioridad 1: Comisión específica del vendedor
+  * Prioridad 2: Comisión de la tienda
+  * Prioridad 3: Comisión global (por defecto 10%)
+- Se calcula precio mostrado: precio base / (1 - comisión/100)
+- Se guarda precio base (lo que recibe el vendedor)
+- Se guarda porcentaje de comisión aplicado
+- El precio mostrado incluye la comisión
+
+5. STOCK:
+- Cantidad de stock (opcional, puede ser NULL para ilimitado)
+- Gestión de stock habilitada/deshabilitada
+- Umbral de stock bajo (por defecto 5)
+
+6. IMÁGENES:
+- Se pueden subir múltiples imágenes
+- Primera imagen es la imagen de portada
+- Las imágenes se almacenan en Supabase Storage
+- Se genera thumbnail para cada imagen
+- Se mantiene orden de las imágenes
+- Formato permitido: imágenes estándar
+- Tamaño máximo: 5MB por imagen
+
+7. VARIANTES (Opcional):
+- Puede tener variantes (talla, color, etc.)
+- Cada variante tiene su propio precio y stock
+- Variante por defecto
+
+8. ESTADOS DEL PRODUCTO:
+- active: Producto activo y visible
+- paused: Producto pausado (no visible)
+- archived: Producto archivado
+- sold: Producto vendido
+- deleted: Producto eliminado
+
+9. FLUJO DE EDICIÓN:
+- Solo el vendedor puede editar sus productos
+- Si se actualiza el precio, se validan límites nuevamente
+- Si se cambia el precio, se recalcula comisión (productos directos)
+- Se puede actualizar stock
+- Se pueden agregar/quitar imágenes
+- Se puede cambiar estado
+
+10. FLUJO DE ELIMINACIÓN:
+- Soft delete: Se marca como deleted
+- No se elimina físicamente de la base de datos
+- Las órdenes relacionadas se mantienen
+
+11. VALIDACIONES IMPORTANTES:
+- Precio debe ser mayor a 0
+- Stock debe ser positivo (si se especifica)
+- Título y descripción no pueden estar vacíos
+- Categoría debe existir
+- Imágenes deben ser válidas
+- No puede duplicar exactamente el mismo producto
+
+12. CACHE Y OPTIMIZACIÓN:
+- Los productos se cachean por 5 minutos (individuales)
+- Los listados se cachean por 2 minutos
+- Se invalida cache al actualizar/eliminar producto
+- Se usa Redis para cache distribuido (si está disponible)
+
+13. PRODUCTOS DESTACADOS:
+- Los admin pueden marcar productos como destacados
+- Los productos destacados aparecen en secciones especiales
+- Se puede activar/desactivar is_featured
+
+14. TRACKING Y ANALYTICS:
+- Se registra cada vista del producto
+- Se trackea conversión
+- Se registra tiempo en página
+- Se guarda información para analytics
+
+================================================================================
+5. AUCTION_FLOW
+================================================================================
+
+FLUJO DE SUBASTAS:
+
+1. CREACIÓN DE SUBASTA:
+- El producto debe tener sale_type = 'auction'
+- Se configura precio inicial (starting_price)
+- Se configura precio de reserva (reserve_price) - opcional
+- Se configura precio de compra inmediata (buy_now_price) - opcional
+- Se configura fecha y hora de inicio (auction_start_at)
+- Se configura fecha y hora de fin (auction_end_at)
+- Se configura incremento mínimo de puja (min_bid_increment)
+- Estado inicial: 'scheduled' (programada)
+
+2. ESTADOS DE SUBASTA:
+- scheduled: Programada (aún no inició)
+- active: Activa (acepta pujas)
+- ended: Finalizada
+- cancelled: Cancelada
+
+3. TRANSICIÓN DE ESTADOS:
+- scheduled → active: Cuando llega la fecha de inicio (o dentro de 2 minutos de tolerancia)
+- active → ended: Cuando llega la fecha de fin
+- Cualquier estado → cancelled: Si el vendedor cancela
+
+4. PUJAS:
+- Requisitos para pujar:
+  * Usuario debe estar autenticado
+  * Usuario debe tener membresía activa (Bronce, Plata, Oro)
+  * La subasta debe estar en estado 'active'
+  * La fecha de fin no debe haber pasado
+  * No puede ser el vendedor del producto
+- Validaciones de puja:
+  * La puja debe ser mayor que la puja actual
+  * Debe cumplir el incremento mínimo
+  * Debe estar dentro del límite de puja del usuario según su membresía
+- Límites de puja por membresía:
+  * Bronce: Hasta 2.5M Gs
+  * Plata: Hasta 10M Gs
+  * Oro: Ilimitado
+  * Free: No puede pujar
+- Sistema anti-sniping:
+  * Bonus time: Si alguien puja en los últimos minutos, se extiende el tiempo
+  * Extensión: Se agrega tiempo adicional (configurable, típicamente 2-5 minutos)
+  * Límites: Máximo de extensiones por subasta para evitar abuso
+- Locks distribuidos:
+  * Se usa Redis para locks distribuidos
+  * Previene condiciones de carrera
+  * Asegura que solo una puja se procese a la vez
+- Rate limiting:
+  * Limita frecuencia de pujas por usuario
+  * Previene spam de pujas
+- Idempotencia:
+  * Cada puja tiene un idempotency key
+  * Previene pujas duplicadas
+
+5. HISTORIAL DE PUJAS:
+- Se registra cada puja con:
+  * ID de la puja
+  * ID del producto
+  * ID del postor
+  * Monto de la puja
+  * Fecha y hora de la puja
+  * Si es auto-bid (futuro)
+  * Si fue retractada
+- Se muestran las últimas pujas (configurable, típicamente 20)
+- Se ordena por monto descendente y luego por fecha
+
+6. GANADOR:
+- Se determina cuando la subasta finaliza (auction_status = 'ended')
+- Es el postor con la puja más alta al momento de finalizar
+- Se guarda winner_id en el producto
+- Si hay precio de reserva y la puja más alta no lo alcanza, puede no haber ganador
+
+7. COMPRA INMEDIATA (BUY NOW):
+- Si está configurado buy_now_price
+- Cualquier usuario puede comprar inmediatamente a ese precio
+- Termina la subasta inmediatamente
+- Crea la orden automáticamente
+
+8. FINALIZACIÓN DE SUBASTA:
+- Cuando termina automáticamente (por fecha de fin):
+  * Se actualiza estado a 'ended'
+  * Se determina ganador
+  * Se calcula comisiones:
+    - Comisión del comprador (por defecto 3% del precio final)
+    - Comisión del vendedor (por defecto 5% del precio final)
+  * Se crea orden con estado 'pending_payment'
+  * Se notifica al ganador
+  * Se notifica al vendedor
+- Cuando se cancela:
+  * Se actualiza estado a 'cancelled'
+  * Se notifica a los postores
+  * No se crea orden
+
+9. CREACIÓN DE ORDEN:
+- Se crea orden con:
+  * buyer_id: ID del ganador
+  * seller_id: ID del vendedor
+  * product_id: ID del producto
+  * quantity: 1
+  * unit_price: Precio final de la subasta
+  * total_amount: Precio final + comisión del comprador
+  * status: 'pending_payment'
+- Se calculan comisiones:
+  * buyer_commission_amount: Monto de comisión del comprador
+  * buyer_total_paid: Total que paga el comprador
+  * seller_commission_amount: Monto de comisión del vendedor
+  * seller_earnings: Lo que recibe el vendedor
+- Se crea registro en platform_fees
+
+10. SEGURIDAD:
+- Validación de tiempo del servidor (previene manipulación de tiempo del cliente)
+- Versión de subasta (optimistic locking)
+- Validación de estado antes de cada puja
+- Validación de límites de membresía
+- Sistema de reputación de usuarios (para prevenir postores remisos)
+
+11. SISTEMA ANTI-POSTORES REMISOS:
+- Se registra reputación de usuarios
+- Se penaliza a usuarios que ganan subastas pero no pagan
+- Se pueden aplicar restricciones a usuarios con mala reputación
+- Se trackea historial de pagos de subastas
+
+12. NOTIFICACIONES:
+- Notificación cuando alguien supera tu puja
+- Notificación cuando ganas una subasta
+- Notificación cuando una subasta está por finalizar
+- Notificación cuando se extiende el tiempo (bonus time)
+
+13. VISUALIZACIÓN EN TIEMPO REAL:
+- Se puede ver actualización de pujas en tiempo real
+- Se muestra tiempo restante en tiempo real
+- Se actualiza puja actual automáticamente
+- Se usa Supabase Realtime para actualizaciones
+
+14. CACHE Y OPTIMIZACIÓN:
+- Datos estáticos de subasta se cachean (título, descripción, imágenes)
+- Datos dinámicos (puja actual, tiempo restante) no se cachean
+- Se usa Redis para cache distribuido
+
+================================================================================
+6. STORE_FLOW
+================================================================================
+
+FLUJO DE TIENDAS:
+
+1. CREACIÓN DE TIENDA:
+- Se puede crear manualmente o automáticamente:
+  * Manual: El vendedor crea la tienda desde el panel
+  * Automático: Se crea cuando publica su primer producto sin tener tienda
+- Información requerida:
+  * Nombre de la tienda
+  * Slug (identificador único, se genera automáticamente si no se proporciona)
+  * Descripción (opcional)
+- Información opcional:
+  * Logo
+  * Imagen de portada
+  * Ubicación
+  * Departamento
+  * Ciudad
+  * Teléfono de contacto
+  * Email de contacto
+  * Website
+  * Redes sociales (Facebook, Instagram, Twitter, LinkedIn)
+
+2. VERIFICACIÓN DE SLUG:
+- El slug debe ser único
+- Se genera automáticamente desde el nombre si no se proporciona:
+  * Se convierte a minúsculas
+  * Se remueven acentos
+  * Se reemplazan espacios con guiones
+  * Se remueven caracteres especiales
+- Si el slug ya existe, se agrega un número (tienda-1, tienda-2, etc.)
+
+3. ESTADO DE LA TIENDA:
+- is_active: true/false (activa/inactiva)
+- is_verified: true/false (verificada por admin)
+- status: active, inactive, suspended (opcional)
+
+4. PERFIL DE LA TIENDA:
+- Rating: Calificación promedio (0-5 estrellas)
+- total_reviews: Número de reseñas
+- total_products: Número de productos
+- total_sales: Número de ventas
+- response_rate: Tasa de respuesta a mensajes
+
+5. BENEFICIOS DE TENER TIENDA:
+- Sin límites de productos (productos ilimitados)
+- Sin límite de precio
+- Página pública de la tienda (URL: /store/[slug])
+- Mejor visibilidad en búsquedas
+- Posibilidad de configurar múltiples catálogos de publicidad
+- Analytics de la tienda
+
+6. GESTIÓN DE PRODUCTOS EN TIENDA:
+- Todos los productos del vendedor se asocian a su tienda
+- Se pueden filtrar productos por tienda
+- Se pueden ver productos destacados de la tienda
+- Se pueden organizar productos en categorías
+
+7. CONFIGURACIÓN DE LA TIENDA:
+- Editar información básica
+- Cambiar logo y banner
+- Actualizar descripción
+- Configurar ubicación
+- Actualizar información de contacto
+- Agregar/modificar redes sociales
+- Configurar catálogos de publicidad
+
+8. CATÁLOGOS DE PUBLICIDAD:
+- Cada tienda puede tener múltiples catálogos
+- Tipos de catálogos: default, collection, promotional
+- Cada catálogo tiene un slug único dentro de la tienda
+- Los productos se pueden agregar manualmente o por filtros automáticos
+- Cada catálogo genera un feed JSON para publicidad
+- URL del feed: /feeds/store/[storeSlug]/[catalogSlug]
+
+9. VISUALIZACIÓN PÚBLICA:
+- Página pública: /store/[slug]
+- Muestra información de la tienda
+- Lista productos de la tienda
+- Muestra reseñas
+- Muestra estadísticas (rating, ventas, etc.)
+- SEO optimizado
+
+10. ESTADÍSTICAS DE LA TIENDA:
+- Total de productos activos
+- Total de ventas
+- Calificación promedio
+- Tasa de respuesta
+- Ingresos totales
+- Ingresos mensuales
+- Número de clientes
+
+11. RESEÑAS:
+- Los compradores pueden dejar reseñas sobre la tienda
+- Se muestran en la página pública
+- Se calcula rating promedio
+- Se pueden filtrar por rating
+
+12. RLS (Row Level Security):
+- Solo el vendedor puede editar su tienda
+- Los admins pueden ver/editar todas las tiendas
+- El público puede ver tiendas activas
+- Las tiendas inactivas no son visibles públicamente
+
+13. ELIMINACIÓN DE TIENDA:
+- Soft delete: Se marca is_active = false
+- Los productos asociados pueden archivarse
+- Las órdenes se mantienen para historial
+
+================================================================================
+7. MEMBERSHIP_INFO
+================================================================================
+
+SISTEMA DE MEMBRESÍAS:
+
+PLANES DISPONIBLES:
+
+1. PLAN FREE (Gratis):
+- Precio: Gratis
+- Límite de puja: No puede pujar
+- Límite de productos: 0 (no puede publicar)
+- Límite de precio: No aplica
+- Características:
+  * Puede navegar y buscar productos
+  * Puede comprar productos directos
+  * Puede agregar al carrito
+  * NO puede pujar en subastas
+  * NO puede publicar productos
+- Mensaje: "Necesitas una membresía para publicar productos"
+
+2. PLAN BRONCE:
+- Precio mensual: 20,000 Gs
+- Precio anual: 200,000 Gs (10 meses gratis)
+- Duración: 30 días (mensual) o 365 días (anual)
+- Límite de puja: 2.5M Gs (2,500,000 Gs)
+- Límite de productos: 5 productos activos
+- Límite de precio base: 2,500,000 Gs por producto
+- Características:
+  * Pujas hasta 2.5M Gs
+  * Hasta 5 productos activos
+  * Precio máximo por producto: 2.5M Gs
+  * Acceso a todas las subastas
+  * Soporte por email
+- Ideal para: Vendedores ocasionales
+
+3. PLAN PLATA:
+- Precio mensual: 50,000 Gs
+- Precio anual: 500,000 Gs (10 meses gratis)
+- Duración: 30 días (mensual) o 365 días (anual)
+- Límite de puja: 10M Gs (10,000,000 Gs)
+- Límite de productos: 10 productos activos
+- Límite de precio base: 10,000,000 Gs por producto
+- Características:
+  * Pujas hasta 10M Gs
+  * Hasta 10 productos activos
+  * Precio máximo por producto: 10M Gs
+  * Acceso a todas las subastas
+  * Soporte prioritario
+  * Notificaciones push
+- Ideal para: Vendedores regulares
+- Marca popular: Sí (recomendado)
+
+4. PLAN ORO:
+- Precio mensual: 100,000 Gs (o 300,000 según configuración)
+- Precio anual: 1,000,000 Gs (o 3,000,000 según configuración)
+- Duración: 30 días (mensual) o 365 días (anual)
+- Límite de puja: Ilimitado
+- Límite de productos: Ilimitado
+- Límite de precio base: Ilimitado
+- Características:
+  * Pujas ilimitadas
+  * Productos ilimitados
+  * Precio ilimitado
+  * Acceso a todas las subastas
+  * Soporte VIP 24/7
+  * Notificaciones push
+  * Acceso anticipado a subastas exclusivas
+- Ideal para: Vendedores profesionales y compradores frecuentes
+
+EXCEPCIÓN: DUEÑOS DE TIENDA:
+- Si un usuario tiene una tienda activa, NO tiene límites:
+  * Productos ilimitados
+  * Precio ilimitado
+  * No requiere membresía para publicar
+- Las tiendas pueden crearse automáticamente o manualmente
+
+SUSCRIPCIONES:
+
+1. TIPOS DE SUSCRIPCIÓN:
+- monthly: Renovación mensual automática
+- yearly: Renovación anual automática
+- one_time: Pago único sin renovación
+
+2. ACTIVACIÓN:
+- Se activa automáticamente tras pago exitoso
+- Se actualiza membership_level en el perfil
+- Se establece membership_expires_at
+- Se crea registro en membership_subscriptions
+- Se desactiva membresía anterior si existe
+
+3. EXPIRACIÓN:
+- Se verifica automáticamente por cron job
+- Al expirar, se marca como 'expired'
+- El usuario vuelve a nivel 'free'
+- Los productos pausados pueden reactivarse si renueva
+
+4. RENOVACIÓN:
+- Puede ser automática (monthly/yearly) o manual
+- Si es automática, se renueva en next_billing_date
+- El usuario puede cancelar la renovación automática
+- Puede renovar antes de expirar
+
+5. CANCELACIÓN:
+- El usuario puede cancelar la renovación automática
+- La membresía sigue activa hasta la fecha de expiración
+- No hay reembolso (a menos que admin lo autorice)
+
+VALIDACIONES:
+
+1. PARA PUBLICAR PRODUCTOS:
+- Debe tener membresía activa (Bronce, Plata, Oro) O ser dueño de tienda
+- La membresía no debe estar expirada
+- Debe cumplir límites de productos activos
+- Debe cumplir límite de precio
+
+2. PARA PUJAR EN SUBASTAS:
+- Debe tener membresía activa (Bronce, Plata, Oro)
+- La membresía no debe estar expirada
+- La puja debe estar dentro del límite según su plan
+
+MÉTODOS DE PAGO:
+- Stripe
+- PayPal
+- Transferencia bancaria
+- Pagopar (método local de Paraguay)
+
+FUNCIONES DEL SISTEMA:
+- get_user_bid_limit(): Obtiene límite de puja del usuario
+- get_user_publication_limits(): Obtiene límites de publicación
+- check_can_publish_product(): Verifica si puede publicar un producto específico
+- activate_membership_subscription(): Activa membresía tras pago
+- check_and_expire_memberships(): Expira membresías vencidas (cron)
+
+================================================================================
+8. FEES_AND_PAYMENTS
+================================================================================
+
+SISTEMA DE COMISIONES:
+
+COMISIONES PARA PRODUCTOS DIRECTOS (sale_type = 'fixed'):
+
+1. CÁLCULO:
+- Precio base: Lo que ingresa el vendedor (lo que quiere recibir)
+- Porcentaje de comisión: Se obtiene por prioridad:
+  * Prioridad 1: Comisión específica del vendedor (commission_settings con scope_type = 'seller')
+  * Prioridad 2: Comisión de la tienda (commission_settings con scope_type = 'store')
+  * Prioridad 3: Comisión global (commission_settings con scope_type = 'global')
+  * Default: 10% si no hay configuración
+- Precio mostrado: precio_base / (1 - comisión/100)
+- Ejemplo: Precio base 90,000 Gs, comisión 10% → Precio mostrado 100,000 Gs
+
+2. AL CREAR PRODUCTO:
+- Se guarda base_price: Precio que recibe el vendedor
+- Se guarda commission_percent_applied: Porcentaje aplicado
+- Se guarda price: Precio mostrado (con comisión incluida)
+
+3. AL VENDER:
+- El comprador paga el precio mostrado (incluye comisión)
+- Se crea registro en platform_fees:
+  * order_amount: Precio pagado por cliente
+  * base_amount: Precio base (lo que recibe vendedor)
+  * commission_amount: Diferencia (la comisión)
+  * commission_percent: Porcentaje aplicado
+
+COMISIONES PARA SUBASTAS:
+
+1. COMISIÓN DEL COMPRADOR:
+- Porcentaje por defecto: 3%
+- Se calcula sobre el precio final de la subasta
+- Se suma al precio final para calcular total a pagar
+- Ejemplo: Subasta finaliza en 100,000 Gs, comisión 3% → Comprador paga 103,000 Gs
+
+2. COMISIÓN DEL VENDEDOR:
+- Porcentaje por defecto: 5%
+- Se calcula sobre el precio final de la subasta
+- Se resta del precio final para calcular lo que recibe el vendedor
+- Ejemplo: Subasta finaliza en 100,000 Gs, comisión 5% → Vendedor recibe 95,000 Gs
+
+3. AL FINALIZAR SUBASTA:
+- Se calculan ambas comisiones
+- Se crea registro en platform_fees con:
+  * auction_final_price: Precio final
+  * buyer_commission_percent: 3% (o configurado)
+  * buyer_commission_amount: Monto de comisión comprador
+  * buyer_total_paid: Total que paga comprador
+  * seller_commission_percent: 5% (o configurado)
+  * seller_commission_amount: Monto de comisión vendedor
+  * seller_earnings: Lo que recibe vendedor
+
+CONFIGURACIÓN DE COMISIONES:
+
+1. ALCANCES (scope_type):
+- global: Comisión global (aplica a todos si no hay otra configuración)
+- store: Comisión específica de tienda
+- seller: Comisión específica de vendedor
+- category: Comisión por categoría (futuro)
+- auction_buyer: Comisión de comprador en subastas
+- auction_seller: Comisión de vendedor en subastas
+
+2. PRIORIDAD:
+- seller > store > global
+- La primera configuración encontrada se usa
+
+3. PERÍODOS DE VALIDEZ:
+- effective_from: Fecha desde cuando aplica
+- effective_until: Fecha hasta cuando aplica (NULL = indefinido)
+- is_active: Si está activa
+
+MÉTODOS DE PAGO:
+
+1. STRIPE:
+- Tarjetas de crédito/débito
+- Procesamiento internacional
+- Integración completa
+
+2. PAYPAL:
+- Cuenta PayPal
+- Procesamiento internacional
+- Integración completa
+
+3. PAGOPAR:
+- Método local de Paraguay
+- Múltiples formas de pago locales
+- Integración con API de Pagopar
+
+4. TRANSFERENCIA BANCARIA:
+- Transferencia directa
+- Requiere confirmación manual
+
+5. PAGO CONTRA ENTREGA:
+- Pago al recibir el producto
+- Solo disponible para envíos locales
+
+6. CRIPTOMONEDAS:
+- Bitcoin, Ethereum, USDT (opcional)
+- Integración futura
+
+ESTADOS DE PAGO:
+
+1. ESTADOS DE PAGO (payment_status):
+- pending: Pendiente
+- processing: Procesando
+- completed: Completado
+- failed: Fallido
+- refunded: Reembolsado
+
+2. ESTADOS DE ORDEN RELACIONADOS:
+- pending: Orden creada
+- pending_payment: Esperando pago
+- paid: Pagado
+- processing: Procesando
+- shipped: Enviado
+- delivered: Entregado
+- cancelled: Cancelado
+- failed: Fallido
+
+FLUJO DE PAGO:
+
+1. PARA PRODUCTOS DIRECTOS:
+- Usuario agrega al carrito
+- Va a checkout
+- Selecciona método de pago
+- Confirma orden
+- Se crea orden con status 'pending_payment'
+- Usuario completa pago
+- Si pago exitoso:
+  * Orden pasa a 'paid'
+  * Se crea platform_fee
+  * Se reduce stock
+  * Se notifica al vendedor
+- Si pago falla:
+  * Orden queda en 'pending_payment'
+  * Usuario puede reintentar
+
+2. PARA SUBASTAS:
+- Subasta finaliza
+- Se determina ganador
+- Se crea orden con status 'pending_payment'
+- Se calculan comisiones
+- Se notifica al ganador
+- Ganador completa pago
+- Si pago exitoso:
+  * Orden pasa a 'paid'
+  * Se crea platform_fee con comisiones
+  * Se notifica al vendedor
+  * Se puede enviar el producto
+
+BALANCE DE VENDEDORES:
+
+1. TIPOS DE BALANCE:
+- pending_balance: Fondos en escolta (esperando confirmación)
+- available_balance: Fondos disponibles para retiro
+
+2. FLUJO:
+- Al completarse una venta, se suma a pending_balance
+- Después de período de escolta (típicamente 7-14 días), se transfiere a available_balance
+- El vendedor puede solicitar retiro de available_balance
+- Se registra en historial de transacciones
+
+3. RETIROS:
+- El vendedor solicita retiro
+- Admin aprueba (si es necesario)
+- Se procesa transferencia
+- Se actualiza balance
+
+REEMBOLSOS:
+
+1. CONDICIONES:
+- Orden cancelada antes de envío
+- Producto no recibido
+- Producto defectuoso
+- Disputa resuelta a favor del comprador
+
+2. PROCESO:
+- Se crea solicitud de reembolso
+- Se revisa el caso
+- Si se aprueba:
+  * Se reembolsa al comprador
+  * Se actualiza platform_fee (status = 'refunded')
+  * Se actualiza balance del vendedor
+  * Se restaura stock si aplica
+
+================================================================================
+9. SHIPPING_INFO
+================================================================================
+
+SISTEMA DE ENVÍOS:
+
+ESTRUCTURA:
+
+1. TABLA SHIPMENTS:
+- id: Identificador único
+- order_id: ID de la orden
+- tracking_number: Número de seguimiento
+- carrier: Empresa de envío
+- service_type: Tipo de servicio
+- status: Estado del envío
+- estimated_delivery: Fecha estimada de entrega
+- actual_delivery: Fecha real de entrega
+- shipping_address: Dirección de envío (JSONB)
+- created_at: Fecha de creación
+- updated_at: Fecha de actualización
+
+ESTADOS DE ENVÍO:
+
+1. STATUS POSIBLES:
+- pending: Pendiente (orden creada pero aún no enviada)
+- processing: Procesando (preparando envío)
+- shipped: Enviado (en tránsito)
+- in_transit: En tránsito (alternativo)
+- delivered: Entregado
+- failed: Fallido (no se pudo entregar)
+- returned: Devuelto
+
+FLUJO DE ENVÍO:
+
+1. CREACIÓN:
+- Se crea automáticamente cuando la orden pasa a 'paid'
+- Estado inicial: 'pending'
+- Se asocia a la orden
+
+2. PREPARACIÓN:
+- El vendedor prepara el producto
+- Puede actualizar estado a 'processing'
+- Agrega número de seguimiento cuando envía
+
+3. ENVÍO:
+- El vendedor marca como 'shipped'
+- Se agrega tracking_number
+- Se establece carrier (empresa de envío)
+- Se establece estimated_delivery
+
+4. SEGUIMIENTO:
+- El comprador puede ver el estado
+- Puede ver el tracking_number
+- Puede seguir el envío (si el carrier lo permite)
+
+5. ENTREGA:
+- Cuando se confirma entrega, se actualiza a 'delivered'
+- Se establece actual_delivery
+- La orden puede completarse
+
+EMPRESAS DE ENVÍO (PROVEEDORES):
+
+1. LOCALES (Paraguay):
+- Correo Paraguayo
+- OCA
+- DHL
+- FedEx
+
+2. REGIONALES:
+- Mercosur Logistics
+- South American Shipping
+
+DIRECCIÓN DE ENVÍO:
+
+1. CAMPOS:
+- fullName: Nombre completo
+- phone: Teléfono
+- address: Dirección completa
+- city: Ciudad
+- state: Departamento
+- postal_code: Código postal
+- country: País (típicamente Paraguay)
+
+2. ALMACENAMIENTO:
+- Se guarda como JSONB en shipping_address
+- Se incluye en la orden
+- Se puede usar para etiquetas de envío
+
+NOTIFICACIONES:
+
+1. AL COMPRADOR:
+- Cuando el producto se envía (con tracking number)
+- Cuando el producto está en tránsito
+- Cuando el producto se entrega
+
+2. AL VENDEDOR:
+- Cuando debe preparar el envío
+- Cuando se confirma la entrega
+
+CÁLCULO DE COSTOS:
+
+1. COSTOS DE ENVÍO:
+- Pueden ser calculados por el vendedor
+- Pueden ser fijos o variables
+- Dependen del carrier y servicio
+- Se pueden agregar a la orden
+
+2. ENVÍO GRATIS:
+- El vendedor puede ofrecer envío gratis
+- Se puede configurar por producto
+- Se puede configurar por orden mínima
+
+SEGUIMIENTO (TRACKING):
+
+1. TRACKING NUMBER:
+- Se proporciona cuando se envía
+- Permite seguir el envío en el sitio del carrier
+- Se muestra al comprador
+
+2. INTEGRACIÓN:
+- Se puede integrar con APIs de carriers para seguimiento automático
+- Se puede actualizar estado automáticamente
+
+ENTREGAS FALLIDAS:
+
+1. RAZONES:
+- Dirección incorrecta
+- Comprador no disponible
+- Rechazado por el comprador
+
+2. PROCESO:
+- Se marca como 'failed' o 'returned'
+- Se contacta al comprador
+- Se puede reenviar o reembolsar
+
+================================================================================
+10. DASHBOARD_FEATURES
+================================================================================
+
+DASHBOARD DEL VENDEDOR:
+
+ESTADÍSTICAS PRINCIPALES:
+
+1. RESUMEN GENERAL:
+- Total de productos: Número total de productos creados
+- Productos activos: Productos actualmente visibles
+- Total de órdenes: Número total de órdenes recibidas
+- Órdenes pendientes: Órdenes que requieren acción
+- Ingresos totales: Suma de todos los ingresos históricos
+- Ingresos mensuales: Ingresos del mes actual
+- Total de clientes: Número de clientes únicos
+
+2. ESTADÍSTICAS DE SUBASTAS:
+- Total de subastas: Número total de subastas creadas
+- Subastas activas: Subastas actualmente en curso
+- Subastas programadas: Subastas que aún no iniciaron
+- Subastas finalizadas: Subastas que ya terminaron
+- Subastas con ganador: Subastas que resultaron en venta
+- Ingresos por subastas: Total ganado por subastas
+
+GESTIÓN DE PRODUCTOS:
+
+1. VISTA DE PRODUCTOS:
+- Ver todos los productos
+- Filtrar por tipo: todos, directos, subastas
+- Filtrar por estado: activos, pausados, archivados, finalizados
+- Ver subastas finalizadas por separado
+- Ver productos pausados por separado
+
+2. ACCIONES RÁPIDAS:
+- Editar producto
+- Ver producto públicamente
+- Pausar producto
+- Activar producto (reactivar)
+- Eliminar producto
+- Duplicar producto
+
+3. INFORMACIÓN MOSTRADA:
+- Imagen del producto
+- Título
+- Precio
+- Estado
+- Tipo de venta
+- Fecha de creación
+- Vistas (si está disponible)
+- Ventas (si está disponible)
+
+GESTIÓN DE ÓRDENES:
+
+1. VISTA DE ÓRDENES:
+- Ver todas las órdenes
+- Filtrar por estado: todas, pendientes, pagadas, procesando, enviadas, entregadas, canceladas
+- Ver detalles de cada orden
+
+2. ACCIONES:
+- Ver detalles completos
+- Procesar orden
+- Marcar como enviado
+- Agregar número de seguimiento
+- Actualizar estado
+- Ver información del comprador
+- Contactar al comprador
+
+GESTIÓN DE SUBASTAS:
+
+1. VISTA DE SUBASTAS:
+- Ver todas las subastas
+- Filtrar por estado: activas, programadas, finalizadas, canceladas
+- Ver detalles de cada subasta
+
+2. INFORMACIÓN:
+- Precio actual
+- Número de pujas
+- Tiempo restante
+- Postor actual
+- Historial de pujas
+
+3. ACCIONES:
+- Ver detalles
+- Cancelar subasta (si es necesario)
+- Contactar postores
+
+ANALYTICS Y MÉTRICAS:
+
+1. VISTAS Y CONVERSIÓN:
+- Vistas de productos
+- Tasa de conversión
+- Productos más vistos
+- Productos más vendidos
+
+2. INGRESOS:
+- Ingresos por período
+- Comparativa mensual
+- Tendencias
+- Proyecciones
+
+3. CLIENTES:
+- Clientes nuevos
+- Clientes recurrentes
+- Valor promedio de orden
+
+ALERTAS Y NOTIFICACIONES:
+
+1. ALERTAS IMPORTANTES:
+- Órdenes nuevas
+- Mensajes sin leer
+- Stock bajo
+- Subastas por finalizar
+- Productos pausados por límites
+- Membresía por expirar
+
+2. NOTIFICACIONES:
+- Notificaciones en tiempo real
+- Notificaciones push (si está habilitado)
+- Notificaciones por email
+- Centro de notificaciones
+
+CONFIGURACIÓN:
+
+1. PERFIL DE VENDEDOR:
+- Editar información personal
+- Cambiar foto de perfil
+- Actualizar biografía
+
+2. CONFIGURACIÓN DE TIENDA:
+- Editar información de la tienda
+- Cambiar logo y banner
+- Configurar catálogos de publicidad
+
+3. PREFERENCIAS:
+- Configurar notificaciones
+- Configurar preferencias de envío
+- Configurar métodos de pago aceptados
+
+BALANCE Y FINANZAS:
+
+1. BALANCE:
+- Ver balance pendiente (en escolta)
+- Ver balance disponible (listo para retiro)
+- Ver historial de transacciones
+- Solicitar retiro
+
+2. COMISIONES:
+- Ver comisiones cobradas
+- Ver historial de comisiones
+- Ver detalles de cada comisión
+
+PRODUCTOS DESTACADOS:
+
+1. SHOWCASE:
+- Ver productos en vitrina
+- Agregar/quitar productos de vitrina
+- Reordenar productos
+
+OTRAS FUNCIONALIDADES:
+
+1. ENLACES RÁPIDOS:
+- Crear nuevo producto
+- Ver mi tienda
+- Ver catálogos de publicidad
+- Configuración de marketing
+
+2. FILTROS Y BÚSQUEDA:
+- Buscar productos por nombre
+- Filtrar por categoría
+- Ordenar por diferentes criterios
+
+================================================================================
+11. ADS_CATALOG_FEEDS
+================================================================================
+
+SISTEMA DE CATÁLOGOS DE ANUNCIOS:
+
+TIPOS DE CATÁLOGOS:
+
+1. CATÁLOGO GLOBAL (VITRINA):
+- Catálogo general de Mercadito Online PY
+- Incluye productos destacados del marketplace
+- URL del feed: /feeds/global/vitrina
+- Formato: JSON
+- Compatible con: Meta (Facebook/Instagram), TikTok, Google Shopping
+
+2. CATÁLOGOS POR TIENDA:
+- Cada tienda puede tener múltiples catálogos
+- Tipos: default, collection, promotional
+- URL del feed: /feeds/store/[storeSlug]/[catalogSlug]
+- Formato: JSON
+- Compatible con las mismas plataformas
+
+ESTRUCTURA DE CATÁLOGO:
+
+1. INFORMACIÓN DEL CATÁLOGO:
+- id: Identificador único
+- store_id: ID de la tienda (NULL para catálogo global)
+- slug: Identificador único dentro de la tienda
+- name: Nombre visible
+- type: Tipo (default, collection, promotional)
+- filters: Criterios de filtrado automático (JSONB)
+- is_active: Si está activo
+- last_generated_at: Última vez que se generó
+- products_count: Número de productos incluidos
+
+2. FILTROS AUTOMÁTICOS:
+- categories: Array de IDs de categorías
+- min_price: Precio mínimo
+- max_price: Precio máximo
+- min_stock: Stock mínimo
+- tags: Array de tags
+- condition: Condición del producto
+- sale_type: Tipo de venta
+
+3. PRODUCTOS EN CATÁLOGO:
+- Se pueden agregar manualmente (store_ad_catalog_products)
+- Se pueden filtrar automáticamente según filtros
+- Solo productos activos se incluyen en el feed
+
+FORMATO DEL FEED:
+
+1. ESTRUCTURA JSON:
+- Array de objetos producto
+- Cada producto tiene:
+  * id: ID del producto
+  * title: Título
+  * description: Descripción (limpia de HTML, truncada a 5000 caracteres)
+  * price: Precio (número)
+  * currency: "PYG"
+  * link: URL completa del producto
+  * image_link: URL de la imagen principal
+  * availability: "in stock" | "out of stock" | "preorder"
+  * condition: "new" | "used" | "refurbished"
+  * brand: (opcional)
+  * category: (opcional)
+  * gtin: (opcional)
+  * mpn: (opcional)
+
+2. MAPEO DE DATOS:
+- Condición: Se mapea desde condición del producto (nuevo → new, usado → used)
+- Disponibilidad: Basado en status y stock_quantity
+- Imagen: Se usa cover_url, si no hay se usa placeholder
+- Link: Se construye como SITE_URL/products/[productId]
+
+GENERACIÓN DEL FEED:
+
+1. PROCESO:
+- Se obtienen productos según filtros o selección manual
+- Se filtran solo productos activos
+- Se mapean al formato del feed
+- Se retorna JSON con headers apropiados
+
+2. CACHE:
+- Cache de 5 minutos (s-maxage=300)
+- Stale while revalidate de 10 minutos
+- Se invalida cuando cambian productos o catálogo
+
+3. CORS:
+- Headers CORS habilitados para permitir acceso desde plataformas externas
+- Access-Control-Allow-Origin: *
+
+USO PARA PUBLICIDAD:
+
+1. META (FACEBOOK/INSTAGRAM):
+- Se conecta el feed JSON a Meta Business
+- Los productos se muestran en anuncios de catálogo
+- Se actualiza automáticamente según el feed
+
+2. TIKTOK:
+- Similar a Meta
+- Se conecta el feed para anuncios de producto
+
+3. GOOGLE SHOPPING:
+- Se puede usar para Google Merchant Center
+- Formato compatible con requerimientos de Google
+
+4. OTRAS PLATAFORMAS:
+- Cualquier plataforma que acepte feeds JSON de productos
+
+CONFIGURACIÓN:
+
+1. CREAR CATÁLOGO:
+- El vendedor crea catálogo desde su dashboard
+- Define nombre y slug
+- Selecciona tipo
+- Configura filtros (opcional)
+
+2. AGREGAR PRODUCTOS:
+- Manualmente: Selecciona productos específicos
+- Automáticamente: Usa filtros para incluir productos
+
+3. ACTIVAR/DESACTIVAR:
+- El vendedor puede activar/desactivar catálogos
+- Solo catálogos activos generan feeds accesibles
+
+4. VER URL DEL FEED:
+- Se muestra la URL completa del feed
+- Se puede copiar para usar en plataformas de publicidad
+
+SINCRONIZACIÓN:
+
+1. ACTUALIZACIÓN:
+- El feed se genera on-demand cuando se accede
+- Se puede forzar regeneración
+- Se actualiza last_generated_at
+
+2. PRODUCTOS INCLUIDOS:
+- Solo productos activos
+- Solo productos de la tienda (para catálogos de tienda)
+- Se respetan filtros configurados
+
+================================================================================
+12. ANY_OTHER_RELEVANT_INFO
+================================================================================
+
+ROLES DE USUARIO:
+
+1. BUYER (Comprador):
+- Rol por defecto
+- Puede comprar productos
+- Puede pujar si tiene membresía
+- Puede dejar reseñas
+
+2. SELLER (Vendedor):
+- Puede publicar productos
+- Requiere membresía activa O tienda
+- Puede recibir órdenes
+- Puede gestionar su tienda
+
+3. ADMIN (Administrador):
+- Acceso total al sistema
+- Puede gestionar usuarios
+- Puede gestionar productos
+- Puede gestionar órdenes
+- Puede configurar comisiones
+- Puede gestionar membresías
+- Puede ver analytics globales
+
+AUTENTICACIÓN:
+
+1. MÉTODOS:
+- Email y contraseña
+- OAuth (Google, Facebook, etc.) - si está configurado
+- Magic link (email sin contraseña) - si está configurado
+
+2. GESTIÓN:
+- Registro de nuevos usuarios
+- Inicio de sesión
+- Cierre de sesión
+- Recuperación de contraseña
+- Cambio de contraseña
+
+SEGURIDAD:
+
+1. ROW LEVEL SECURITY (RLS):
+- Políticas de seguridad a nivel de base de datos
+- Los usuarios solo pueden ver/editar sus propios datos
+- Los admins pueden ver todo
+- El público puede ver productos activos
+
+2. VALIDACIONES:
+- Validación de datos en frontend y backend
+- Validación de permisos antes de acciones
+- Rate limiting para prevenir abuso
+
+3. AUTENTICACIÓN:
+- Tokens JWT de Supabase
+- Sesiones seguras
+- Refresh tokens
+
+NOTIFICACIONES:
+
+1. TIPOS:
+- Órdenes nuevas
+- Mensajes nuevos
+- Pujas superadas
+- Subastas finalizadas
+- Stock bajo
+- Membresía por expirar
+
+2. CANALES:
+- Notificaciones en la aplicación
+- Email (si está configurado)
+- Push notifications (si está habilitado)
+- WhatsApp (si está configurado)
+
+CHAT Y MENSAJERÍA:
+
+1. FUNCIONALIDADES:
+- Chat en tiempo real entre compradores y vendedores
+- Mensajería asociada a productos
+- Historial de conversaciones
+- Indicadores de "escribiendo"
+- Notificaciones de nuevos mensajes
+
+2. TECNOLOGÍA:
+- Supabase Realtime
+- Almacenamiento en base de datos
+- Encriptación en tránsito
+
+REVIEWS Y RATINGS:
+
+1. RESEÑAS DE PRODUCTOS:
+- Los compradores pueden dejar reseñas después de comprar
+- Calificación de 1 a 5 estrellas
+- Comentario opcional
+- Se muestran en la página del producto
+
+2. RESEÑAS DE VENDEDORES/TIENDAS:
+- Los compradores pueden calificar vendedores
+- Se calcula rating promedio
+- Se muestran en el perfil del vendedor/tienda
+
+WISHLIST Y FAVORITOS:
+
+1. PRODUCTOS:
+- Los usuarios pueden agregar productos a favoritos
+- Pueden ver su lista de favoritos
+- Pueden eliminar de favoritos
+
+2. TIENDAS:
+- Los usuarios pueden seguir tiendas favoritas
+- Pueden ver tiendas seguidas
+
+BÚSQUEDA:
+
+1. FUNCIONALIDADES:
+- Búsqueda por texto (título, descripción)
+- Filtros avanzados (categoría, precio, condición, etc.)
+- Ordenamiento (fecha, precio, relevancia)
+- Sugerencias de búsqueda
+- Búsqueda por tags
+
+2. OPTIMIZACIÓN:
+- Índices en base de datos
+- Búsqueda full-text (si está disponible)
+- Cache de resultados
+
+CATEGORÍAS:
+
+1. ESTRUCTURA:
+- Categorías jerárquicas (padre/hijo)
+- Cada categoría tiene nombre, descripción, imagen
+- Productos se asocian a categorías
+
+2. GESTIÓN:
+- Los admins pueden crear/editar categorías
+- Se muestran en navegación
+- Se usan para filtros
+
+SEO:
+
+1. OPTIMIZACIONES:
+- Meta tags dinámicos por página
+- Open Graph tags
+- Twitter Cards
+- Structured Data (JSON-LD)
+- Sitemap.xml
+- Robots.txt
+
+2. URLs:
+- URLs amigables (slug-based)
+- URLs canónicas
+- Redirecciones apropiadas
+
+ANALYTICS:
+
+1. TRACKING:
+- Eventos de usuario (vistas, clics, compras)
+- Analytics de productos
+- Analytics de tiendas
+- Analytics globales (admin)
+
+2. MÉTRICAS:
+- Vistas de página
+- Conversiones
+- Tiempo en página
+- Productos más populares
+- Búsquedas más frecuentes
+
+PWA (PROGRESSIVE WEB APP):
+
+1. CARACTERÍSTICAS:
+- Instalable en dispositivos
+- Funciona offline (limitado)
+- Push notifications
+- Iconos y tema personalizados
+
+2. MANIFEST:
+- Nombre: "Mercadito Online PY"
+- Nombre corto: "Mercadito PY"
+- Theme color: #3b82f6
+- Background color: #ffffff
+
+CRON JOBS:
+
+1. TAREAS AUTOMÁTICAS:
+- Cerrar subastas expiradas
+- Expirar membresías vencidas
+- Verificar entregas
+- Limpiar datos antiguos
+- Auditoría nocturna
+- Backup de base de datos
+- Verificar stock bajo
+
+INTEGRACIONES:
+
+1. PAYMENT GATEWAYS:
+- Stripe
+- PayPal
+- Pagopar (local)
+
+2. EMAIL:
+- Resend (si está configurado)
+- Supabase Auth (transaccional)
+
+3. STORAGE:
+- Supabase Storage para imágenes
+
+4. ANALYTICS:
+- Google Analytics (si está configurado)
+- Analytics propio
+
+ERROR HANDLING:
+
+1. GESTIÓN DE ERRORES:
+- Error boundaries en frontend
+- Logging de errores
+- Mensajes de error amigables
+- Fallbacks elegantes
+
+LOGGING:
+
+1. SISTEMA DE LOGS:
+- Logs de errores
+- Logs de acciones importantes
+- Logs de auditoría
+- Logs de performance
+
+PERFORMANCE:
+
+1. OPTIMIZACIONES:
+- Cache de productos y listados
+- Lazy loading de imágenes
+- Code splitting
+- Optimización de imágenes
+- CDN (Vercel Edge Network)
+
+2. CACHE:
+- Redis para cache distribuido (si está disponible)
+- Cache en memoria para desarrollo
+- Cache de headers HTTP
+
+================================================================================
+FIN DEL DOCUMENTO
+================================================================================
+
+Este documento contiene toda la información relevante del sistema Mercadito Online PY
+para la construcción del Asistente Oficial basado en la lógica real del sistema.
+
+Toda la información aquí contenida está basada en el análisis del código fuente,
+migraciones de base de datos, servicios y configuración real del proyecto.
+
+NO se incluye código, solo información y explicaciones de cómo funciona el sistema.
+
+
+
+
+
+
+

@@ -5,6 +5,7 @@
 
 import type { Metadata, Viewport } from 'next';
 import Link from 'next/link';
+// import MercaditoAssistantWidget from '@/components/MercaditoAssistantWidget';
 
 export const metadata: Metadata = {
   title: {
@@ -60,6 +61,18 @@ export default function DashboardLayout({
                 >
                   Mis Productos
                 </Link>
+                <Link 
+                  href="/dashboard/orders" 
+                  className="text-gray-500 hover:text-gray-900 transition-colors"
+                >
+                  Órdenes
+                </Link>
+                <Link 
+                  href="/dashboard/sourcing-orders" 
+                  className="text-gray-500 hover:text-gray-900 transition-colors"
+                >
+                  Pedidos por conseguir
+                </Link>
               </nav>
             </div>
             <div className="flex items-center space-x-4">
@@ -78,6 +91,9 @@ export default function DashboardLayout({
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {children}
       </main>
+
+      {/* Widget del Asistente */}
+      {/* <MercaditoAssistantWidget /> */}
     </div>
   );
 }

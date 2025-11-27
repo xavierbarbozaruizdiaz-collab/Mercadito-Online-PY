@@ -71,7 +71,7 @@ $currentBranch = git branch --show-current
 
 if ($currentBranch -ne "main" -and $currentBranch -ne "production") {
     Write-Warning "Estás en la rama '$currentBranch', no en 'main' o 'production'"
-    $confirm = Read-Host "¿Continuar de todas formas? (y/n)"
+    $confirm = Read-Host 'Continuar de todas formas? (y/n)'
     if ($confirm -ne "y" -and $confirm -ne "Y") {
         exit 1
     }
@@ -88,7 +88,7 @@ $gitStatus = git status --short
 if ($gitStatus) {
     Write-Warning "Hay cambios sin commitear en el working directory"
     git status --short
-    $confirm = Read-Host "¿Continuar de todas formas? (y/n)"
+    $confirm = Read-Host 'Continuar de todas formas? (y/n)'
     if ($confirm -ne "y" -and $confirm -ne "Y") {
         exit 1
     }
@@ -109,13 +109,13 @@ if (-not (Test-Path "node_modules") -or (Get-Item "package.json").LastWriteTime 
     }
     Write-Success "Dependencias instaladas"
 } else {
-    Write-Success "Dependencias ya instaladas (usando cache)"
+    Write-Success 'Dependencias ya instaladas (usando cache)'
 }
 
 # ============================================
 # PASO 5: QA Local (Lint + Build)
 # ============================================
-Write-Step "Ejecutando QA local (lint + build)..."
+Write-Step 'Ejecutando QA local (lint + build)...'
 
 # Lint (no bloqueante, solo advertencia)
 Write-Step "Ejecutando ESLint..."
@@ -149,7 +149,7 @@ Write-Step "Verificando Vercel CLI..."
 $vercelCmd = "npx vercel"
 if (Get-Command vercel -ErrorAction SilentlyContinue) {
     $vercelCmd = "vercel"
-    Write-Success "Vercel CLI encontrado (global)"
+    Write-Success 'Vercel CLI encontrado (global)'
 } else {
     Write-Warning "Vercel CLI no encontrado globalmente, usando npx"
 }
@@ -179,14 +179,18 @@ Write-Host "   - Asegúrate de que todas las variables de entorno estén configu
 Write-Host "   - Verifica que el build local funcionó correctamente"
 Write-Host ""
 
-$confirm = Read-Host "¿Continuar con el deploy a producción? (y/n)"
+    $confirm = Read-Host 'Continuar con el deploy a produccion? (y/n)'
 if ($confirm -ne "y" -and $confirm -ne "Y") {
     Write-Warning "Deploy cancelado por el usuario"
     exit 0
 }
 
 # Ejecutar deploy
-& $vercelCmd --prod --yes
+if ($vercelCmd -eq "vercel") {
+    vercel --prod --yes
+} else {
+    npx vercel --prod --yes
+}
 if ($LASTEXITCODE -eq 0) {
     Write-Host ""
     Write-Success "🎉 Deploy a producción completado exitosamente!"

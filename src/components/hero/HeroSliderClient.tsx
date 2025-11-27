@@ -46,3 +46,10 @@ export default function HeroSliderClient({ slides }: HeroSliderClientProps) {
   return <HeroSlider slides={slides} data-testid="hero-slider" />;
 }
 
+
+
+
+
+
+
+

@@ -44,6 +44,7 @@ const baseSidebarItems: SidebarItem[] = [
 const sellerSidebarItems: SidebarItem[] = [
   { icon: Plus, label: 'Nuevo Producto', href: '/dashboard/new-product', roles: ['seller', 'admin'] },
   { icon: ShoppingCart, label: 'Pedidos', href: '/dashboard/orders', roles: ['seller', 'admin'] },
+  { icon: ShoppingCart, label: 'Pedidos por conseguir', href: '/dashboard/sourcing-orders', roles: ['seller', 'admin'] },
   { icon: Package, label: 'Inventario', href: '/dashboard/inventory', roles: ['seller', 'admin'] },
   { icon: BarChart3, label: 'Analytics', href: '/dashboard/analytics', roles: ['seller', 'admin'] },
   { icon: DollarSign, label: 'Retiros', href: '/dashboard/payouts', roles: ['seller', 'admin'] },

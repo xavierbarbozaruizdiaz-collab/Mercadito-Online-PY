@@ -198,21 +198,24 @@ export default async function ProductPage(
   const category = p.categories && p.categories.length > 0 ? p.categories[0] : null;
   
   // Obtener información de la tienda si existe (cargar directamente si no viene en la query)
-  let store: { id: string; name: string; slug: string; logo_url: string | null; description: string | null } | null = null;
+  let store: { id: string; name: string; slug: string; logo_url: string | null; description: string | null; contact_phone?: string | null; phone?: string | null } | null = null;
+  let storePhone: string | null = null;
   
   if (p.stores && p.stores.length > 0) {
     store = p.stores[0];
+    storePhone = (p.stores[0] as any).contact_phone || (p.stores[0] as any).phone || null;
   } else if (p.store_id) {
     // Si no viene en la relación, cargar directamente
     try {
       const { data: storeData } = await supabase
         .from('stores')
-        .select('id, name, slug, logo_url, description')
+        .select('id, name, slug, logo_url, description, contact_phone, phone')
         .eq('id', p.store_id)
         .single();
       
       if (storeData) {
         store = storeData;
+        storePhone = storeData.contact_phone || storeData.phone || null;
       }
     } catch (err) {
       console.warn('No se pudo cargar información de la tienda:', err);
@@ -220,12 +223,13 @@ export default async function ProductPage(
   }
   
   // Obtener información del vendedor si no hay tienda
-  let sellerInfo: { name: string; email?: string } | null = null;
+  let sellerInfo: { name: string; email?: string; phone?: string | null } | null = null;
+  let sellerPhone: string | null = null;
   if (!store && p.seller_id) {
     try {
       const { data: sellerProfile } = await supabase
         .from('profiles')
-        .select('email, first_name, last_name')
+        .select('email, first_name, last_name, phone')
         .eq('id', p.seller_id)
         .single();
       
@@ -234,11 +238,28 @@ export default async function ProductPage(
           name: sellerProfile.first_name && sellerProfile.last_name 
             ? `${sellerProfile.first_name} ${sellerProfile.last_name}`
             : sellerProfile.email?.split('@')[0] || 'Vendedor',
-          email: sellerProfile.email
+          email: sellerProfile.email,
+          phone: sellerProfile.phone || null
         };
+        sellerPhone = sellerProfile.phone || null;
       }
     } catch (err) {
       console.warn('No se pudo cargar información del vendedor:', err);
+    }
+  } else if (p.seller_id && !storePhone) {
+    // Si hay tienda pero no tiene teléfono, intentar obtener el del vendedor
+    try {
+      const { data: sellerProfile } = await supabase
+        .from('profiles')
+        .select('phone')
+        .eq('id', p.seller_id)
+        .single();
+      
+      if (sellerProfile?.phone) {
+        sellerPhone = sellerProfile.phone;
+      }
+    } catch (err) {
+      // Ignorar error, no es crítico
     }
   }
 
@@ -381,7 +402,9 @@ export default async function ProductPage(
                 ...p,
                 title: p.title,
                 price: Number(p.price),
-              }} 
+              }}
+              sellerPhone={sellerPhone}
+              storePhone={storePhone}
             />
 
             {/* Alerta de precio */}

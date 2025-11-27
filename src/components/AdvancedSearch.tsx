@@ -71,6 +71,14 @@ export default function AdvancedSearch({
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [activeTab, setActiveTab] = useState<'products' | 'stores'>('products');
 
+  // Sincronizar searchQuery con initialQuery cuando cambie la URL
+  useEffect(() => {
+    if (initialQuery !== searchQuery) {
+      setSearchQuery(initialQuery);
+      setFilters({ query: initialQuery });
+    }
+  }, [initialQuery]);
+
   // Usar el hook de búsqueda
   const {
     products,
@@ -194,12 +202,37 @@ export default function AdvancedSearch({
         <CardContent>
           <div className="space-y-4">
             {/* Barra de búsqueda principal */}
-            <SearchBar
-              placeholder="Buscar productos, marcas, categorías..."
-              onSearch={handleSearch}
-              size="lg"
-              className="w-full"
-            />
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Buscar productos, marcas, categorías..."
+                value={searchQuery}
+                onChange={(e) => handleQueryChange(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    handleSearch();
+                  }
+                }}
+                className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
+              />
+              <Button onClick={handleSearch} className="px-6">
+                <Search className="w-4 h-4 mr-2" />
+                Buscar
+              </Button>
+              {searchQuery && (
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setFilters({ query: '' });
+                    router.push('/search');
+                  }}
+                  className="px-4"
+                >
+                  Limpiar
+                </Button>
+              )}
+            </div>
 
             {/* Filtros activos */}
             {getActiveFiltersCount() > 0 && (
@@ -314,6 +347,7 @@ export default function AdvancedSearch({
           onStoreClick={handleStoreClick}
           onLoadMore={() => handlePageChange(pagination.page + 1)}
           hasMore={pagination.page < pagination.total_pages}
+          searchQuery={filters.query || searchQuery}
         />
       )}
 

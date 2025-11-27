@@ -65,4 +65,7 @@ supabase/.branches/
 supabase/docker/
 supabase/.env
 
+# OAuth secret hash generator (NUNCA commitear este archivo con secret real)
+scripts/hash-oauth-secret.mjs
+
 .vercel

@@ -22,6 +22,8 @@ export type HeroSlide = {
   bg_image_url?: string | null;
   storage_path?: string | null;
   public_url?: string | null;
+  link_url?: string | null;
+  show_title?: boolean | null;
   position: number;
 };
 
@@ -78,6 +80,27 @@ export default function HeroSlider({ slides, ...rest }: Props) {
     }
   }, [slides?.length]);
 
+  // Pre-cargar todas las imágenes del slider para evitar desaparición al deslizar
+  useEffect(() => {
+    if (!slides?.length) return;
+
+    const imageUrls: string[] = [];
+    slides.forEach((s) => {
+      if (s.bg_type === 'image') {
+        const url = s.bg_image_url || s.public_url || (s as any).image_url;
+        if (url) {
+          imageUrls.push(url as string);
+        }
+      }
+    });
+
+    // Pre-cargar todas las imágenes
+    imageUrls.forEach((url) => {
+      const img = new window.Image();
+      img.src = url;
+    });
+  }, [slides]);
+
   if (!slides?.length) return null;
 
   // Solo mostrar controles si hay más de un slide
@@ -92,59 +115,120 @@ export default function HeroSlider({ slides, ...rest }: Props) {
     >
       <div className="overflow-hidden" ref={emblaRef}>
         <div className="flex touch-pan-y">
-          {slides.map((s, i) => (
-            <div className="relative flex-[0_0_100%]" key={s.id}>
-              <div className="relative w-full min-h-[220px] md:min-h-[340px] lg:min-h-[420px] xl:min-h-[520px]">
-                {s.bg_type === 'image' && (s.bg_image_url || (s as any).image_url || s.public_url) ? (
-                  <Image
-                    src={(s.bg_image_url || (s as any).image_url || s.public_url) as string}
-                    alt={s.title ?? 'Promoción'}
-                    fill
-                    priority={i === 0}
-                    sizes="100vw"
-                    className="object-cover"
-                  />
-                ) : (
-                  <div 
-                    className="h-full w-full"
-                    style={{
-                      background: s.bg_gradient_from && s.bg_gradient_to
-                        ? `linear-gradient(90deg, ${s.bg_gradient_from}, ${s.bg_gradient_to})`
-                        : (s as any).gradient_from && (s as any).gradient_to
-                        ? `linear-gradient(90deg, ${(s as any).gradient_from}, ${(s as any).gradient_to})`
-                        : 'linear-gradient(90deg, #14B8A6, #06B6D4)'
-                    }}
-                  />
-                )}
+          {slides.map((s, i) => {
+            const imageUrl = s.bg_image_url || s.public_url || (s as any).image_url;
+            const slideContent = (
+              <div className="relative flex-[0_0_100%]" key={s.id}>
+                <div className="relative w-full min-h-[220px] md:min-h-[340px] lg:min-h-[420px] xl:min-h-[520px]">
+                  {s.bg_type === 'image' && imageUrl ? (
+                    <Image
+                      src={imageUrl as string}
+                      alt={s.title ?? 'Promoción'}
+                      fill
+                      priority={i < 3} // Pre-cargar las primeras 3 imágenes
+                      sizes="100vw"
+                      className="object-cover"
+                      unoptimized={imageUrl?.includes('supabase.co')} // Desactivar optimización para URLs de Supabase
+                      onError={(e) => {
+                        console.error('[HeroSlider] Error loading image:', imageUrl);
+                        // Fallback a gradiente si falla la carga
+                        const target = e.target as HTMLImageElement;
+                        if (target.parentElement) {
+                          target.style.display = 'none';
+                        }
+                      }}
+                      onLoad={() => {
+                        // Forzar re-render del carrusel cuando la imagen carga
+                        if (emblaApi) {
+                          emblaApi.reInit();
+                        }
+                      }}
+                    />
+                  ) : (
+                    <div 
+                      className="h-full w-full"
+                      style={{
+                        background: s.bg_gradient_from && s.bg_gradient_to
+                          ? `linear-gradient(90deg, ${s.bg_gradient_from}, ${s.bg_gradient_to})`
+                          : (s as any).gradient_from && (s as any).gradient_to
+                          ? `linear-gradient(90deg, ${(s as any).gradient_from}, ${(s as any).gradient_to})`
+                          : 'linear-gradient(90deg, #14B8A6, #06B6D4)'
+                      }}
+                    />
+                  )}
 
-                {(s.title || s.subtitle || s.cta_primary_label || s.cta_secondary_label) && (
-                  <div className="absolute inset-0 bg-black/20">
-                    <div className="mx-auto max-w-6xl px-4 h-full flex flex-col items-start justify-center text-white">
-                      {s.title && (
-                        <h1 className="text-2xl md:text-4xl lg:text-5xl font-bold drop-shadow">
-                          {s.title}
-                        </h1>
-                      )}
-                      {s.subtitle && (
-                        <p className="mt-2 text-sm md:text-base opacity-90">{s.subtitle}</p>
-                      )}
-                      <div className="mt-4 flex gap-3">
-                        {s.cta_primary_label && s.cta_primary_href && (
-                          <a
-                            href={s.cta_primary_href}
-                            className="inline-flex items-center justify-center rounded-lg px-5 py-2.5 bg-primary text-white hover:bg-primary/90"
-                            data-testid="primary-btn"
-                          >
-                            {s.cta_primary_label}
-                          </a>
+                  {(s.show_title !== false && (s.title || s.subtitle)) || s.cta_primary_label || s.cta_secondary_label ? (
+                    <div className="absolute inset-0 bg-black/20">
+                      <div className="mx-auto max-w-6xl px-4 h-full flex flex-col items-center justify-center text-center text-white">
+                        {s.show_title !== false && s.title && (
+                          <h1 className="text-2xl md:text-4xl lg:text-5xl font-bold drop-shadow">
+                            {s.title}
+                          </h1>
+                        )}
+                        {s.subtitle && (
+                          <p className="mt-2 text-sm md:text-base opacity-90">{s.subtitle}</p>
+                        )}
+                        {(s.cta_primary_label || s.cta_secondary_label) && (
+                          <div className="mt-4 flex flex-col sm:flex-row gap-3 items-center justify-center">
+                            {s.cta_primary_label && s.cta_primary_href && (
+                              <a
+                                href={s.cta_primary_href}
+                                onClick={(e) => {
+                                  if (s.link_url) {
+                                    e.stopPropagation();
+                                  }
+                                }}
+                                className="inline-flex items-center justify-center rounded-lg px-5 py-2.5 bg-white/20 backdrop-blur-sm border border-white/30 text-white hover:bg-white/30 transition-colors text-sm sm:text-base font-medium"
+                                data-testid="primary-btn"
+                              >
+                                {s.cta_primary_label}
+                              </a>
+                            )}
+                            {s.cta_secondary_label && s.cta_secondary_href && (
+                              <a
+                                href={s.cta_secondary_href}
+                                onClick={(e) => {
+                                  if (s.link_url) {
+                                    e.stopPropagation();
+                                  }
+                                }}
+                                className="inline-flex items-center justify-center rounded-lg px-5 py-2.5 bg-white/20 backdrop-blur-sm border border-white/30 text-white hover:bg-white/30 transition-colors text-sm sm:text-base font-medium"
+                                data-testid="secondary-btn"
+                              >
+                                {s.cta_secondary_label}
+                              </a>
+                            )}
+                          </div>
                         )}
                       </div>
                     </div>
-                  </div>
-                )}
+                  ) : null}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+
+            // Si hay link_url, envolver todo el slide en un link
+            if (s.link_url) {
+              return (
+                <a
+                  key={s.id}
+                  href={s.link_url}
+                  className="block relative flex-[0_0_100%]"
+                  onClick={(e) => {
+                    // Si hay CTAs, permitir que funcionen sin activar el link del slide
+                    const target = e.target as HTMLElement;
+                    if (target.closest('a[data-testid]')) {
+                      e.stopPropagation();
+                    }
+                  }}
+                >
+                  {slideContent}
+                </a>
+              );
+            }
+
+            return slideContent;
+          })}
         </div>
       </div>
 
@@ -187,5 +271,12 @@ export default function HeroSlider({ slides, ...rest }: Props) {
     </section>
   );
 }
+
+
+
+
+
+
+
 
 
