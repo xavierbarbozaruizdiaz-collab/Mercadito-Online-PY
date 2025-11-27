@@ -11,10 +11,12 @@ import RafflesNavLink from "@/components/RafflesNavLink";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import ToastProvider from "@/components/ui/ToastProvider";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import AnalyticsProvider from "@/components/AnalyticsProvider";
 import { Gavel, Ticket } from "lucide-react";
 import Logo from "@/components/Logo";
-import Footer from "@/components/Footer";
+import FooterWrapper from "@/components/FooterWrapper";
 import { SITE_URL } from "@/lib/config/site";
+import MercaditoAssistantWidget from "@/components/MercaditoAssistantWidget";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -112,7 +114,6 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const fbPixelId = process.env.NEXT_PUBLIC_FACEBOOK_PIXEL_ID;
   const gtmId = process.env.NEXT_PUBLIC_GTM_ID || 'GTM-PQ8Q6JGW';
 
   return (
@@ -144,37 +145,8 @@ export default function RootLayout({
 
         <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16x16.png" />
         <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png" />
-
-        {/* Facebook Pixel */}
-        {fbPixelId && (
-          <>
-            <script
-              dangerouslySetInnerHTML={{
-                __html: `
-                  !function(f,b,e,v,n,t,s)
-                  {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-                  n.callMethod.apply(n,arguments):n.queue.push(arguments)};
-                  if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-                  n.queue=[];t=b.createElement(e);t.async=!0;
-                  t.src=v;s=b.getElementsByTagName(e)[0];
-                  s.parentNode.insertBefore(t,s)}(window, document,'script',
-                  'https://connect.facebook.net/en_US/fbevents.js');
-                  fbq('init', '${fbPixelId}');
-                  fbq('track', 'PageView');
-                `,
-              }}
-            />
-            <noscript>
-              <img
-                height="1"
-                width="1"
-                style={{ display: 'none' }}
-                src={`https://www.facebook.com/tr?id=${fbPixelId}&ev=PageView&noscript=1`}
-                alt=""
-              />
-            </noscript>
-          </>
-        )}
+        {/* Deshabilitar preload automático problemático */}
+        <meta name="next-head-count" content="0" />
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         {/* C) Noscript */}
@@ -189,6 +161,7 @@ export default function RootLayout({
         
         <ErrorBoundary>
           <ThemeProvider>
+            <AnalyticsProvider>
             {/* Header mejorado */}
             <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-sm border-b border-gray-200 shadow-md">
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -256,8 +229,12 @@ export default function RootLayout({
               <main className="flex-1">
                 {children}
               </main>
-              <Footer />
+              <FooterWrapper />
             </div>
+
+            {/* Widget del Asistente - Disponible en toda la aplicación */}
+            <MercaditoAssistantWidget />
+            </AnalyticsProvider>
 
             {/* Service Worker - Desregistro agresivo */}
             <Script

@@ -8,7 +8,17 @@
 import Link from 'next/link';
 import { Facebook, Instagram, Twitter, Mail, Phone, MapPin } from 'lucide-react';
 
-export default function Footer() {
+interface FooterProps {
+  contactEmail?: string;
+  contactPhone?: string;
+  location?: string;
+}
+
+export default function Footer({ 
+  contactEmail = 'contacto@mercadito-online-py.com',
+  contactPhone = '+595 981 234 567',
+  location = 'Asunción, Paraguay'
+}: FooterProps) {
   const currentYear = new Date().getFullYear();
   const enableProductsApi = process.env.NEXT_PUBLIC_ENABLE_PRODUCTS_API === 'true';
   const productsHref = enableProductsApi ? '/products' : '/vitrina';
@@ -119,19 +129,19 @@ export default function Footer() {
             <ul className="space-y-3 text-sm">
               <li className="flex items-center gap-2">
                 <Mail className="w-4 h-4" />
-                <a href="mailto:contacto@mercadito-online-py.com" className="hover:text-white transition-colors">
-                  contacto@mercadito-online-py.com
+                <a href={`mailto:${contactEmail}`} className="hover:text-white transition-colors">
+                  {contactEmail}
                 </a>
               </li>
               <li className="flex items-center gap-2">
                 <Phone className="w-4 h-4" />
-                <a href="tel:+595981234567" className="hover:text-white transition-colors">
-                  +595 981 234 567
+                <a href={`tel:${contactPhone.replace(/\s/g, '')}`} className="hover:text-white transition-colors">
+                  {contactPhone}
                 </a>
               </li>
               <li className="flex items-start gap-2">
                 <MapPin className="w-4 h-4 mt-1 flex-shrink-0" />
-                <span>Asunción, Paraguay</span>
+                <span>{location}</span>
               </li>
             </ul>
           </div>

@@ -210,7 +210,7 @@ export default function SiteSettingsPage() {
           <div>
             <h2 className="text-lg font-semibold mb-4">Métodos de Pago Disponibles</h2>
             <div className="space-y-2">
-              {['cash', 'transfer', 'card'].map((method) => (
+              {['cash', 'transfer', 'card', 'pagopar'].map((method) => (
                 <label key={method} className="flex items-center gap-2">
                   <input
                     type="checkbox"
@@ -230,7 +230,13 @@ export default function SiteSettingsPage() {
                     }}
                     className="rounded border-gray-300"
                   />
-                  <span className="capitalize">{method === 'cash' ? 'Efectivo' : method === 'transfer' ? 'Transferencia' : 'Tarjeta'}</span>
+                  <span className="capitalize">
+                    {method === 'cash' ? 'Efectivo' 
+                     : method === 'transfer' ? 'Transferencia' 
+                     : method === 'card' ? 'Tarjeta'
+                     : method === 'pagopar' ? 'Pagopar'
+                     : method}
+                  </span>
                 </label>
               ))}
             </div>
