@@ -6,8 +6,15 @@
 
 import { supabase } from '@/lib/supabaseServer';
 import Footer from './Footer';
+import { unstable_noStore as noStore } from 'next/cache';
+
+// Deshabilitar cache para que siempre obtenga datos frescos
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export default async function FooterWrapper() {
+  // Forzar que no se cachee esta función
+  noStore();
   // Obtener datos de configuración desde la base de datos
   let contactEmail = 'contacto@mercadito-online-py.com';
   let contactPhone = '+595 981 234 567';
@@ -19,32 +26,32 @@ export default async function FooterWrapper() {
       .select('key, value')
       .in('key', ['contact_email', 'contact_phone', 'location']);
 
-    if (!error && data) {
-      const settings: Record<string, any> = {};
+    if (!error && data && data.length > 0) {
       data.forEach((s: any) => {
-        // El valor está almacenado como JSONB, puede ser string, number, array, etc.
-        // Si es un string JSON (con comillas), parsearlo
+        // El valor está almacenado como JSONB
+        // Supabase puede devolverlo como string JSON o ya parseado
         let parsedValue = s.value;
-        if (typeof s.value === 'string' && s.value.startsWith('"') && s.value.endsWith('"')) {
+        
+        // Si es un string, intentar parsearlo
+        if (typeof s.value === 'string') {
           try {
+            // Si es un JSON string (ej: "contacto@email.com"), parsearlo
             parsedValue = JSON.parse(s.value);
           } catch {
-            // Si falla el parse, usar el valor original
+            // Si no es JSON válido, usar el valor directamente
             parsedValue = s.value;
           }
         }
-        settings[s.key] = parsedValue;
+        
+        // Asignar el valor parseado según la clave
+        if (s.key === 'contact_email' && typeof parsedValue === 'string') {
+          contactEmail = parsedValue;
+        } else if (s.key === 'contact_phone' && typeof parsedValue === 'string') {
+          contactPhone = parsedValue;
+        } else if (s.key === 'location' && typeof parsedValue === 'string') {
+          location = parsedValue;
+        }
       });
-
-      if (settings.contact_email && typeof settings.contact_email === 'string') {
-        contactEmail = settings.contact_email;
-      }
-      if (settings.contact_phone && typeof settings.contact_phone === 'string') {
-        contactPhone = settings.contact_phone;
-      }
-      if (settings.location && typeof settings.location === 'string') {
-        location = settings.location;
-      }
     }
   } catch (error) {
     // Si hay error, usar valores por defecto
