@@ -22,7 +22,7 @@ jobs:
     continue-on-error: true  # No bloquear workflow completo
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -50,7 +50,7 @@ jobs:
     continue-on-error: true  # No bloquear workflow completo
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -93,7 +93,7 @@ jobs:
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev')
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -127,7 +127,7 @@ jobs:
     continue-on-error: true  # No fallar si secrets no están configurados
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Deploy to Vercel
         continue-on-error: true
@@ -148,7 +148,7 @@ jobs:
     continue-on-error: true  # No bloquear si falla
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
