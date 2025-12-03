@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import imageCompression from 'browser-image-compression';
 import { supabase, getSessionWithTimeout } from '@/lib/supabaseClient';
 import Link from 'next/link';
+import CommissionPreview from '@/components/CommissionPreview';
 
 // Helper para formatear moneda
 function formatCurrency(amount: number): string {
@@ -61,6 +62,15 @@ export default function NewProduct() {
   
   // Campos específicos por categoría
   const [categoryFields, setCategoryFields] = useState<AllCategoryFields>({});
+
+  // LPMS-COMMISSION-START: Estado para información de comisiones
+  const [commissionInfo, setCommissionInfo] = useState<{
+    percent: number;
+    amount: number;
+    sellerEarnings: number;
+  } | null>(null);
+  const [commissionLoading, setCommissionLoading] = useState(false);
+  // LPMS-COMMISSION-END
 
   const [imagePreviews, setImagePreviews] = useState<ImagePreview[]>([]);
   const [loading, setLoading] = useState(false);
@@ -175,6 +185,54 @@ export default function NewProduct() {
   }, []);
 
   const priceNumber = useMemo(() => Number(price || 0), [price]);
+
+  // LPMS-COMMISSION-START: Cargar información de comisiones cuando cambia precio o tipo de venta
+  useEffect(() => {
+    if (saleType === 'direct' && priceNumber > 0) {
+      loadCommissionInfo();
+    } else {
+      setCommissionInfo(null);
+    }
+  }, [priceNumber, saleType, storeId]);
+
+  async function loadCommissionInfo() {
+    if (!priceNumber || priceNumber <= 0 || saleType !== 'direct') {
+      setCommissionInfo(null);
+      return;
+    }
+
+    setCommissionLoading(true);
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      if (!session?.session?.user?.id) {
+        setCommissionInfo(null);
+        return;
+      }
+
+      const sellerId = session.session.user.id;
+      const { getCommissionForDirectSale } = await import('@/lib/services/commissionService');
+      
+      const commissionPercent = await getCommissionForDirectSale(
+        sellerId,
+        storeId || undefined
+      );
+      
+      const commissionAmount = Math.round(priceNumber * commissionPercent / 100);
+      const sellerEarnings = priceNumber - commissionAmount;
+      
+      setCommissionInfo({
+        percent: commissionPercent,
+        amount: commissionAmount,
+        sellerEarnings: sellerEarnings
+      });
+    } catch (err) {
+      console.error('Error loading commission info:', err);
+      setCommissionInfo(null);
+    } finally {
+      setCommissionLoading(false);
+    }
+  }
+  // LPMS-COMMISSION-END
   const imagesCount = imagePreviews.length;
 
   // Validación en tiempo real
@@ -893,6 +951,19 @@ export default function NewProduct() {
               {validationErrors.price && (
                 <p className="text-red-500 text-sm mt-1">{validationErrors.price}</p>
               )}
+              {/* LPMS-COMMISSION-START: Vista previa de comisiones */}
+              {saleType === 'direct' && priceNumber > 0 && (
+                commissionLoading || commissionInfo ? (
+                  <CommissionPreview
+                    price={priceNumber}
+                    commissionPercent={commissionInfo?.percent || 0}
+                    commissionAmount={commissionInfo?.amount || 0}
+                    sellerEarnings={commissionInfo?.sellerEarnings || 0}
+                    loading={commissionLoading}
+                  />
+                ) : null
+              )}
+              {/* LPMS-COMMISSION-END */}
             </div>
           )}
 

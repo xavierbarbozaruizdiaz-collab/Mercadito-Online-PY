@@ -8,6 +8,7 @@ import { getAuctionById, getAuctionStats, type AuctionProduct } from '@/lib/serv
 import AuctionTimer from '@/components/auction/AuctionTimer';
 import BidForm from '@/components/auction/BidForm';
 import BidHistory from '@/components/auction/BidHistory';
+import AuctionEndedSummary from '@/components/auction/AuctionEndedSummary';
 import { formatCurrency } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
@@ -244,7 +245,10 @@ export default function AuctionDetailPage() {
             console.log('✅ Conectado a canal de subasta');
           } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
             setIsConnected(false);
-            console.warn('⚠️ Desconectado del canal de subasta');
+            // Solo loguear en desarrollo, no mostrar warning en producción
+            if (process.env.NODE_ENV === 'development') {
+              console.warn('⚠️ Desconectado del canal de subasta');
+            }
             // Forzar re-fetch al reconectar
             setTimeout(() => {
               loadAuction();
@@ -955,6 +959,15 @@ export default function AuctionDetailPage() {
                 </CardContent>
               </Card>
             )}
+
+            {/* LPMS-COMMISSION-START: Resumen de comisiones para vendedor cuando subasta finaliza */}
+            {isEnded && auction.auction_status === 'ended' && currentUserId === auction.seller_id && (
+              <AuctionEndedSummary 
+                auctionId={productId} 
+                productTitle={auction.title}
+              />
+            )}
+            {/* LPMS-COMMISSION-END */}
 
             {/* Área de pujas - Estilo tipo Copart/IAA */}
             {isActive && (
