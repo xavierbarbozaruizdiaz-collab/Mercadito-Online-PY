@@ -8,7 +8,6 @@ import { getAuctionById, getAuctionStats, type AuctionProduct } from '@/lib/serv
 import AuctionTimer from '@/components/auction/AuctionTimer';
 import BidForm from '@/components/auction/BidForm';
 import BidHistory from '@/components/auction/BidHistory';
-import AuctionEndedSummary from '@/components/auction/AuctionEndedSummary';
 import { formatCurrency } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
@@ -245,14 +244,14 @@ export default function AuctionDetailPage() {
             console.log('✅ Conectado a canal de subasta');
           } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
             setIsConnected(false);
-            // Solo loguear en desarrollo, no mostrar warning en producción
-            if (process.env.NODE_ENV === 'development') {
-              console.warn('⚠️ Desconectado del canal de subasta');
-            }
-            // Forzar re-fetch al reconectar
+            console.warn('⚠️ Desconectado del canal de subasta. El sistema intentará reconectar automáticamente...');
+            
+            // Recargar datos de la subasta después de un breve retraso
+            // El canal de Supabase se reconectará automáticamente
             setTimeout(() => {
+              console.log('🔄 Recargando datos de la subasta...');
               loadAuction();
-            }, 1000);
+            }, 2000);
           }
         });
       
@@ -586,36 +585,64 @@ export default function AuctionDetailPage() {
     );
   }
 
-  const isActive = auction.auction_status === 'active';
-  const isScheduled = auction.auction_status === 'scheduled';
-  const isEnded = auction.auction_status === 'ended' || auction.auction_status === 'cancelled';
-  const currentBid = auction.current_bid || auction.price;
-  
   // Calcular tiempo para el timer usando tiempo sincronizado del servidor
   // Usar getSyncedNow() para obtener tiempo sincronizado actualizado
   // Calcular dentro del render para que se actualice en cada renderizado
   const syncedNowMs = getSyncedNow();
+  
+  // Determinar estado real de la subasta
+  // Considerar tanto el estado en BD como las fechas reales
+  const hasStartDate = auction.auction_start_at ? new Date(auction.auction_start_at).getTime() <= syncedNowMs : false;
+  const hasEndDate = auction.auction_end_at ? new Date(auction.auction_end_at).getTime() > syncedNowMs : false;
+  
+  // La subasta está realmente activa si:
+  // 1. El estado en BD es 'active', O
+  // 2. Tiene fecha de inicio que ya pasó y fecha de fin que aún no pasó (aunque el estado no se haya actualizado aún)
+  const isActive = auction.auction_status === 'active' || 
+                   (auction.auction_status !== 'ended' && 
+                    auction.auction_status !== 'cancelled' && 
+                    hasStartDate && 
+                    hasEndDate);
+  
+  const isScheduled = auction.auction_status === 'scheduled' && !hasStartDate;
+  const isEnded: boolean = Boolean(
+    auction.auction_status === 'ended' || 
+    auction.auction_status === 'cancelled' || 
+    (auction.auction_end_at && new Date(auction.auction_end_at).getTime() <= syncedNowMs)
+  );
+  const currentBid = auction.current_bid || auction.price;
   let endAtMs = 0;
   let startAtMs = 0;
   
-  // Para subastas activas, mostrar tiempo hasta el fin
-  if (auction.auction_end_at && !isEnded) {
-    const endDate = new Date(auction.auction_end_at);
-    endAtMs = endDate.getTime();
-    // Si ya pasó el tiempo, no mostrar
-    if (endAtMs <= syncedNowMs) {
-      endAtMs = 0;
+  // IMPORTANTE: Si la subasta ya finalizó, no calcular tiempos (mostrar estado finalizado)
+  if (isEnded) {
+    // No calcular tiempos si ya finalizó - el componente mostrará el estado finalizado
+    endAtMs = 0;
+    startAtMs = 0;
+  } else {
+    // Para subastas activas, mostrar tiempo hasta el fin
+    if (auction.auction_end_at && isActive) {
+      const endDate = new Date(auction.auction_end_at);
+      endAtMs = endDate.getTime();
+      // Si ya pasó el tiempo pero no está marcada como ended, aún mostrar (puede estar procesando)
+      if (endAtMs <= syncedNowMs) {
+        // Si pasó el tiempo pero el estado aún no es 'ended', podría estar en proceso
+        // Mantener endAtMs para que el timer muestre 0:00 o el componente maneje la expiración
+        // El servidor debería actualizar el estado a 'ended' pronto
+      }
     }
-  }
-  
-  // Para subastas programadas, mostrar tiempo hasta el inicio
-  // O también si no está activa pero tiene fecha de inicio
-  if (auction.auction_start_at && (isScheduled || (!isActive && !isEnded))) {
-    const startDate = new Date(auction.auction_start_at);
-    startAtMs = startDate.getTime();
-    // Solo mostrar si la fecha es en el futuro (usando tiempo sincronizado)
-    if (startAtMs <= syncedNowMs) {
-      startAtMs = 0; // Ya pasó, no mostrar
+    
+    // Para subastas programadas, mostrar tiempo hasta el inicio
+    // Solo si está programada Y tiene fecha de inicio
+    if (auction.auction_start_at && isScheduled) {
+      const startDate = new Date(auction.auction_start_at);
+      startAtMs = startDate.getTime();
+      // Solo mostrar si la fecha es en el futuro (usando tiempo sincronizado)
+      if (startAtMs <= syncedNowMs) {
+        // Si la fecha ya pasó pero sigue en scheduled, el servidor debería activarla
+        // Por ahora, no mostrar timer (startAtMs = 0)
+        startAtMs = 0;
+      }
     }
   }
   
@@ -809,8 +836,8 @@ export default function AuctionDetailPage() {
 
           {/* Columna derecha: Área de pujas destacada */}
           <div className="space-y-6">
-            {/* Timer prominente - SIEMPRE visible - Mejorado estéticamente */}
-            {(!isEnded && (endAtMs > 0 || startAtMs > 0)) && (
+            {/* Timer prominente - Solo mostrar si NO está finalizada y tiene tiempo */}
+            {!isEnded && (endAtMs > 0 || startAtMs > 0) && (
               <Card className="border-2 border-blue-500 shadow-2xl relative overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-br from-blue-600 via-purple-600 to-indigo-700 opacity-10 animate-pulse"></div>
                 <CardContent className="p-6 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 relative">
@@ -861,26 +888,24 @@ export default function AuctionDetailPage() {
                           loadAuction();
                         }}
                       />
-                    ) : (
-                      <div className="text-blue-900">
-                        <p className="text-sm">Esperando fecha de inicio...</p>
-                      </div>
-                    )}
+                    ) : null}
                     {/* Toggle de sonido */}
-                    <button
-                      onClick={() => setSoundEnabled(!soundEnabled)}
-                      className="mt-3 text-xs text-gray-600 hover:text-gray-900 transition-colors flex items-center gap-1 mx-auto"
-                      title={soundEnabled ? 'Sonido activado' : 'Sonido desactivado'}
-                    >
-                      {soundEnabled ? '🔊' : '🔇'} {soundEnabled ? 'Sonido ON' : 'Sonido OFF'}
-                    </button>
+                    {(isActive && endAtMs > 0) || startAtMs > 0 ? (
+                      <button
+                        onClick={() => setSoundEnabled(!soundEnabled)}
+                        className="mt-3 text-xs text-gray-600 hover:text-gray-900 transition-colors flex items-center gap-1 mx-auto"
+                        title={soundEnabled ? 'Sonido activado' : 'Sonido desactivado'}
+                      >
+                        {soundEnabled ? '🔊' : '🔇'} {soundEnabled ? 'Sonido ON' : 'Sonido OFF'}
+                      </button>
+                    ) : null}
                   </div>
                 </CardContent>
               </Card>
             )}
             
-            {/* Mostrar mensaje si no hay fechas configuradas */}
-            {!isEnded && endAtMs === 0 && startAtMs === 0 && (
+            {/* Mostrar mensaje si está programada pero no hay fechas configuradas - Solo si NO está finalizada */}
+            {!isEnded && isScheduled && endAtMs === 0 && startAtMs === 0 && (
               <Card className="border-2 border-yellow-400 shadow-lg">
                 <CardContent className="p-6 bg-yellow-50">
                   <div className="text-center">
@@ -888,7 +913,9 @@ export default function AuctionDetailPage() {
                       ⚠️ Subasta Programada
                     </p>
                     <p className="text-xs text-yellow-700">
-                      Las fechas de inicio aún no están configuradas
+                      {auction.auction_start_at 
+                        ? 'La fecha de inicio ya pasó. La subasta se activará pronto.'
+                        : 'Las fechas de inicio aún no están configuradas'}
                     </p>
                   </div>
                 </CardContent>
@@ -960,16 +987,8 @@ export default function AuctionDetailPage() {
               </Card>
             )}
 
-            {/* LPMS-COMMISSION-START: Resumen de comisiones para vendedor cuando subasta finaliza */}
-            {isEnded && auction.auction_status === 'ended' && currentUserId === auction.seller_id && (
-              <AuctionEndedSummary 
-                auctionId={productId} 
-                productTitle={auction.title}
-              />
-            )}
-            {/* LPMS-COMMISSION-END */}
-
             {/* Área de pujas - Estilo tipo Copart/IAA */}
+            {/* Mostrar formulario si está activa (ahora incluye verificación de fechas) */}
             {isActive && (
               <Card className="border-2 border-purple-500 shadow-lg">
                 <CardHeader className="bg-gradient-to-r from-purple-600 to-purple-700 text-white">
@@ -1037,7 +1056,13 @@ export default function AuctionDetailPage() {
                     <Alert variant="warning" className="mb-4">
                       <AlertDescription className="flex items-center gap-2">
                         <Clock className="h-4 w-4 animate-pulse" />
-                        Reconectando... Las pujas están deshabilitadas temporalmente.
+                        <div>
+                          <strong>Desconectado del canal en tiempo real</strong>
+                          <p className="text-sm mt-1 opacity-90">
+                            No recibirás actualizaciones instantáneas. Las pujas siguen funcionando normalmente.
+                            Intentando reconectar...
+                          </p>
+                        </div>
                       </AlertDescription>
                     </Alert>
                   )}
