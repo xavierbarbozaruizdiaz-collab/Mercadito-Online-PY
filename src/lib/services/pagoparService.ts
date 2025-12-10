@@ -3,6 +3,7 @@
 // Integración con la pasarela de pagos Pagopar de Paraguay
 // ============================================
 
+import { createHash } from 'crypto';
 import { logger } from '@/lib/utils/logger';
 
 export interface PagoparConfig {
@@ -38,6 +39,7 @@ export interface PagoparInvoice {
   venta?: {
     forma_pago: number; // 1 = Contado, 2 = Cuotas
   };
+  external_reference?: string; // Referencia externa (orderId o subscriptionId)
 }
 
 export interface PagoparCreateTokenResponse {
@@ -95,10 +97,64 @@ function getConfig(): PagoparConfig {
 // ============================================
 
 function getApiUrl(endpoint: string): string {
-  // Pagopar usa la misma URL para sandbox y producción, pero diferentes tokens
+  // NOTA: Según documentación de Pagopar, usan la misma URL para sandbox y producción
+  // La diferencia está en los tokens (sandbox vs producción)
+  // URL oficial de Pagopar: https://api.pagopar.com/api
   const baseUrl = 'https://api.pagopar.com/api';
+  const fullUrl = `${baseUrl}/${endpoint}`;
   
-  return `${baseUrl}/${endpoint}`;
+  return fullUrl;
+}
+
+// ============================================
+// FUNCIONES HELPER PARA LOGGING SANITIZADO
+// ============================================
+
+/**
+ * Sanitiza un token mostrando solo los primeros 4 y últimos 4 caracteres
+ */
+function sanitizeToken(token: string | null | undefined): string | null {
+  if (!token) return null;
+  if (token.length <= 8) return '***';
+  return `${token.slice(0, 4)}***${token.slice(-4)}`;
+}
+
+/**
+ * Sanitiza el payload del comprador para logging (sin datos sensibles completos)
+ */
+function sanitizeBuyer(buyer: PagoparInvoice['comprador']): {
+  razon_social: string;
+  ruc: string;
+  email: string;
+  telefono: string;
+} {
+  return {
+    razon_social: buyer.razon_social,
+    ruc: buyer.ruc,
+    email: buyer.email ? `${buyer.email.split('@')[0]}@***` : buyer.email, // Solo mostrar parte local del email
+    telefono: buyer.telefono ? `${buyer.telefono.slice(0, 3)}***${buyer.telefono.slice(-2)}` : buyer.telefono,
+  };
+}
+
+/**
+ * Log del payload sanitizado (solo en servidor)
+ */
+function logSanitizedPayload(
+  operation: 'create-token' | 'create-invoice',
+  url: string,
+  environment: 'sandbox' | 'production',
+  method: string,
+  bodySanitized: any
+): void {
+  // Solo loguear en servidor (no en cliente)
+  if (typeof window !== 'undefined') return;
+
+  console.error(`[pagopar][${operation}] payload`, {
+    url,
+    environment,
+    method,
+    bodySanitized,
+  });
 }
 
 // ============================================
@@ -106,33 +162,173 @@ function getApiUrl(endpoint: string): string {
 // ============================================
 
 /**
+ * Generar token SHA1 para orden Pagopar según especificación oficial
+ * token = sha1(privateToken + orderId + monto_total_normalizado)
+ * 
+ * @param privateToken - Token privado del comercio (PAGOPAR_PRIVATE_TOKEN)
+ * @param orderId - ID del pedido en nuestra base de datos
+ * @param totalAmountGs - Monto total en Guaraníes como entero (ej: 200000)
+ * @returns Hash SHA1 del token combinado
+ */
+export function generatePagoparOrderToken({
+  privateToken,
+  orderId,
+  totalAmountGs,
+}: {
+  privateToken: string;
+  orderId: string | number;
+  totalAmountGs: number;
+}): string {
+  // Validaciones
+  if (!privateToken || !privateToken.trim()) {
+    throw new Error('privateToken es requerido para generar token SHA1');
+  }
+  if (orderId === null || orderId === undefined || orderId === '') {
+    throw new Error('orderId es requerido para generar token SHA1');
+  }
+  if (totalAmountGs === null || totalAmountGs === undefined || isNaN(totalAmountGs) || totalAmountGs <= 0) {
+    throw new Error('totalAmountGs debe ser un número mayor a 0');
+  }
+  
+  // Normalizar monto_total a entero y convertir a string
+  const montoTotalNormalizado = Math.round(totalAmountGs).toString();
+  
+  // Convertir orderId a string
+  const orderIdStr = String(orderId);
+  
+  // Concatenar: privateToken + orderId + monto_total_normalizado
+  const tokenString = privateToken + orderIdStr + montoTotalNormalizado;
+  
+  // Generar hash SHA1
+  const hash = createHash('sha1');
+  hash.update(tokenString);
+  const tokenHash = hash.digest('hex');
+  
+  return tokenHash;
+}
+
+/**
  * Crear token de autenticación Pagopar
  */
 export async function createPagoparToken(): Promise<PagoparToken> {
   try {
+    const config = getConfig();
     
-    const response = await fetch(getApiUrl('token'), {
+    // Validar que los tokens existen antes de hacer la llamada
+    if (!config.publicToken || !config.privateToken) {
+      throw new Error('Pagopar tokens no están configurados. Verifica las variables de entorno NEXT_PUBLIC_PAGOPAR_PUBLIC_TOKEN y PAGOPAR_PRIVATE_TOKEN');
+    }
+
+    const apiUrl = getApiUrl('token');
+    
+    // Logging detallado ANTES del request (sin exponer tokens)
+    logger.info('[pagopar][create-token] request', {
+      url: apiUrl,
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        public_key: getConfig().publicToken,
-        private_key: getConfig().privateToken,
-      }),
+      environment: config.environment,
+      hasPublicToken: !!config.publicToken,
+      hasPrivateToken: !!config.privateToken,
+      publicTokenLength: config.publicToken.length,
+      publicTokenPreview: sanitizeToken(config.publicToken),
+      // No exponer información del token privado
     });
+
+    // Preparar payload (sin loguear valores completos por seguridad)
+    const requestPayload = {
+      public_key: config.publicToken,
+      private_key: config.privateToken,
+    };
+
+    // Log del payload sanitizado ANTES del fetch
+    logSanitizedPayload(
+      'create-token',
+      apiUrl,
+      config.environment,
+      'POST',
+      {
+        publicTokenPreview: sanitizeToken(config.publicToken),
+        privateTokenPreview: sanitizeToken(config.privateToken),
+      }
+    );
+
+    let response: Response;
+    let responseBodyText: string;
+    
+    try {
+      // Logging del request que se va a enviar (sin valores sensibles)
+      logger.debug('[pagopar][create-token] sending request', {
+        url: apiUrl,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        payloadKeys: Object.keys(requestPayload),
+        payloadHasPublicKey: !!requestPayload.public_key,
+        payloadHasPrivateKey: !!requestPayload.private_key,
+      });
+
+      response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestPayload),
+        // Timeout de 30 segundos
+        signal: AbortSignal.timeout(30000),
+      });
+    } catch (fetchError: any) {
+      // Error de red (timeout, conexión rechazada, DNS, etc.)
+      logger.error('[pagopar][create-token] network error', {
+        url: apiUrl,
+        method: 'POST',
+        errorType: fetchError?.name || 'unknown',
+        message: fetchError?.message,
+        stack: fetchError?.stack,
+        environment: config.environment,
+      });
+      throw new Error(`Pagopar network error: ${fetchError?.message || 'Failed to connect to Pagopar API'}`);
+    }
 
     // Leer el body como texto ANTES de verificar response.ok
     // Esto nos permite ver la respuesta exacta de Pagopar incluso si hay error
-    const responseBodyText = await response.text();
-
-    // Log detallado de la respuesta (solo si hay error o para debug)
-    if (!response.ok) {
-      logger.error('[pagopar][create-token] response error', {
+    try {
+      responseBodyText = await response.text();
+    } catch (readError: any) {
+      logger.error('[pagopar][create-token] error reading response body', {
+        error: readError?.message,
         status: response.status,
         statusText: response.statusText,
-        body: responseBodyText,
-        url: getApiUrl('token'),
+      });
+      throw new Error(`Pagopar network error: Failed to read response body - ${readError?.message}`);
+    }
+
+    // Logging detallado de la respuesta (SIEMPRE, para debugging)
+    logger.info('[pagopar][create-token] response', {
+      url: apiUrl,
+      method: 'POST',
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok,
+      isClientError: response.status >= 400 && response.status < 500,
+      isServerError: response.status >= 500,
+      bodyLength: responseBodyText.length,
+      bodyPreview: responseBodyText.substring(0, 500), // Solo primeros 500 chars
+      environment: config.environment,
+    });
+
+    // Log detallado de la respuesta (solo si hay error)
+    if (!response.ok) {
+      // Error de API (status >= 400)
+      logger.error('[pagopar][create-token] API error response', {
+        url: apiUrl,
+        method: 'POST',
+        status: response.status,
+        statusText: response.statusText,
+        bodyPreview: responseBodyText.substring(0, 500), // Solo primeros 500 chars
+        bodyLength: responseBodyText.length,
+        isClientError: response.status >= 400 && response.status < 500,
+        isServerError: response.status >= 500,
+        environment: config.environment,
       });
       
       // Intentar parsear el body como JSON para obtener errores más detallados
@@ -140,13 +336,15 @@ export async function createPagoparToken(): Promise<PagoparToken> {
       try {
         const errorData = JSON.parse(responseBodyText);
         if (errorData.errores && Array.isArray(errorData.errores)) {
-          errorMessage = `Pagopar API error: ${errorData.errores.join(', ')}`;
+          errorMessage = `Pagopar API error (${response.status}): ${errorData.errores.join(', ')}`;
         } else if (errorData.mensaje) {
-          errorMessage = `Pagopar API error: ${errorData.mensaje}`;
+          errorMessage = `Pagopar API error (${response.status}): ${errorData.mensaje}`;
+        } else if (errorData.error) {
+          errorMessage = `Pagopar API error (${response.status}): ${errorData.error}`;
         }
       } catch (parseError) {
-        // Si no es JSON válido, usar el texto crudo
-        errorMessage = `Pagopar API error: ${response.status} ${response.statusText} - ${responseBodyText.substring(0, 200)}`;
+        // Si no es JSON válido, usar el texto crudo (truncado)
+        errorMessage = `Pagopar API error (${response.status} ${response.statusText}): ${responseBodyText.substring(0, 200)}`;
       }
       
       throw new Error(errorMessage);
@@ -167,7 +365,20 @@ export async function createPagoparToken(): Promise<PagoparToken> {
 
     return data.datos;
   } catch (err: any) {
-    logger.error('Error creating Pagopar token', err);
+    // Categorizar el error para mejor logging
+    const errorType = err?.message?.includes('network error') 
+      ? 'network' 
+      : err?.message?.includes('API error') 
+      ? 'api' 
+      : 'unknown';
+    
+    logger.error('[pagopar][create-token] error creating token', {
+      errorType,
+      message: err?.message,
+      stack: err?.stack,
+    });
+    
+    // Re-lanzar el error para que lo manejen los callers
     throw err;
   }
 }
@@ -176,44 +387,261 @@ export async function createPagoparToken(): Promise<PagoparToken> {
  * Crear factura en Pagopar
  */
 export async function createPagoparInvoice(
-  invoiceData: Omit<PagoparInvoice, 'token' | 'public_key'>
+  invoiceData: Omit<PagoparInvoice, 'token' | 'public_key'> & {
+    orderId?: string | number;
+    totalAmountGs?: number;
+  }
 ): Promise<{ id_factura: number; link_pago: string; qr_code?: string }> {
   try {
-    // Primero obtener token
-    const token = await createPagoparToken();
-
+    const config = getConfig();
+    
+    // Validar y normalizar monto_total (debe ser entero en Guaraníes)
+    const montoTotal = Math.round(invoiceData.monto_total);
+    if (montoTotal <= 0) {
+      throw new Error('monto_total debe ser mayor a 0');
+    }
+    
+    // Validar y normalizar items (precios deben ser enteros)
+    const itemsNormalizados = invoiceData.items.map(item => ({
+      concepto: item.concepto,
+      cantidad: item.cantidad,
+      precio: Math.round(item.precio), // Asegurar que sea entero
+    }));
+    
+    // Validar que la suma de items coincida aproximadamente con monto_total
+    const sumaItems = itemsNormalizados.reduce((sum, item) => sum + (item.precio * item.cantidad), 0);
+    const diferencia = Math.abs(sumaItems - montoTotal);
+    if (diferencia > 100) { // Permitir diferencia de hasta 100 Gs. por redondeo
+      logger.warn('[pagopar][create-invoice] monto_total no coincide con suma de items', {
+        monto_total: montoTotal,
+        sumaItems,
+        diferencia,
+      });
+    }
+    
+    // Generar token SHA1 según especificación oficial de Pagopar
+    // token = sha1(privateToken + orderId + monto_total_normalizado)
+    let pagoparToken: string;
+    if (invoiceData.orderId && invoiceData.totalAmountGs !== undefined) {
+      // Usar el nuevo método con hash SHA1
+      pagoparToken = generatePagoparOrderToken({
+        privateToken: config.privateToken,
+        orderId: invoiceData.orderId,
+        totalAmountGs: invoiceData.totalAmountGs,
+      });
+      
+      logger.debug('[pagopar][create-invoice] using SHA1 token', {
+        orderId: invoiceData.orderId,
+        totalAmountGs: invoiceData.totalAmountGs,
+        tokenLength: pagoparToken.length,
+        tokenPreview: sanitizeToken(pagoparToken),
+      });
+    } else {
+      // Fallback: usar el método anterior (token de autenticación)
+      // Esto se mantiene para compatibilidad, pero debería usarse el método SHA1
+      const token = await createPagoparToken();
+      pagoparToken = token.token;
+      
+      logger.warn('[pagopar][create-invoice] using legacy token method (orderId/totalAmountGs not provided)');
+    }
+    
+    // Extraer orderId y totalAmountGs del invoiceData (no deben ir en el payload a Pagopar)
+    const { orderId: _orderId, totalAmountGs: _totalAmountGs, ...invoiceDataWithoutExtras } = invoiceData;
+    
     const invoicePayload: PagoparInvoice = {
-      ...invoiceData,
-      token: token.token,
-      public_key: getConfig().publicToken,
+      ...invoiceDataWithoutExtras,
+      monto_total: montoTotal,
+      items: itemsNormalizados,
+      token: pagoparToken,
+      public_key: config.publicToken,
     };
 
-    const response = await fetch(getApiUrl('facturacion'), {
+    const apiUrl = getApiUrl('facturacion');
+    
+    // Log del payload sanitizado ANTES del fetch
+    logSanitizedPayload(
+      'create-invoice',
+      apiUrl,
+      config.environment,
+      'POST',
+      {
+        monto_total: invoicePayload.monto_total,
+        tipo_factura: invoicePayload.tipo_factura,
+        items: invoicePayload.items.map(item => ({
+          concepto: item.concepto,
+          cantidad: item.cantidad,
+          precio: item.precio,
+        })),
+        comprador: sanitizeBuyer(invoicePayload.comprador),
+        fecha_vencimiento: invoicePayload.fecha_vencimiento,
+        external_reference: invoicePayload.external_reference,
+        venta: invoicePayload.venta,
+        tokenPreview: sanitizeToken(invoicePayload.token), // Token SHA1 sanitizado
+        publicTokenPreview: sanitizeToken(invoicePayload.public_key),
+      }
+    );
+    
+    // Logging detallado ANTES del request
+    logger.info('[pagopar][create-invoice] request', {
+      url: apiUrl,
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(invoicePayload),
+      environment: config.environment,
+      monto_total: invoicePayload.monto_total,
+      tipo_factura: invoicePayload.tipo_factura,
+      itemsCount: invoicePayload.items.length,
+      hasToken: !!invoicePayload.token,
+      hasPublicKey: !!invoicePayload.public_key,
+      tokenLength: invoicePayload.token?.length || 0,
+      tokenPreview: sanitizeToken(invoicePayload.token), // Token SHA1 sanitizado
+      publicKeyLength: invoicePayload.public_key?.length || 0,
+      external_reference: invoicePayload.external_reference,
+    });
+
+    let response: Response;
+    let responseBodyText: string;
+    
+    try {
+      // Logging del payload (sin valores sensibles completos)
+      logger.debug('[pagopar][create-invoice] sending request', {
+        url: apiUrl,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        payload: {
+          monto_total: invoicePayload.monto_total,
+          tipo_factura: invoicePayload.tipo_factura,
+          items: invoicePayload.items.map(item => ({
+            concepto: item.concepto,
+            cantidad: item.cantidad,
+            precio: item.precio,
+          })),
+          comprador: {
+            razon_social: invoicePayload.comprador.razon_social,
+            ruc: invoicePayload.comprador.ruc,
+            email: invoicePayload.comprador.email,
+            telefono: invoicePayload.comprador.telefono,
+          },
+          fecha_vencimiento: invoicePayload.fecha_vencimiento,
+          external_reference: invoicePayload.external_reference,
+          hasToken: !!invoicePayload.token,
+          hasPublicKey: !!invoicePayload.public_key,
+        },
+      });
+
+      response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(invoicePayload),
+        // Timeout de 30 segundos
+        signal: AbortSignal.timeout(30000),
+      });
+    } catch (fetchError: any) {
+      // Error de red (timeout, conexión rechazada, DNS, etc.)
+      logger.error('[pagopar][create-invoice] network error', {
+        url: apiUrl,
+        method: 'POST',
+        errorType: fetchError?.name || 'unknown',
+        message: fetchError?.message,
+        stack: fetchError?.stack,
+        environment: config.environment,
+      });
+      throw new Error(`Pagopar network error: ${fetchError?.message || 'Failed to connect to Pagopar API'}`);
+    }
+
+    // Leer el body como texto primero para mejor manejo de errores
+    try {
+      responseBodyText = await response.text();
+    } catch (readError: any) {
+      logger.error('[pagopar][create-invoice] error reading response body', {
+        error: readError?.message,
+        status: response.status,
+        statusText: response.statusText,
+      });
+      throw new Error(`Pagopar network error: Failed to read response body - ${readError?.message}`);
+    }
+
+    // Logging detallado de la respuesta (SIEMPRE, para debugging)
+    logger.info('[pagopar][create-invoice] response', {
+      url: apiUrl,
+      method: 'POST',
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok,
+      isClientError: response.status >= 400 && response.status < 500,
+      isServerError: response.status >= 500,
+      bodyLength: responseBodyText.length,
+      bodyPreview: responseBodyText.substring(0, 500), // Solo primeros 500 chars
+      environment: config.environment,
     });
 
     if (!response.ok) {
-      throw new Error(`Pagopar API error: ${response.status} ${response.statusText}`);
+      // Error de API (status >= 400)
+      logger.error('[pagopar][create-invoice] API error response', {
+        url: apiUrl,
+        method: 'POST',
+        status: response.status,
+        statusText: response.statusText,
+        bodyPreview: responseBodyText.substring(0, 500), // Solo primeros 500 chars
+        bodyLength: responseBodyText.length,
+        isClientError: response.status >= 400 && response.status < 500,
+        isServerError: response.status >= 500,
+        environment: config.environment,
+      });
+      
+      let errorMessage = `Pagopar API error: ${response.status} ${response.statusText}`;
+      try {
+        const errorData = JSON.parse(responseBodyText);
+        if (errorData.errores && Array.isArray(errorData.errores)) {
+          errorMessage = `Pagopar API error (${response.status}): ${errorData.errores.join(', ')}`;
+        } else if (errorData.mensaje) {
+          errorMessage = `Pagopar API error (${response.status}): ${errorData.mensaje}`;
+        } else if (errorData.error) {
+          errorMessage = `Pagopar API error (${response.status}): ${errorData.error}`;
+        }
+      } catch (parseError) {
+        // Si no es JSON válido, usar el texto crudo (truncado)
+        errorMessage = `Pagopar API error (${response.status} ${response.statusText}): ${responseBodyText.substring(0, 200)}`;
+      }
+      
+      throw new Error(errorMessage);
     }
 
-    const data: PagoparCreateInvoiceResponse = await response.json();
+    const data: PagoparCreateInvoiceResponse = JSON.parse(responseBodyText);
 
     if (!data.resultado || !data.datos) {
+      logger.error('[pagopar][create-invoice] invalid response structure', {
+        resultado: data.resultado,
+        hasDatos: !!data.datos,
+        errores: data.errores,
+        bodyPreview: responseBodyText.substring(0, 500),
+      });
       throw new Error(data.errores?.join(', ') || 'Error al crear factura Pagopar');
     }
 
-    logger.info('Pagopar invoice created', {
+    logger.info('[pagopar][create-invoice] invoice created successfully', {
       id_factura: data.datos.id_factura,
-      link_pago: data.datos.link_pago,
+      hasLinkPago: !!data.datos.link_pago,
     });
 
     return data.datos;
   } catch (err: any) {
-    logger.error('Error creating Pagopar invoice', err);
+    // Categorizar el error para mejor logging
+    const errorType = err?.message?.includes('network error') 
+      ? 'network' 
+      : err?.message?.includes('API error') 
+      ? 'api' 
+      : 'unknown';
+    
+    logger.error('[pagopar][create-invoice] error creating invoice', {
+      errorType,
+      message: err?.message,
+      stack: err?.stack,
+    });
+    
+    // Re-lanzar el error para que lo manejen los callers
     throw err;
   }
 }
@@ -281,11 +709,23 @@ export function formatPagoparItems(
     price: number;
   }>
 ): PagoparInvoiceItem[] {
-  return items.map(item => ({
-    concepto: item.title,
-    cantidad: item.quantity,
-    precio: Math.round(item.price), // Pagopar usa enteros (Guaraníes)
-  }));
+  // Pagopar requiere precios como enteros (Guaraníes sin decimales)
+  // Math.round() asegura que no haya decimales
+  return items.map(item => {
+    const precioRedondeado = Math.round(item.price);
+    if (precioRedondeado <= 0) {
+      logger.warn('[pagopar][format-items] precio <= 0 detectado', {
+        title: item.title,
+        price: item.price,
+        precioRedondeado,
+      });
+    }
+    return {
+      concepto: item.title,
+      cantidad: item.quantity,
+      precio: precioRedondeado,
+    };
+  });
 }
 
 /**

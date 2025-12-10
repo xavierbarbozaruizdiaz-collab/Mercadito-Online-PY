@@ -89,14 +89,21 @@ export async function POST(request: NextRequest) {
     const pagoparItems = formatPagoparItems(items);
     const tipoFactura = paymentMethod === 'card' ? 2 : 1;
 
+    // Normalizar monto total a entero (Guaraníes)
+    const totalAmountGs = Math.round(totalAmount);
+
     try {
       const invoice = await createPagoparInvoice({
-        monto_total: Math.round(totalAmount),
+        monto_total: totalAmountGs,
         tipo_factura: tipoFactura,
         comprador: pagoparBuyer,
         items: pagoparItems,
         fecha_vencimiento: calculateDueDate(7),
         venta: { forma_pago: 1 },
+        external_reference: orderId, // Referencia externa para tracking
+        // Pasar orderId y totalAmountGs para generar token SHA1 según especificación oficial
+        orderId: orderId,
+        totalAmountGs: totalAmountGs,
       });
 
       await (supabase as any)
