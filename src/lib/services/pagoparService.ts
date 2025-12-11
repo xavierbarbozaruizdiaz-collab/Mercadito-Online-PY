@@ -190,10 +190,11 @@ export function generatePagoparOrderToken({
     throw new Error('totalAmountGs debe ser un número mayor a 0');
   }
   
-  // Normalizar monto_total a entero y convertir a string
-  const montoTotalNormalizado = Math.round(totalAmountGs).toString();
+  // Según documentación Pagopar: sha1(token_privado + idPedido + strval(floatval(monto_total)))
+  // Convertir monto a float y luego a string (no redondear a entero)
+  const montoTotalNormalizado = parseFloat(String(totalAmountGs)).toString();
   
-  // Convertir orderId a string
+  // Convertir orderId a string (debe ser exactamente igual al id_pedido_comercio)
   const orderIdStr = String(orderId);
   
   // Concatenar: privateToken + orderId + monto_total_normalizado
