@@ -430,11 +430,13 @@ export async function createPagoparInvoice(
         totalAmountGs: invoiceData.totalAmountGs,
       });
       
-      logger.debug('[pagopar][create-invoice] using SHA1 token', {
+      logger.info('[pagopar][create-invoice] using SHA1 token', {
         orderId: invoiceData.orderId,
         totalAmountGs: invoiceData.totalAmountGs,
         tokenLength: pagoparToken.length,
         tokenPreview: sanitizeToken(pagoparToken),
+        tokenFirstChars: pagoparToken.substring(0, 10),
+        tokenLastChars: pagoparToken.substring(pagoparToken.length - 10),
       });
     } else {
       // Fallback: usar el método anterior (token de autenticación)
