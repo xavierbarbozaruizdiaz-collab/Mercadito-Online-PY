@@ -619,9 +619,18 @@ export async function createPagoparInvoice(
         resultado: data.resultado,
         hasDatos: !!data.datos,
         errores: data.errores,
-        bodyPreview: responseBodyText.substring(0, 500),
+        bodyFull: responseBodyText, // Log completo para debug
+        requestPayload: {
+          monto_total: invoicePayload.monto_total,
+          tipo_factura: invoicePayload.tipo_factura,
+          tokenLength: invoicePayload.token?.length,
+          tokenPreview: sanitizeToken(invoicePayload.token),
+          hasPublicKey: !!invoicePayload.public_key,
+          external_reference: invoicePayload.external_reference,
+        },
       });
-      throw new Error(data.errores?.join(', ') || 'Error al crear factura Pagopar');
+      const errorMsg = data.errores?.join(', ') || 'Error al crear factura Pagopar';
+      throw new Error(`${errorMsg} | Response: ${responseBodyText.substring(0, 200)}`);
     }
 
     logger.info('[pagopar][create-invoice] invoice created successfully', {
