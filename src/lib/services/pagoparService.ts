@@ -28,6 +28,7 @@ export interface PagoparInvoice {
   public_key: string;
   monto_total: number;
   tipo_factura: number; // 1 = Factura, 2 = Factura + Tarjeta
+  id_pedido_comercio?: string; // ID del pedido en nuestro sistema (requerido para token SHA1)
   comprador: {
     razon_social: string;
     ruc: string;
@@ -457,6 +458,8 @@ export async function createPagoparInvoice(
       items: itemsNormalizados,
       token: pagoparToken,
       public_key: config.publicToken,
+      // id_pedido_comercio debe coincidir exactamente con el orderId usado en el token SHA1
+      id_pedido_comercio: invoiceData.orderId ? String(invoiceData.orderId) : undefined,
     };
 
     const apiUrl = getApiUrl('facturacion');
