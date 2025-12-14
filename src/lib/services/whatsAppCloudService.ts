@@ -1,4 +1,160 @@
 // ============================================
+// MERCADITO ONLINE PY - WHATSAPP CLOUD SERVICE (v19.0)
+// Servicio liviano para WhatsApp Cloud API basado en env vars:
+// - WHATSAPP_TOKEN
+// - WHATSAPP_PHONE_ID
+// - APP_ENV / NEXT_PUBLIC_APP_ENV (solo producción)
+// ============================================
+
+import { logger } from '@/lib/utils/logger';
+
+const API_VERSION = 'v19.0';
+const GRAPH_BASE_URL = 'https://graph.facebook.com';
+
+function isProductionEnv(): boolean {
+  const appEnv = process.env.APP_ENV || process.env.NEXT_PUBLIC_APP_ENV || process.env.NODE_ENV;
+  return appEnv === 'production';
+}
+
+function getCredentials() {
+  const token = process.env.WHATSAPP_TOKEN;
+  const phoneId = process.env.WHATSAPP_PHONE_ID;
+
+  if (!token || !phoneId) {
+    logger.warn('WhatsApp Cloud API deshabilitado: faltan WHATSAPP_TOKEN o WHATSAPP_PHONE_ID');
+    return null;
+  }
+
+  if (!isProductionEnv()) {
+    logger.info('WhatsApp Cloud API desactivado en entorno no producción', {
+      APP_ENV: process.env.APP_ENV,
+      NEXT_PUBLIC_APP_ENV: process.env.NEXT_PUBLIC_APP_ENV,
+      NODE_ENV: process.env.NODE_ENV,
+    });
+    return null;
+  }
+
+  return { token, phoneId };
+}
+
+function formatPhone(to: string): string {
+  if (!to) return '';
+
+  // Solo números y +
+  let formatted = to.replace(/[^0-9+]/g, '');
+
+  // Quitar + inicial
+  if (formatted.startsWith('+')) {
+    formatted = formatted.substring(1);
+  }
+
+  // Reemplazar 0 inicial por 595 (Paraguay)
+  if (formatted.startsWith('0')) {
+    formatted = '595' + formatted.substring(1);
+  }
+
+  // Si no empieza con 595, agregarlo
+  if (!formatted.startsWith('595')) {
+    formatted = '595' + formatted;
+  }
+
+  return formatted;
+}
+
+export async function sendTextMessage(to: string, message: string): Promise<any> {
+  const creds = getCredentials();
+  if (!creds) return null;
+
+  try {
+    const payload = {
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to: formatPhone(to),
+      type: 'text',
+      text: { body: message },
+    };
+
+    const url = `${GRAPH_BASE_URL}/${API_VERSION}/${creds.phoneId}/messages`;
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${creds.token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      logger.error('Error enviando mensaje WhatsApp Cloud', {
+        status: response.status,
+        error,
+      });
+      return null;
+    }
+
+    const data = await response.json();
+    logger.info('Mensaje WhatsApp Cloud enviado', { to: formatPhone(to), data });
+    return data;
+  } catch (error) {
+    logger.error('Error inesperado en sendTextMessage (WhatsApp Cloud)', error);
+    return null;
+  }
+}
+
+export async function sendTemplate(
+  template: string,
+  to: string,
+  components?: any,
+  languageCode: string = 'es'
+): Promise<any> {
+  const creds = getCredentials();
+  if (!creds) return null;
+
+  try {
+    const payload = {
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to: formatPhone(to),
+      type: 'template',
+      template: {
+        name: template,
+        language: { code: languageCode },
+        components,
+      },
+    };
+
+    const url = `${GRAPH_BASE_URL}/${API_VERSION}/${creds.phoneId}/messages`;
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${creds.token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      logger.error('Error enviando plantilla WhatsApp Cloud', {
+        status: response.status,
+        error,
+      });
+      return null;
+    }
+
+    const data = await response.json();
+    logger.info('Plantilla WhatsApp Cloud enviada', { to: formatPhone(to), template, data });
+    return data;
+  } catch (error) {
+    logger.error('Error inesperado en sendTemplate (WhatsApp Cloud)', error);
+    return null;
+  }
+}
+
+// ============================================
 // WHATSAPP CLOUD API SERVICE
 // Servicio para enviar mensajes automáticos vía WhatsApp Cloud API
 // ============================================
