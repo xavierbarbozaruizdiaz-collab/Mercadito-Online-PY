@@ -54,16 +54,16 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-  // Redirects para compatibilidad con diferentes navegadores
-  async redirects() {
-    return [
-      {
-        source: '/manifest.webmanifest',
-        destination: '/manifest.json',
-        permanent: true,
-      },
-    ];
-  },
+  // Redirects removido - Next.js maneja manifest.webmanifest automáticamente
+  // async redirects() {
+  //   return [
+  //     {
+  //       source: '/manifest.webmanifest',
+  //       destination: '/manifest.json',
+  //       permanent: true,
+  //     },
+  //   ];
+  // },
 };
 
 export default nextConfig;
