@@ -5,8 +5,7 @@
 
 import { supabase } from '@/lib/supabaseClient';
 import { logger } from '@/lib/utils/logger';
-// Importar sendTextMessage - función exportada en línea 64 y re-exportada en línea 469
-// @ts-expect-error - TypeScript no detecta la exportación correctamente, pero existe en runtime
+// Importar sendTextMessage - función exportada directamente
 import { sendTextMessage } from '@/lib/services/whatsAppCloudService';
 
 async function getUserPhone(userId: string): Promise<string | null> {
