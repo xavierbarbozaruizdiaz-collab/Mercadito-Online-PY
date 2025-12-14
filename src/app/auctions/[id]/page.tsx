@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -13,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui';
-import { ArrowLeft, Gavel, User, MapPin, Calendar, Clock, ChevronLeft, ChevronRight, Share2, Flag, TrendingUp } from 'lucide-react';
+import { ArrowLeft, Gavel, User, MapPin, Calendar, Clock, ChevronLeft, ChevronRight, Share2, Flag, TrendingUp, ShoppingCart, CheckCircle2, XCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import ProductImageGallery from '@/components/ProductImageGallery';
 import { getSyncedNow } from '@/lib/utils/timeSync';
@@ -40,6 +40,16 @@ export default function AuctionDetailPage() {
   const [winnerInfo, setWinnerInfo] = useState<any>(null);
   const [recentEvents, setRecentEvents] = useState<Array<{type: string; message: string; time: string}>>([]);
   const [previousEndAt, setPreviousEndAt] = useState<string | null>(null); // Para detectar extensiones anti-sniping
+  
+  // Refs para polling adaptativo (accesibles desde callbacks)
+  const isInAntiSnipingRef = useRef<boolean>(false);
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const timeSyncIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Contador para limitar requests durante anti-sniping
+  const lastLoadTimeRef = useRef<number>(0);
+  const requestsInLastSecondRef = useRef<number>(0);
+  const requestsResetIntervalRef = useRef<NodeJS.Timeout | null>(null);
   
   // Función para reproducir sonido (mover fuera de useEffect)
   const playBidSound = useCallback(() => {
@@ -133,10 +143,88 @@ export default function AuctionDetailPage() {
     if (productId) {
       loadAuction();
       
-      // Verificar estado cada 10 segundos para activar/cerrar subastas automáticamente
-      const statusCheckInterval = setInterval(() => {
-        loadAuction();
-      }, 10000);
+      // ============================================
+      // POLLING ADAPTATIVO: Aumentar frecuencia en últimos segundos
+      // ============================================
+      const setupAdaptivePolling = () => {
+        // Limpiar intervalo anterior si existe
+        if (pollingIntervalRef.current) {
+          clearInterval(pollingIntervalRef.current);
+        }
+        
+        // Calcular tiempo restante
+        if (!auction?.auction_end_at || auction.auction_status === 'ended' || auction.auction_status === 'cancelled') {
+          // Si la subasta terminó, usar polling normal de 10s (para detectar cierre)
+          pollingIntervalRef.current = setInterval(() => {
+            loadAuction();
+          }, 10000);
+          return;
+        }
+        
+        const endAtMs = new Date(auction.auction_end_at).getTime();
+        const now = getSyncedNow();
+        const remainingMs = Math.max(0, endAtMs - now);
+        
+        // Determinar intervalo según tiempo restante
+        let intervalMs: number;
+        
+        if (isInAntiSnipingRef.current) {
+          // Durante extensión anti-sniping: actualizar cada 500ms usando quick endpoint
+          intervalMs = 500;
+          if (process.env.NODE_ENV === 'development') {
+            console.log('⚡ ANTI-SNIPING: Polling cada 500ms (quick)');
+          }
+          
+          pollingIntervalRef.current = setInterval(() => {
+            loadAuctionQuick();
+          }, intervalMs);
+        } else if (remainingMs <= 10000) {
+          // Últimos 10 segundos: actualizar cada 1 segundo usando quick
+          intervalMs = 1000;
+          if (process.env.NODE_ENV === 'development') {
+            console.log('🔥 ÚLTIMOS 10s: Polling cada 1s (quick)');
+          }
+          
+          pollingIntervalRef.current = setInterval(() => {
+            loadAuctionQuick();
+          }, intervalMs);
+        } else if (remainingMs <= 30000) {
+          // Últimos 30 segundos: actualizar cada 2 segundos usando quick
+          intervalMs = 2000;
+          if (process.env.NODE_ENV === 'development') {
+            console.log('🔥 ÚLTIMOS 30s: Polling cada 2s (quick)');
+          }
+          
+          pollingIntervalRef.current = setInterval(() => {
+            loadAuctionQuick();
+          }, intervalMs);
+        } else if (remainingMs <= 60000) {
+          // Último minuto: actualizar cada 3 segundos
+          intervalMs = 3000;
+          if (process.env.NODE_ENV === 'development') {
+            console.log('⏱️ ÚLTIMO MINUTO: Polling cada 3s');
+          }
+          
+          pollingIntervalRef.current = setInterval(() => {
+            loadAuction();
+          }, intervalMs);
+        } else {
+          // Normal: actualizar cada 10 segundos
+          intervalMs = 10000;
+          
+          pollingIntervalRef.current = setInterval(() => {
+            loadAuction();
+          }, intervalMs);
+        }
+      };
+      
+      // Configurar polling inicial
+      setupAdaptivePolling();
+      
+      // Reconfigurar polling cada 5 segundos para ajustar según tiempo restante
+      const pollingConfigInterval = setInterval(() => {
+        setupAdaptivePolling();
+      }, 5000);
       
       // Configurar suscripción en tiempo real para actualizar el timer cuando hay nuevas pujas
       const channel = supabase
@@ -173,9 +261,22 @@ export default function AuctionDetailPage() {
                 const extensionMs = newEndAt.getTime() - oldEndAt.getTime();
                 
                 if (extensionMs > 0) {
-                  console.log('⏰ ⚠️ ANTI-SNIPING ACTIVADO: +' + (extensionMs / 1000) + 's');
+                  if (process.env.NODE_ENV === 'development') {
+                    console.log('⏰ ⚠️ ANTI-SNIPING ACTIVADO: +' + (extensionMs / 1000) + 's');
+                  }
+                  isInAntiSnipingRef.current = true; // Activar flag para polling ultra-rápido
+                  requestsInLastSecondRef.current = 0; // Reset contador al activar anti-sniping
                   setNewBidNotification(`⏰ +${Math.floor(extensionMs / 1000)}s bonus tiempo!`);
-                  setTimeout(() => setNewBidNotification(null), 5000);
+                  
+                  // Reconfigurar polling inmediatamente para usar frecuencia anti-sniping
+                  setupAdaptivePolling();
+                  
+                  // Desactivar flag después de la extensión (con margen de seguridad)
+                  setTimeout(() => {
+                    isInAntiSnipingRef.current = false;
+                    requestsInLastSecondRef.current = 0;
+                    setupAdaptivePolling(); // Reconfigurar polling
+                  }, extensionMs + 5000); // Mantener polling rápido durante extensión + 5s
                   
                   // Sonido especial para extensión
                   try {
@@ -191,6 +292,9 @@ export default function AuctionDetailPage() {
                     oscillator.start(audioContext.currentTime);
                     oscillator.stop(audioContext.currentTime + 0.4);
                   } catch (e) {}
+                  
+                  // Ocultar notificación después de 5 segundos
+                  setTimeout(() => setNewBidNotification(null), 5000);
                 }
               }
               
@@ -229,54 +333,221 @@ export default function AuctionDetailPage() {
             if (payload.new) {
               const newBid = payload.new as any;
               const bidAmount = formatCurrency(newBid.amount);
+              if (process.env.NODE_ENV === 'development') {
               console.log('💰 Nueva puja recibida:', bidAmount);
+            }
               setNewBidNotification(`¡Nueva puja: ${bidAmount}!`);
               // Ocultar notificación después de 5 segundos
               setTimeout(() => setNewBidNotification(null), 5000);
             }
-            loadAuction();
+            
+            // CRÍTICO: Recargar subasta inmediatamente para actualizar winner_id y current_bid
+            // Esto asegura que todos los usuarios vean quién es el ganador actual
+            if (auction?.auction_end_at) {
+              const endAtMs = new Date(auction.auction_end_at).getTime();
+              const now = getSyncedNow();
+              const remainingMs = endAtMs - now;
+              
+              if (remainingMs <= 30000) {
+                // En últimos 30s, usar quick endpoint para respuesta más rápida
+                loadAuctionQuick();
+              } else {
+                loadAuction();
+              }
+              
+              if (remainingMs <= 60000) {
+                // Si quedan menos de 60 segundos, reconfigurar polling para usar frecuencia máxima
+                setupAdaptivePolling();
+              }
+            } else {
+              loadAuction();
+            }
           }
         )
         .subscribe((status) => {
           // Detectar estado de conexión
           if (status === 'SUBSCRIBED') {
             setIsConnected(true);
-            console.log('✅ Conectado a canal de subasta');
-          } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
-            setIsConnected(false);
-            console.warn('⚠️ Desconectado del canal de subasta. El sistema intentará reconectar automáticamente...');
-            
-            // Recargar datos de la subasta después de un breve retraso
-            // El canal de Supabase se reconectará automáticamente
-            setTimeout(() => {
-              console.log('🔄 Recargando datos de la subasta...');
-              loadAuction();
-            }, 2000);
-          }
+            if (process.env.NODE_ENV === 'development') {
+              console.log('✅ Conectado a canal de subasta');
+            }
+                      } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+                        setIsConnected(false);
+                        // Solo loguear warning en desarrollo o si es un error persistente
+                        if (process.env.NODE_ENV === 'development') {
+                          console.warn('⚠️ Desconectado del canal de subasta. El sistema intentará reconectar automáticamente...');
+                        }
+                        
+                        // Recargar datos de la subasta después de un breve retraso
+                        // El canal de Supabase se reconectará automáticamente
+                        setTimeout(() => {
+                          if (process.env.NODE_ENV === 'development') {
+                            console.log('🔄 Recargando datos de la subasta...');
+                          }
+                          loadAuction();
+                        }, 2000);
+                      }
         });
       
-      // Sincronizar tiempo del servidor periódicamente
-      const timeSyncInterval = setInterval(async () => {
-        try {
-          const { getServerTime } = await import('@/lib/utils/timeSync');
-          const serverTimeNow = await getServerTime();
-          setServerTime(serverTimeNow);
-        } catch (err) {
-          console.warn('Error sincronizando tiempo:', err);
+      // Sincronizar tiempo del servidor periódicamente (más frecuente en últimos segundos)
+      const setupTimeSync = () => {
+        if (timeSyncIntervalRef.current) {
+          clearInterval(timeSyncIntervalRef.current);
         }
-      }, 30000);
-
+        
+        // Calcular tiempo restante para determinar frecuencia
+        if (!auction?.auction_end_at || auction.auction_status === 'ended' || auction.auction_status === 'cancelled') {
+          // Subasta terminada: sincronizar cada 30s
+          timeSyncIntervalRef.current = setInterval(async () => {
+            try {
+              const { getServerTime } = await import('@/lib/utils/timeSync');
+              const serverTimeNow = await getServerTime();
+              setServerTime(serverTimeNow);
+            } catch (err) {
+              console.warn('Error sincronizando tiempo:', err);
+            }
+          }, 30000);
+          return;
+        }
+        
+        const endAtMs = new Date(auction.auction_end_at).getTime();
+        const now = getSyncedNow();
+        const remainingMs = Math.max(0, endAtMs - now);
+        
+        // Sincronizar más frecuentemente en últimos segundos
+        const syncInterval = remainingMs <= 60000 ? 5000 : 30000; // 5s si quedan <60s, 30s si no
+        
+        timeSyncIntervalRef.current = setInterval(async () => {
+          try {
+            const { getServerTime } = await import('@/lib/utils/timeSync');
+            const serverTimeNow = await getServerTime();
+            setServerTime(serverTimeNow);
+          } catch (err) {
+            console.warn('Error sincronizando tiempo:', err);
+          }
+        }, syncInterval);
+      };
+      
+      setupTimeSync();
+      
+      // Reconfigurar sincronización de tiempo cada 10 segundos
+      const timeSyncConfigInterval = setInterval(() => {
+        setupTimeSync();
+      }, 10000);
+      
+      // Reset contador de requests cada segundo durante anti-sniping
+      requestsResetIntervalRef.current = setInterval(() => {
+        requestsInLastSecondRef.current = 0;
+      }, 1000);
+      
       return () => {
-        clearInterval(statusCheckInterval);
-        clearInterval(timeSyncInterval);
+        if (pollingIntervalRef.current) {
+          clearInterval(pollingIntervalRef.current);
+        }
+        if (timeSyncIntervalRef.current) {
+          clearInterval(timeSyncIntervalRef.current);
+        }
+        if (requestsResetIntervalRef.current) {
+          clearInterval(requestsResetIntervalRef.current);
+        }
+        clearInterval(pollingConfigInterval);
+        clearInterval(timeSyncConfigInterval);
         supabase.removeChannel(channel);
       };
     }
   }, [productId, playBidSound, triggerBidConfetti]);
 
-  const loadAuction = async () => {
+  // Función para cargar solo datos críticos (últimos segundos)
+  const loadAuctionQuick = async () => {
     try {
+      const now = Date.now();
+      
+      // Límite de seguridad: máximo 5 requests por segundo durante anti-sniping
+      if (isInAntiSnipingRef.current) {
+        const timeSinceLastLoad = now - lastLoadTimeRef.current;
+        if (timeSinceLastLoad < 200) {
+          // Si pasó menos de 200ms desde la última carga, saltar esta
+          return;
+        }
+        
+        requestsInLastSecondRef.current++;
+        if (requestsInLastSecondRef.current > 5) {
+          // Límite de 5 requests por segundo alcanzado
+          return;
+        }
+      }
+      
+      lastLoadTimeRef.current = now;
+      
+      // Endpoint liviano solo para datos críticos
+      const response = await fetch(`/api/auctions/${productId}/quick`, {
+        cache: 'no-store',
+      });
+      
+      if (!response.ok) {
+        // Si falla quick endpoint, usar load completo
+        await loadAuction();
+        return;
+      }
+      
+      const quickData = await response.json();
+      
+      // Actualizar solo campos críticos
+      if (auction) {
+        setAuction({
+          ...auction,
+          current_bid: quickData.current_bid,
+          winner_id: quickData.winner_id,
+          auction_status: quickData.auction_status,
+          auction_end_at: quickData.auction_end_at,
+          total_bids: quickData.total_bids,
+        });
+        
+        // Actualizar previousEndAt si cambió (anti-sniping)
+        if (quickData.auction_end_at && quickData.auction_end_at !== previousEndAt) {
+          setPreviousEndAt(quickData.auction_end_at);
+        }
+        
+        // Si terminó, cargar datos completos una vez
+        if (quickData.auction_status === 'ended' && auction.auction_status !== 'ended') {
+          await loadAuction();
+        }
+      }
+    } catch (err) {
+      // Si falla, intentar carga completa
+      console.warn('Error en loadAuctionQuick, usando loadAuction completo:', err);
+      await loadAuction();
+    }
+  };
+
+  const loadAuction = async (useQuick: boolean = false) => {
+    try {
+      // Early return: Si la subasta terminó y ya tenemos los datos, no recargar innecesariamente
+      if (auction?.auction_status === 'ended' && !useQuick) {
+        // Solo recargar una vez más para asegurar datos finales
+        const hasLoadedAfterEnd = sessionStorage.getItem(`auction-ended-${productId}`);
+        if (hasLoadedAfterEnd) {
+          return;
+        }
+        sessionStorage.setItem(`auction-ended-${productId}`, 'true');
+      }
+      
       setError(null);
+      
+      // Determinar si usar endpoint quick (últimos 30 segundos)
+      const shouldUseQuick = useQuick || (() => {
+        if (!auction?.auction_end_at) return false;
+        const endAtMs = new Date(auction.auction_end_at).getTime();
+        const now = getSyncedNow();
+        const remainingMs = Math.max(0, endAtMs - now);
+        return remainingMs <= 30000; // Usar quick en últimos 30s
+      })();
+      
+      if (shouldUseQuick && !useQuick) {
+        // Si estamos en últimos 30s pero no fue llamado explícitamente como quick, usar quick
+        await loadAuctionQuick();
+        return;
+      }
       
       // Obtener usuario actual
       try {
@@ -286,7 +557,10 @@ export default function AuctionDetailPage() {
           setCurrentUserId(session.session.user.id);
         }
       } catch (err) {
-        console.warn('Error obteniendo usuario:', err);
+        // Reducir logs verbosos en producción
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('Error obteniendo usuario:', err);
+        }
       }
       
       // Obtener tiempo del servidor para sincronización
@@ -295,14 +569,16 @@ export default function AuctionDetailPage() {
         const serverTimeNow = await getServerTime();
         setServerTime(serverTimeNow);
       } catch (err) {
-        console.warn('Error sincronizando tiempo del servidor:', err);
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('Error sincronizando tiempo del servidor:', err);
+        }
         setServerTime(Date.now());
       }
       
       // Usar versión optimizada con caché y queries consolidadas
       const [auctionData, statsData] = await Promise.all([
         getAuctionById(productId, { 
-          useCache: true, 
+          useCache: !shouldUseQuick, // No usar caché en últimos segundos
           includeSellerInfo: true, 
           includeImages: true 
         }),
@@ -314,30 +590,23 @@ export default function AuctionDetailPage() {
         return;
       }
 
-      // Cargar información del vendedor
-      if (auctionData.seller_id) {
+      // Cargar información del vendedor (solo si no vino en auctionData)
+      // Mejor práctica: usar el servicio que maneja errores correctamente
+      if (auctionData.seller_id && !(auctionData as any).seller_info) {
         try {
-          console.log('🔍 Cargando información del vendedor:', auctionData.seller_id);
-          const { data: seller, error: sellerError } = await supabase
-            .from('profiles')
-            .select('id, first_name, last_name, email')
-            .eq('id', auctionData.seller_id)
-            .single();
+          // Usar servicio que maneja mejor los errores y RLS
+          const { getSellerProfileById } = await import('@/lib/services/sellerProfileService');
+          const sellerProfile = await getSellerProfileById(auctionData.seller_id);
           
-          if (sellerError) {
-            console.error('Error al obtener perfil del vendedor:', sellerError);
-            // Si el perfil no existe, crear un objeto fallback
+          if (sellerProfile) {
             setSellerInfo({
-              id: auctionData.seller_id,
-              first_name: null,
-              last_name: null,
-              email: null,
+              id: sellerProfile.id,
+              first_name: sellerProfile.first_name || null,
+              last_name: sellerProfile.last_name || null,
+              email: sellerProfile.email || null,
             });
-          } else if (seller) {
-            console.log('✅ Información del vendedor cargada:', seller);
-            setSellerInfo(seller);
           } else {
-            // Fallback si no hay datos
+            // Fallback silencioso - no romper la página si falta info del vendedor
             setSellerInfo({
               id: auctionData.seller_id,
               first_name: null,
@@ -346,8 +615,22 @@ export default function AuctionDetailPage() {
             });
           }
         } catch (err: any) {
-          console.error('Error loading seller info:', err);
-          // Fallback en caso de error
+          // Error silencioso - continuar sin info del vendedor
+          // NO loguear errores esperados (400, 401, PGRST116) - estos son normales en producción
+          const isExpectedError = 
+            err?.code === 'PGRST116' || 
+            err?.code === '23505' ||
+            err?.message?.includes('400') ||
+            err?.message?.includes('401') ||
+            err?.message?.includes('Unauthorized') ||
+            err?.message?.includes('Bad Request') ||
+            err?.status === 400 ||
+            err?.status === 401;
+          
+          if (!isExpectedError && process.env.NODE_ENV === 'development') {
+            console.warn('⚠️ Error cargando info del vendedor (no crítico):', err?.message || err);
+          }
+          
           setSellerInfo({
             id: auctionData.seller_id,
             first_name: null,
@@ -355,7 +638,11 @@ export default function AuctionDetailPage() {
             email: null,
           });
         }
-      } else {
+      } else if ((auctionData as any).seller_info) {
+        // Si ya viene en auctionData, usar eso
+        setSellerInfo((auctionData as any).seller_info);
+      } else if (!auctionData.seller_id) {
+        // Solo mostrar error si realmente no hay seller_id
         console.warn('⚠️ Subasta sin seller_id');
         setError('Esta subasta no tiene vendedor asignado');
       }
@@ -425,17 +712,31 @@ export default function AuctionDetailPage() {
       // Cargar información del ganador si la subasta terminó
       if (auctionData.auction_status === 'ended' && auctionData.winner_id) {
         try {
-          const { data: winner } = await supabase
-            .from('profiles')
-            .select('id, first_name, last_name, email')
-            .eq('id', auctionData.winner_id)
-            .single();
+          // Usar servicio para obtener perfil del ganador (mejor manejo de errores)
+          const { getSellerProfileById } = await import('@/lib/services/sellerProfileService');
+          const winnerProfile = await getSellerProfileById(auctionData.winner_id);
           
-          if (winner) {
-            setWinnerInfo(winner);
+          if (winnerProfile) {
+            setWinnerInfo({
+              id: winnerProfile.id,
+              first_name: winnerProfile.first_name || null,
+              last_name: winnerProfile.last_name || null,
+              email: winnerProfile.email || null,
+            });
           }
-        } catch (err) {
-          console.warn('Error cargando información del ganador:', err);
+        } catch (err: any) {
+          // Error silencioso - continuar sin info del ganador
+          // NO loguear errores esperados en producción
+          const isExpectedError = 
+            err?.code === 'PGRST116' || 
+            err?.message?.includes('400') ||
+            err?.message?.includes('401') ||
+            err?.status === 400 ||
+            err?.status === 401;
+          
+          if (!isExpectedError && process.env.NODE_ENV === 'development') {
+            console.warn('⚠️ Error cargando info del ganador (no crítico):', err?.message || err);
+          }
         }
       }
       
@@ -521,7 +822,7 @@ export default function AuctionDetailPage() {
       try {
         const { data: relatedData, error: relatedError } = await supabase
           .from('products')
-          .select('id, title, image_url:cover_url')
+          .select('id, title, cover_url')
           .eq('sale_type', 'auction')
           .not('seller_id', 'is', null)
           .or('status.is.null,status.eq.active,status.eq.paused')
@@ -533,12 +834,37 @@ export default function AuctionDetailPage() {
           setRelatedAuctions(relatedData.map((a: any) => ({
             id: a.id,
             title: a.title,
-            image_url: a.image_url
+            image_url: a.cover_url || null
           })));
           console.log('🔗 Subastas relacionadas cargadas:', relatedData.length);
+        } else if (relatedError) {
+          // NO loguear errores 400/401 - estos son esperados y no deben aparecer en consola de producción
+          const isExpectedError = 
+            relatedError.code === 'PGRST116' || 
+            relatedError.message?.includes('400') ||
+            relatedError.message?.includes('401') ||
+            relatedError.status === 400 ||
+            relatedError.status === 401;
+          
+          if (!isExpectedError && process.env.NODE_ENV === 'development') {
+            console.warn('⚠️ Error cargando subastas relacionadas:', relatedError);
+          }
+          // Continuar sin subastas relacionadas - no romper el flujo
         }
-      } catch (relatedErr) {
-        console.error('Error cargando subastas relacionadas:', relatedErr);
+      } catch (relatedErr: any) {
+        // Error silencioso para no romper la página
+        // NO loguear errores esperados (400, 401) en producción
+        const isExpectedError = 
+          relatedErr?.code === 'PGRST116' || 
+          relatedErr?.message?.includes('400') ||
+          relatedErr?.message?.includes('401') ||
+          relatedErr?.status === 400 ||
+          relatedErr?.status === 401;
+        
+        if (!isExpectedError && process.env.NODE_ENV === 'development') {
+          console.warn('⚠️ Excepción cargando subastas relacionadas (no crítico):', relatedErr?.message || relatedErr);
+        }
+        // Continuar sin subastas relacionadas
       }
       
     } catch (err: any) {
@@ -592,19 +918,21 @@ export default function AuctionDetailPage() {
   
   // Determinar estado real de la subasta
   // Considerar tanto el estado en BD como las fechas reales
-  const hasStartDate = auction.auction_start_at ? new Date(auction.auction_start_at).getTime() <= syncedNowMs : false;
+  const hasStartDate = auction.auction_start_at ? new Date(auction.auction_start_at).getTime() <= syncedNowMs : true; // Si no tiene start_at, considerar que ya empezó
   const hasEndDate = auction.auction_end_at ? new Date(auction.auction_end_at).getTime() > syncedNowMs : false;
   
   // La subasta está realmente activa si:
-  // 1. El estado en BD es 'active', O
-  // 2. Tiene fecha de inicio que ya pasó y fecha de fin que aún no pasó (aunque el estado no se haya actualizado aún)
-  const isActive = auction.auction_status === 'active' || 
-                   (auction.auction_status !== 'ended' && 
-                    auction.auction_status !== 'cancelled' && 
-                    hasStartDate && 
-                    hasEndDate);
+  // 1. El estado en BD es 'active' Y la fecha de inicio ya pasó (si existe), Y la fecha de fin no pasó (si existe)
+  // 2. O si no tiene start_at pero tiene estado 'active' y no está finalizada
+  const isActive = auction.auction_status === 'active' && 
+                   hasStartDate && // CRÍTICO: Debe haber iniciado
+                   (hasEndDate || !auction.auction_end_at); // Y no debe haber finalizado (si tiene end_at)
   
-  const isScheduled = auction.auction_status === 'scheduled' && !hasStartDate;
+  // La subasta está programada si:
+  // - Tiene estado 'scheduled', O
+  // - Tiene estado 'active' pero aún no ha iniciado (start_at en el futuro)
+  const isScheduled = auction.auction_status === 'scheduled' || 
+                     (auction.auction_status === 'active' && auction.auction_start_at && !hasStartDate);
   const isEnded: boolean = Boolean(
     auction.auction_status === 'ended' || 
     auction.auction_status === 'cancelled' || 
@@ -646,8 +974,9 @@ export default function AuctionDetailPage() {
     }
   }
   
-  // Debug: log de valores para verificar
-  console.log('🕐 Timer Debug:', {
+  // Debug: log de valores para verificar (solo en desarrollo)
+  if (process.env.NODE_ENV === 'development') {
+    console.log('🕐 Timer Debug:', {
     status: auction.auction_status,
     isActive,
     isScheduled,
@@ -656,17 +985,22 @@ export default function AuctionDetailPage() {
     auction_end_at: auction.auction_end_at,
     startAtMs,
     endAtMs,
-    startAtDate: startAtMs > 0 ? new Date(startAtMs).toISOString() : null,
-    endAtDate: endAtMs > 0 ? new Date(endAtMs).toISOString() : null,
-  });
+      startAtDate: startAtMs > 0 ? new Date(startAtMs).toISOString() : null,
+      endAtDate: endAtMs > 0 ? new Date(endAtMs).toISOString() : null,
+    });
+  }
 
-  // Encontrar índice de subasta actual en las relacionadas
-  const currentAuctionIndex = relatedAuctions.findIndex(a => a.id === productId);
-  const prevAuction = currentAuctionIndex > 0 ? relatedAuctions[currentAuctionIndex - 1] : null;
-  const nextAuction = currentAuctionIndex >= 0 && currentAuctionIndex < relatedAuctions.length - 1 
-    ? relatedAuctions[currentAuctionIndex + 1] 
-    : relatedAuctions.length > 0 && currentAuctionIndex === -1 
-      ? relatedAuctions[0] 
+  // Encontrar índice de subasta actual en las relacionadas (protección contra errores)
+  const currentAuctionIndex = Array.isArray(relatedAuctions) 
+    ? relatedAuctions.findIndex(a => a?.id === productId) 
+    : -1;
+  const prevAuction = currentAuctionIndex > 0 && Array.isArray(relatedAuctions)
+    ? relatedAuctions[currentAuctionIndex - 1] || null
+    : null;
+  const nextAuction = currentAuctionIndex >= 0 && Array.isArray(relatedAuctions) && currentAuctionIndex < relatedAuctions.length - 1 
+    ? relatedAuctions[currentAuctionIndex + 1] || null
+    : Array.isArray(relatedAuctions) && relatedAuctions.length > 0 && currentAuctionIndex === -1 
+      ? relatedAuctions[0] || null
       : null;
 
   return (
@@ -704,7 +1038,7 @@ export default function AuctionDetailPage() {
                   <h1 className="text-3xl font-bold text-gray-900 mb-2">{auction.title}</h1>
                   <div className="flex items-center gap-3 flex-wrap">
                     <Badge variant={isActive ? 'success' : isEnded ? 'secondary' : 'warning'} size="lg">
-                      {isActive ? 'ACTIVA' : isEnded ? 'FINALIZADA' : 'PROGRAMADA'}
+                      {isActive ? 'ACTIVA' : isEnded ? 'FINALIZADA' : isScheduled ? 'PROGRAMADA' : 'PROGRAMADA'}
                     </Badge>
                     {auction.reserve_price && (
                       <Badge variant="warning" size="md">
@@ -1082,15 +1416,91 @@ export default function AuctionDetailPage() {
                     />
                   </div>
 
-                  {/* Compra ahora destacada */}
-                  {auction.buy_now_price && (
+                  {/* Compra ahora destacada - Solo mostrar cuando la subasta haya terminado */}
+                  {auction.buy_now_price && isEnded && (
                     <div className="mt-6 pt-6 border-t">
-                      <div className="text-center mb-4">
-                        <p className="text-sm text-gray-600 mb-2">Compra Inmediata</p>
-                        <p className="text-2xl font-bold text-emerald-600">
-                          {formatCurrency(auction.buy_now_price)}
-                        </p>
-                      </div>
+                      {(() => {
+                        const needsApproval = currentBid < auction.buy_now_price;
+                        const approvalStatus = (auction as any).approval_status;
+                        const approvalDeadline = (auction as any).approval_deadline;
+                        
+                        if (needsApproval) {
+                          // Mostrar estado de aprobación
+                          if (approvalStatus === 'approved') {
+                            return (
+                              <div className="text-center p-4 bg-green-50 border-2 border-green-300 rounded-lg">
+                                <div className="flex items-center justify-center gap-2 mb-2">
+                                  <CheckCircle2 className="h-5 w-5 text-green-600" />
+                                  <p className="text-sm font-bold text-green-900">Compra Aprobada</p>
+                                </div>
+                                <p className="text-sm text-green-800 mb-2">
+                                  El vendedor ha aprobado la compra. Puedes proceder con el pago.
+                                </p>
+                                <Button
+                                  onClick={() => {
+                                    const checkoutUrl = `/checkout?auction=${productId}`;
+                                    window.location.href = checkoutUrl;
+                                  }}
+                                  className="bg-green-600 hover:bg-green-700 text-white"
+                                >
+                                  💳 Proceder al Pago
+                                </Button>
+                              </div>
+                            );
+                          } else if (approvalStatus === 'rejected') {
+                            return (
+                              <div className="text-center p-4 bg-red-50 border-2 border-red-300 rounded-lg">
+                                <div className="flex items-center justify-center gap-2 mb-2">
+                                  <XCircle className="h-5 w-5 text-red-600" />
+                                  <p className="text-sm font-bold text-red-900">Compra Rechazada</p>
+                                </div>
+                                <p className="text-sm text-red-800 mb-2">
+                                  El vendedor ha rechazado la compra. El monto ganador no alcanzó el precio esperado.
+                                </p>
+                              </div>
+                            );
+                          } else {
+                            // pending_approval o null
+                            return (
+                              <div className="text-center p-4 bg-amber-50 border-2 border-amber-300 rounded-lg">
+                                <div className="flex items-center justify-center gap-2 mb-2">
+                                  <ShoppingCart className="h-5 w-5 text-amber-600" />
+                                  <p className="text-sm font-bold text-amber-900">Monto menor a la oferta esperada</p>
+                                </div>
+                                <p className="text-sm text-amber-800 mb-1">
+                                  Monto ganador: <span className="font-semibold">{formatCurrency(currentBid)}</span>
+                                </p>
+                                <p className="text-sm text-amber-800 mb-2">
+                                  Precio de compra inmediata: <span className="font-semibold">{formatCurrency(auction.buy_now_price)}</span>
+                                </p>
+                                <p className="text-sm font-semibold text-amber-900 mb-2">
+                                  Se espera aprobación del vendedor para confirmar la compra.
+                                </p>
+                                {approvalDeadline && (
+                                  <p className="text-xs text-amber-700">
+                                    Plazo de respuesta: {new Date(approvalDeadline).toLocaleDateString('es-PY', { 
+                                      day: 'numeric', 
+                                      month: 'short', 
+                                      hour: '2-digit', 
+                                      minute: '2-digit' 
+                                    })}
+                                  </p>
+                                )}
+                              </div>
+                            );
+                          }
+                        } else {
+                          // Monto >= buy_now_price, mostrar botón normal
+                          return (
+                            <div className="text-center mb-4">
+                              <p className="text-sm text-gray-600 mb-2">Compra Inmediata</p>
+                              <p className="text-2xl font-bold text-emerald-600">
+                                {formatCurrency(auction.buy_now_price)}
+                              </p>
+                            </div>
+                          );
+                        }
+                      })()}
                     </div>
                   )}
                 </CardContent>
@@ -1252,14 +1662,14 @@ export default function AuctionDetailPage() {
         )}
 
         {/* Subastas Relacionadas - Grid */}
-        {relatedAuctions.length > 0 && (
+        {Array.isArray(relatedAuctions) && relatedAuctions.length > 0 && (
           <div className="mt-12 pt-8 border-t border-gray-200">
             <div className="mb-6">
               <h2 className="text-2xl font-bold text-gray-900 mb-2">Más Subastas</h2>
               <p className="text-gray-600">Explora otras subastas disponibles</p>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {relatedAuctions.slice(0, 8).map((related) => (
+              {relatedAuctions.slice(0, 8).filter(related => related && related.id).map((related) => (
                 <Link
                   key={related.id}
                   href={`/auctions/${related.id}`}
@@ -1286,7 +1696,7 @@ export default function AuctionDetailPage() {
                   </div>
                   <div className="p-3">
                     <h3 className="font-semibold text-gray-900 text-sm line-clamp-2 group-hover:text-blue-600 transition-colors">
-                      {related.title}
+                      {related?.title || 'Sin título'}
                     </h3>
                   </div>
                 </Link>

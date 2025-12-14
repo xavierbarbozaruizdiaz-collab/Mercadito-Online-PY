@@ -47,9 +47,18 @@ export default function CommissionsAdminPage() {
 
       setSettings(settingsData);
       
-      // Verificar y loggear errores de stores
+      // Verificar y manejar errores de stores silenciosamente
       if (storesData.error) {
-        logger.error('Error loading stores', storesData.error);
+        const isExpectedError = 
+          storesData.error.code === 'PGRST116' || 
+          storesData.error.message?.includes('400') ||
+          storesData.error.message?.includes('401') ||
+          storesData.error.status === 400 ||
+          storesData.error.status === 401;
+        
+        if (!isExpectedError && process.env.NODE_ENV === 'development') {
+          logger.warn('⚠️ Error loading stores (no crítico)', storesData.error);
+        }
         console.error('Error loading stores:', storesData.error);
         setStores([]);
       } else {

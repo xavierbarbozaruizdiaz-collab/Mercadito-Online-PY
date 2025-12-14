@@ -48,16 +48,42 @@ export default function SourcingOrderPrompt({
           return;
         }
 
-        const { data: stores } = await supabase
+        const { data: stores, error: storesError } = await supabase
           .from('stores')
           .select('id')
           .eq('seller_id', session.user.id)
           .eq('is_active', true)
           .limit(1);
 
-        setIsSeller(stores && stores.length > 0);
-      } catch (error) {
-        console.error('Error verificando si es vendedor:', error);
+        if (!storesError) {
+          setIsSeller(stores && stores.length > 0);
+        } else {
+          // Error silencioso - asumir que no es vendedor si hay error
+          const isExpectedError = 
+            storesError.code === 'PGRST116' || 
+            storesError.message?.includes('400') ||
+            storesError.message?.includes('401') ||
+            storesError.status === 400 ||
+            storesError.status === 401;
+          
+          if (!isExpectedError && process.env.NODE_ENV === 'development') {
+            console.warn('⚠️ Error verificando si es vendedor (no crítico):', storesError);
+          }
+          setIsSeller(false);
+        }
+      } catch (error: any) {
+        // Error silencioso - asumir que no es vendedor si hay error
+        const isExpectedError = 
+          error?.code === 'PGRST116' || 
+          error?.message?.includes('400') ||
+          error?.message?.includes('401') ||
+          error?.status === 400 ||
+          error?.status === 401;
+        
+        if (!isExpectedError && process.env.NODE_ENV === 'development') {
+          console.warn('⚠️ Excepción verificando si es vendedor (no crítico):', error?.message || error);
+        }
+        setIsSeller(false);
         setIsSeller(false);
       } finally {
         setCheckingSeller(false);

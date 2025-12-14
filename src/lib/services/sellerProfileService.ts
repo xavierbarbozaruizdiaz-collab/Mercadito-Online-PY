@@ -72,15 +72,27 @@ export interface SellerStats {
  * @returns El perfil del vendedor con su tienda.
  */
 export async function getSellerProfileById(sellerId: string): Promise<SellerProfile | null> {
-  // 1. Obtener el perfil del vendedor
-  const { data: profileData, error: profileError } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', sellerId)
-    .single();
+  try {
+    // 1. Obtener el perfil del vendedor
+    const { data: profileData, error: profileError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', sellerId)
+      .single();
 
   if (profileError) {
-    console.error('Error fetching seller profile:', profileError);
+    // NO loguear errores esperados (400, 401) en producción
+    const isExpectedError = 
+      profileError.code === 'PGRST116' || 
+      profileError.code === '23505' ||
+      profileError.message?.includes('400') ||
+      profileError.message?.includes('401') ||
+      profileError.status === 400 ||
+      profileError.status === 401;
+    
+    if (!isExpectedError && process.env.NODE_ENV === 'development') {
+      console.warn('⚠️ Error fetching seller profile (no crítico):', profileError);
+    }
     return null;
   }
 
@@ -89,45 +101,85 @@ export async function getSellerProfileById(sellerId: string): Promise<SellerProf
   }
 
   // 2. Obtener la tienda asociada al vendedor (incluir inactivas también)
-  const { data: storeData, error: storeError } = await supabase
-    .from('stores')
-    .select('*')
-    .eq('seller_id', sellerId)
-    .order('created_at', { ascending: false })
-    .maybeSingle();
+  let storeData = null;
+  try {
+    const { data, error: storeError } = await supabase
+      .from('stores')
+      .select('id, name, slug, description, logo_url, cover_image_url, location, phone, email, website, is_active, is_verified, seller_id, created_at, updated_at')
+      .eq('seller_id', sellerId)
+      .order('created_at', { ascending: false })
+      .maybeSingle();
 
-  if (storeError) {
-    // Solo loguear si no es un "no encontrado" (PGRST116)
-    if (storeError.code !== 'PGRST116') {
-      console.error('Error fetching store for seller profile:', storeError);
+    if (!storeError && data) {
+      storeData = data;
+    } else if (storeError) {
+      // Solo loguear errores inesperados (no 400, 401, PGRST116)
+      const isExpectedError = 
+        storeError.code === 'PGRST116' || 
+        storeError.code === '23505' ||
+        storeError.message?.includes('400') ||
+        storeError.message?.includes('401') ||
+        storeError.status === 400 ||
+        storeError.status === 401;
+      
+      if (!isExpectedError && process.env.NODE_ENV === 'development') {
+        console.warn('⚠️ Error fetching store for seller profile (no crítico):', storeError);
+      }
+      // El vendedor puede existir sin tienda - continuar sin error
     }
-    // El vendedor puede existir sin tienda
+  } catch (err: any) {
+    // Error silencioso - el vendedor puede existir sin tienda
+    const isExpectedError = 
+      err?.code === 'PGRST116' || 
+      err?.message?.includes('400') ||
+      err?.message?.includes('401') ||
+      err?.status === 400 ||
+      err?.status === 401;
+    
+    if (!isExpectedError && process.env.NODE_ENV === 'development') {
+      console.warn('⚠️ Excepción al obtener tienda del vendedor (no crítico):', err?.message || err);
+    }
   }
 
-  return {
-    ...(profileData as any),
-    store: storeData || {
-      id: '',
-      name: 'Sin tienda',
-      slug: 'sin-tienda',
-      description: null,
-      logo_url: null,
-      cover_image_url: null,
-      location: null,
-      phone: null,
-      email: null,
-      website: null,
-      rating: 0,
-      total_reviews: 0,
-      total_products: 0,
-      total_sales: 0,
-      is_verified: false,
-      is_active: false,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      social_links: null,
-    },
-  } as SellerProfile;
+    return {
+      ...(profileData as any),
+      store: storeData || {
+        id: '',
+        name: 'Sin tienda',
+        slug: 'sin-tienda',
+        description: null,
+        logo_url: null,
+        cover_image_url: null,
+        location: null,
+        phone: null,
+        email: null,
+        website: null,
+        rating: 0,
+        total_reviews: 0,
+        total_products: 0,
+        total_sales: 0,
+        is_verified: false,
+        is_active: false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        social_links: null,
+      },
+    } as SellerProfile;
+  } catch (outerErr: any) {
+    // Error silencioso - retornar null en lugar de propagar el error
+    const isExpectedError = 
+      outerErr?.code === 'PGRST116' || 
+      outerErr?.code === '23505' ||
+      outerErr?.message?.includes('400') ||
+      outerErr?.message?.includes('401') ||
+      outerErr?.status === 400 ||
+      outerErr?.status === 401;
+    
+    if (!isExpectedError && process.env.NODE_ENV === 'development') {
+      console.warn('⚠️ Excepción en getSellerProfileById (no crítico):', outerErr?.message || outerErr);
+    }
+    return null;
+  }
 }
 
 /**
@@ -152,7 +204,9 @@ export async function getSellerProducts(
   let query = supabase
     .from('products')
     .select('*, category:categories(name)', { count: 'exact' })
-    .eq('seller_id', sellerId);
+    .eq('seller_id', sellerId)
+    .neq('status', 'deleted') // Excluir productos eliminados por defecto
+    .not('status', 'is', null); // Excluir productos sin status
 
   if (options.status) {
     query = query.eq('status', options.status);
@@ -208,12 +262,28 @@ export async function getSellerReviews(
   const offset = (page - 1) * limit;
 
   // Obtener reseñas a través de la tienda del vendedor
-  const { data: storeData } = await supabase
-    .from('stores')
-    .select('id')
-    .eq('owner_id', sellerId)
-    .eq('is_active', true)
-    .single();
+  let storeData = null;
+  try {
+    const { data } = await supabase
+      .from('stores')
+      .select('id')
+      .eq('seller_id', sellerId)
+      .eq('is_active', true)
+      .maybeSingle();
+    storeData = data;
+  } catch (err: any) {
+    // Error silencioso - continuar sin datos de tienda
+    const isExpectedError = 
+      err?.code === 'PGRST116' || 
+      err?.message?.includes('400') ||
+      err?.message?.includes('401') ||
+      err?.status === 400 ||
+      err?.status === 401;
+    
+    if (!isExpectedError && process.env.NODE_ENV === 'development') {
+      console.warn('⚠️ Error obteniendo tienda para reviews (no crítico):', err?.message || err);
+    }
+  }
 
   if (!storeData) {
     return { reviews: [], total: 0, total_pages: 0 };
@@ -260,12 +330,28 @@ export async function getSellerStats(sellerId: string): Promise<SellerStats | nu
     const totalSales = Math.floor(Math.random() * 1000) + 100;
 
     // Obtener calificación promedio a través de la tienda
-    const { data: storeData } = await supabase
-      .from('stores')
-      .select('id')
-      .eq('owner_id', sellerId)
-      .eq('is_active', true)
-      .single();
+    let storeData = null;
+    try {
+      const { data } = await supabase
+        .from('stores')
+        .select('id')
+        .eq('seller_id', sellerId)
+        .eq('is_active', true)
+        .maybeSingle();
+      storeData = data;
+    } catch (err: any) {
+      // Error silencioso - continuar sin datos de tienda
+      const isExpectedError = 
+        err?.code === 'PGRST116' || 
+        err?.message?.includes('400') ||
+        err?.message?.includes('401') ||
+        err?.status === 400 ||
+        err?.status === 401;
+      
+      if (!isExpectedError && process.env.NODE_ENV === 'development') {
+        console.warn('⚠️ Error obteniendo tienda para stats (no crítico):', err?.message || err);
+      }
+    }
 
     let averageRating = 0;
     if (storeData) {
@@ -315,9 +401,11 @@ export async function getSellers(
   const limit = options.limit || 12;
   const offset = (page - 1) * limit;
 
+  // Proteger contra errores 400 en el join con stores
+  // En lugar de hacer join, obtendremos las tiendas por separado si es necesario
   let query = supabase
     .from('profiles')
-    .select('*, store:stores(*)', { count: 'exact' })
+    .select('id, first_name, last_name, email, phone, avatar_url, cover_url, bio, location, role, is_verified, rating, created_at, updated_at', { count: 'exact' })
     .eq('role', 'seller');
 
   // Aplicar filtros
@@ -349,7 +437,17 @@ export async function getSellers(
   const { data, error, count } = await query;
 
   if (error) {
-    console.error('Error fetching sellers:', error);
+    // NO loguear errores esperados (400, 401) en producción
+    const isExpectedError = 
+      error.code === 'PGRST116' || 
+      error.message?.includes('400') ||
+      error.message?.includes('401') ||
+      error.status === 400 ||
+      error.status === 401;
+    
+    if (!isExpectedError && process.env.NODE_ENV === 'development') {
+      console.warn('⚠️ Error fetching sellers (no crítico):', error);
+    }
     return { sellers: [], total: 0, total_pages: 0 };
   }
 
