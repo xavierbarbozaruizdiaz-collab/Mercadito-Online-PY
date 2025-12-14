@@ -5,6 +5,7 @@
 
 import type { Metadata, Viewport } from 'next';
 import Link from 'next/link';
+import { PendingApprovalLink } from '@/components/dashboard/PendingApprovalLink';
 // import MercaditoAssistantWidget from '@/components/MercaditoAssistantWidget';
 
 export const metadata: Metadata = {
@@ -67,6 +68,7 @@ export default function DashboardLayout({
                 >
                   Órdenes
                 </Link>
+                <PendingApprovalLink />
                 <Link 
                   href="/dashboard/sourcing-orders" 
                   className="text-gray-500 hover:text-gray-900 transition-colors"

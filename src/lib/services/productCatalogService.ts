@@ -80,6 +80,7 @@ export async function getStoreProductsForCatalog(
       .from('products')
       .select('*', { count: 'exact' })
       .eq('store_id', storeId)
+      .eq('status', 'active')
       .order('created_at', { ascending: false })
       .range(offset, offset + pageSize - 1);
 

@@ -93,13 +93,29 @@ async function getAuthenticatedUser(request: NextRequest) {
 // ============================================
 
 async function validateAuction(auctionId: string) {
-  const { data: auction, error } = await supabaseAdmin
+  type AuctionData = {
+    id: string;
+    seller_id: string;
+    sale_type: string;
+    auction_status: string;
+    auction_end_at: string | null;
+    current_bid: number | null;
+    min_bid_increment: number | null;
+    total_bids: number;
+    winner_id: string | null;
+    auction_version: number | null;
+    attributes: any;
+  };
+  
+  const { data: auctionData, error } = await supabaseAdmin
     .from('products')
     .select(
       'id, seller_id, sale_type, auction_status, auction_end_at, current_bid, min_bid_increment, total_bids, winner_id, auction_version, attributes'
     )
     .eq('id', auctionId)
     .single();
+  
+  const auction = auctionData as AuctionData | null;
 
   if (error || !auction) {
     return { valid: false, error: 'Subasta no encontrada', errorCode: undefined, auction: null };
@@ -191,6 +207,52 @@ export async function POST(
 
     const userId = user.id;
     const clientIp = getClientIp(request);
+
+    // ========================================
+    // [SECURITY PATCH] Validación de membresía en servidor para pujas
+    // ========================================
+    // Verificar que el usuario tiene membresía activa antes de permitir pujar
+    type MembershipData = { membership_level: string | null; membership_expires_at: string | null };
+    
+    const { data: profileData, error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .select('membership_level, membership_expires_at')
+      .eq('id', userId)
+      .single();
+    
+    const profile = profileData as MembershipData | null;
+
+    if (profileError || !profile) {
+      logger.warn('[Bid API] Error obteniendo perfil para validar membresía', {
+        userId,
+        error: profileError,
+      });
+      return NextResponse.json<BidResponse>(
+        { success: false, error: 'Error al verificar membresía. Intenta de nuevo.' },
+        { status: 500 }
+      );
+    }
+
+    // Verificar que la membresía esté activa
+    const hasActiveMembership = profileData.membership_expires_at 
+      && new Date(profileData.membership_expires_at) > new Date()
+      && profileData.membership_level !== 'free';
+
+    if (!hasActiveMembership) {
+      logger.warn('[Bid API] Intento de puja sin membresía activa', {
+        userId,
+        membership_level: profile.membership_level,
+        expires_at: profile.membership_expires_at,
+      });
+      return NextResponse.json<BidResponse>(
+        { 
+          success: false, 
+          error: 'Se requiere membresía activa para participar en subastas.',
+          error_code: 'NO_ACTIVE_MEMBERSHIP'
+        },
+        { status: 403 }
+      );
+    }
 
     // ========================================
     // 2. VALIDAR RATE LIMITING
@@ -306,13 +368,28 @@ export async function POST(
         // - Notificaciones
 
         const clientSentAt = new Date().toISOString();
-        const { data: rpcResult, error: rpcError } = await (supabaseAdmin as any).rpc('place_bid', {
+        // [SECURITY PATCH] Tipado más seguro para RPC call
+        interface PlaceBidResult {
+          success?: boolean;
+          bid_id?: string;
+          current_bid?: number;
+          winner_id?: string;
+          auction_status?: string;
+          auction_end_at?: string;
+          version?: number;
+          is_duplicate?: boolean;
+          bonus_applied?: boolean;
+          bonus_new_end_time?: string;
+          bonus_extension_seconds?: number;
+        }
+        const rpcCall = (supabaseAdmin as any).rpc('place_bid', {
           p_product_id: auctionId,
           p_bidder_id: userId,
           p_amount: bidAmount,
           p_idempotency_key: idempotencyKey || null,
           p_client_sent_at: clientSentAt,
         });
+        const { data: rpcResult, error: rpcError } = await rpcCall as { data: PlaceBidResult | null; error: any };
 
         if (rpcError) {
           // Detectar si el error es por subasta expirada o estado inválido
@@ -356,11 +433,13 @@ export async function POST(
         }
 
         // La función retorna JSONB con información de la puja
+        // [SECURITY PATCH] Tipado más seguro para respuesta RPC
         if (typeof rpcResult === 'object' && rpcResult !== null) {
+          const typedResult = rpcResult as PlaceBidResult;
           // Nueva respuesta con más datos, incluyendo información de bonus time
-          const bonusApplied = rpcResult.bonus_applied === true;
-          const bonusNewEndTime = rpcResult.bonus_new_end_time 
-            ? new Date(rpcResult.bonus_new_end_time).toISOString() 
+          const bonusApplied = typedResult.bonus_applied === true;
+          const bonusNewEndTime = typedResult.bonus_new_end_time 
+            ? new Date(typedResult.bonus_new_end_time).toISOString() 
             : undefined;
           
           // Logging cuando se aplica bonus time
@@ -368,25 +447,25 @@ export async function POST(
             logger.info('[Bid API] Bonus time aplicado', {
               auctionId,
               userId,
-              oldEndTime: rpcResult.auction_end_at,
+              oldEndTime: typedResult.auction_end_at,
               newEndTime: bonusNewEndTime,
-              extensionSeconds: rpcResult.bonus_extension_seconds,
+              extensionSeconds: typedResult.bonus_extension_seconds,
             });
           }
           
           return {
-            success: rpcResult.success !== false,
-            bid_id: rpcResult.bid_id,
-            current_bid: rpcResult.current_bid || bidAmount,
-            winner_id: rpcResult.winner_id,
-            auction_status: rpcResult.auction_status || 'active',
-            auction_end_at: rpcResult.auction_end_at || bonusNewEndTime,
-            version: rpcResult.version,
-            is_duplicate: rpcResult.is_duplicate || false,
+            success: typedResult.success !== false,
+            bid_id: typedResult.bid_id,
+            current_bid: typedResult.current_bid || bidAmount,
+            winner_id: typedResult.winner_id,
+            auction_status: typedResult.auction_status || 'active',
+            auction_end_at: typedResult.auction_end_at || bonusNewEndTime,
+            version: typedResult.version,
+            is_duplicate: typedResult.is_duplicate || false,
             // Información de bonus time
             bonus_applied: bonusApplied,
             bonus_new_end_time: bonusNewEndTime,
-            bonus_extension_seconds: rpcResult.bonus_extension_seconds || undefined,
+            bonus_extension_seconds: typedResult.bonus_extension_seconds || undefined,
           };
         }
 
@@ -455,7 +534,21 @@ export async function POST(
       );
     }
 
-    const bidData = result.result as any;
+    // [SECURITY PATCH] Tipado más seguro para resultado del lock
+    interface LockBidResult {
+      success: boolean;
+      bid_id?: string;
+      current_bid?: number;
+      winner_id?: string;
+      auction_status?: string;
+      auction_end_at?: string;
+      version?: number;
+      is_duplicate?: boolean;
+      bonus_applied?: boolean;
+      bonus_new_end_time?: string;
+      bonus_extension_seconds?: number;
+    }
+    const bidData = result.result as LockBidResult;
 
     // ========================================
     // 9. OBTENER ESTADO ACTUALIZADO DE LA SUBASTA
@@ -466,6 +559,14 @@ export async function POST(
       .select('current_bid, winner_id, auction_status, auction_end_at, auction_version')
       .eq('id', auctionId)
       .single();
+
+    const updatedAuctionData = updatedAuction as {
+      current_bid: number | null;
+      winner_id: string | null;
+      auction_status: string | null;
+      auction_end_at: string | null;
+      auction_version: number | null;
+    } | null;
 
     // ========================================
     // 10. RESPUESTA EXITOSA
@@ -478,10 +579,10 @@ export async function POST(
     const response: BidResponse = {
       success: true,
       bid_id: bidData.bid_id,
-      current_bid: updatedAuction?.current_bid || bidData.current_bid,
-      winner_id: updatedAuction?.winner_id || bidData.winner_id,
-      auction_status: updatedAuction?.auction_status || bidData.auction_status || 'active',
-      auction_end_at: updatedAuction?.auction_end_at || bidData.auction_end_at,
+      current_bid: updatedAuctionData?.current_bid || bidData.current_bid,
+      winner_id: updatedAuctionData?.winner_id || bidData.winner_id,
+      auction_status: updatedAuctionData?.auction_status || bidData.auction_status || 'active',
+      auction_end_at: updatedAuctionData?.auction_end_at || bidData.auction_end_at,
       version: updatedAuction?.auction_version || bidData.version,
     };
 

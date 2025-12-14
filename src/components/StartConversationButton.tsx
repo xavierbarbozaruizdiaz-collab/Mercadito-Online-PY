@@ -83,10 +83,14 @@ export default function StartConversationButton({
     try {
       const formattedPhone = formatPhoneForWhatsApp(phone);
       const message = generateWhatsAppMessage(product);
-      const whatsappUrl = `https://wa.me/${formattedPhone.replace('+', '')}?text=${message}`;
+      // CORREGIDO: Asegurar que el número no tenga el + en la URL de wa.me
+      const phoneNumber = formattedPhone.startsWith('+') ? formattedPhone.substring(1) : formattedPhone;
+      const whatsappUrl = `https://wa.me/${phoneNumber}?text=${message}`;
+      
+      console.log('📱 Abriendo WhatsApp:', { phone, formattedPhone, phoneNumber, whatsappUrl });
       
       // Abrir WhatsApp en una nueva pestaña
-      window.open(whatsappUrl, '_blank');
+      window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
     } catch (error) {
       console.error('Error opening WhatsApp:', error);
       alert('Error al abrir WhatsApp. Por favor, verifica que el número de teléfono sea válido.');

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { supabase } from '@/lib/supabase/client';
 import { formatCurrency, formatDate } from '@/lib/utils';
@@ -87,212 +87,205 @@ export default function MarketingPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [syncingCatalog, setSyncingCatalog] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showRedirect, setShowRedirect] = useState(false);
 
-  // Verificar autenticación (solo redirigir si realmente no hay sesión después de un tiempo razonable)
+  // Refs para control absoluto - SIN dependencias circulares
+  const initializedRef = useRef(false);
+  const loadingRef = useRef(false);
+  const currentStoreIdRef = useRef<string | null>(null);
+
+  // UN SOLO useEffect para toda la inicialización
   useEffect(() => {
-    // Dar más tiempo para que la sesión se cargue antes de redirigir
-    const timeoutId = setTimeout(() => {
-      if (!authLoading && !user) {
-        // Verificar sesión directamente antes de redirigir
+    // Si ya se inicializó, no hacer nada
+    if (initializedRef.current) return;
+    
+    // Si está cargando auth, esperar
+    if (authLoading) return;
+    
+    // Si no hay usuario, no hacer nada
+    if (!user?.id) {
+      setLoading(false);
+      return;
+    }
+
+    // Marcar como inicializado INMEDIATAMENTE para evitar ejecuciones múltiples
+    initializedRef.current = true;
+    loadingRef.current = true;
+
+    (async () => {
+      try {
+        setLoading(true);
+        const userId = user.id;
+
+        // 1. Cargar tiendas
+        const { data: storesData, error: storesError } = await supabase
+          .from('stores')
+          .select('id, name, slug, is_fallback_store')
+          .eq('seller_id', userId)
+          .eq('is_active', true);
+
+        if (storesError && storesError.code !== 'PGRST116') {
+          logger.error('Error loading stores', storesError);
+          setStores([]);
+        } else {
+          const storesList = storesData || [];
+          setStores(storesList);
+
+          // 2. Seleccionar tienda inicial si hay tiendas
+          if (storesList.length > 0) {
+            const fallbackStore = storesList.find((s: any) => s.is_fallback_store === true);
+            const storeToSelect = fallbackStore || storesList[0];
+            currentStoreIdRef.current = storeToSelect.id;
+            setSelectedStore(storeToSelect.id);
+          }
+        }
+
+        // 3. Cargar campañas (solo si hay tienda seleccionada)
+        const storeIdToLoad = currentStoreIdRef.current;
+        if (storeIdToLoad) {
+          let query = supabase
+            .from('marketing_campaigns')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+          query = query.eq('store_id', storeIdToLoad);
+
+          const { data: campaignsData, error: campaignsError } = await query;
+
+          if (campaignsError && campaignsError.code !== 'PGRST116' && campaignsError.code !== '42P01' && campaignsError.code !== 'PGRST301') {
+            logger.error('Error loading campaigns', campaignsError);
+            setCampaigns([]);
+          } else {
+            setCampaigns(campaignsData || []);
+            
+            // Cargar métricas si hay campañas
+            if (campaignsData && campaignsData.length > 0) {
+              try {
+                const { data: metricsData } = await supabase
+                  .from('campaign_metrics')
+                  .select('*')
+                  .in('campaign_id', campaignsData.map(c => c.id))
+                  .order('date', { ascending: false });
+
+                if (metricsData) {
+                  const grouped: Record<string, CampaignMetrics[]> = {};
+                  metricsData.forEach((metric: CampaignMetrics) => {
+                    if (!grouped[metric.campaign_id]) {
+                      grouped[metric.campaign_id] = [];
+                    }
+                    grouped[metric.campaign_id].push(metric);
+                  });
+                  setMetrics(grouped);
+                }
+              } catch (metricsErr) {
+                logger.warn('Error loading metrics', metricsErr);
+              }
+            }
+          }
+        }
+      } catch (err) {
+        logger.error('Error in initialization', err);
+        setError('Ocurrió un error al cargar los datos. Por favor, recarga la página.');
+      } finally {
+        setLoading(false);
+        loadingRef.current = false;
+      }
+    })();
+  }, [user?.id, authLoading]); // Solo estas dos dependencias
+
+  // useEffect SEPARADO solo para cuando cambia selectedStore manualmente
+  useEffect(() => {
+    // Solo ejecutar si ya se inicializó y el store cambió manualmente
+    if (!initializedRef.current) return;
+    if (!user?.id || authLoading) return;
+    if (loadingRef.current) return;
+
+    const newStoreId = selectedStore;
+    
+    // Si no cambió realmente, no hacer nada
+    if (newStoreId === currentStoreIdRef.current) return;
+    
+    // Si es null, no cargar
+    if (!newStoreId) {
+      setCampaigns([]);
+      return;
+    }
+
+    // Actualizar ref
+    currentStoreIdRef.current = newStoreId;
+    loadingRef.current = true;
+
+    (async () => {
+      try {
+        setLoading(true);
+
+        let query = supabase
+          .from('marketing_campaigns')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .eq('store_id', newStoreId);
+
+        const { data, error } = await query;
+
+        if (error && error.code !== 'PGRST116' && error.code !== '42P01' && error.code !== 'PGRST301') {
+          logger.error('Error loading campaigns', error);
+          setCampaigns([]);
+        } else {
+          setCampaigns(data || []);
+          
+          if (data && data.length > 0) {
+            try {
+              const { data: metricsData } = await supabase
+                .from('campaign_metrics')
+                .select('*')
+                .in('campaign_id', data.map(c => c.id))
+                .order('date', { ascending: false });
+
+              if (metricsData) {
+                const grouped: Record<string, CampaignMetrics[]> = {};
+                metricsData.forEach((metric: CampaignMetrics) => {
+                  if (!grouped[metric.campaign_id]) {
+                    grouped[metric.campaign_id] = [];
+                  }
+                  grouped[metric.campaign_id].push(metric);
+                });
+                setMetrics(grouped);
+              }
+            } catch (metricsErr) {
+              logger.warn('Error loading metrics', metricsErr);
+            }
+          }
+        }
+      } catch (err) {
+        logger.error('Error loading campaigns', err);
+        setCampaigns([]);
+      } finally {
+        setLoading(false);
+        loadingRef.current = false;
+      }
+    })();
+  }, [selectedStore, user?.id, authLoading]);
+
+  // Verificar autenticación
+  useEffect(() => {
+    if (!authLoading && !user) {
+      const timer = setTimeout(() => {
         supabase.auth.getSession().then(({ data: { session } }) => {
           if (!session) {
             window.location.href = '/auth/sign-in';
           }
         });
-      }
-    }, 2000); // Esperar 2 segundos antes de verificar
-
-    return () => clearTimeout(timeoutId);
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
   }, [authLoading, user]);
-
-  // Cargar tiendas del usuario
-  useEffect(() => {
-    if (user && !authLoading) {
-      loadStores();
-    }
-  }, [user, authLoading]);
-
-  // Cargar campañas (pero no bloquear renderizado si falla)
-  useEffect(() => {
-    if (user && !authLoading) {
-      loadCampaigns();
-    } else if (!authLoading && !user) {
-      // Si no hay usuario después de cargar, no intentar cargar campañas
-      setLoading(false);
-    }
-  }, [user, authLoading, selectedStore]);
-
-  async function loadStores() {
-    try {
-      const { data: session, error: sessionError } = await supabase.auth.getSession();
-      
-      if (sessionError) {
-        logger.error('Error getting session in loadStores', sessionError);
-        return;
-      }
-      
-      if (!session?.session?.user?.id) {
-        logger.warn('No session in loadStores');
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from('stores')
-        .select('id, name, slug')
-        .eq('seller_id', session.session.user.id)
-        .eq('is_active', true);
-
-      if (error) {
-        logger.error('Error loading stores', error);
-        setStores([]);
-        return;
-      }
-      
-      setStores(data || []);
-      
-      // Seleccionar la primera tienda por defecto
-      if (data && data.length > 0 && !selectedStore) {
-        setSelectedStore(data[0].id);
-      }
-    } catch (err) {
-      logger.error('Error loading stores', err);
-      setStores([]);
-    }
-  }
-
-  async function loadCampaigns() {
-    try {
-      setLoading(true);
-      const { data: session, error: sessionError } = await supabase.auth.getSession();
-      
-      if (sessionError) {
-        logger.error('Error getting session', sessionError);
-        setLoading(false);
-        return;
-      }
-      
-      if (!session?.session?.user?.id) {
-        logger.warn('No session found');
-        setLoading(false);
-        // NO redirigir aquí, dejar que el useEffect de autenticación lo maneje
-        return;
-      }
-
-      let query = supabase
-        .from('marketing_campaigns')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      // Si hay una tienda seleccionada, filtrar por ella
-      if (selectedStore) {
-        query = query.eq('store_id', selectedStore);
-      }
-
-      const { data, error } = await query;
-
-      // Si la tabla no existe o hay error de permisos, simplemente mostrar lista vacía
-      if (error) {
-        // Si es error de tabla no existe o permisos, no lanzar error
-        if (error.code === '42P01' || error.code === 'PGRST301' || error.message?.includes('does not exist')) {
-          logger.warn('Marketing campaigns table does not exist or no access', error);
-          setCampaigns([]);
-          setLoading(false);
-          return;
-        }
-        // Para otros errores, solo loguear pero no fallar
-        logger.error('Error loading campaigns', error);
-        setCampaigns([]);
-        setLoading(false);
-        return;
-      }
-      
-      setCampaigns(data || []);
-
-      // Cargar métricas para cada campaña (solo si hay campañas y la tabla existe)
-      if (data && data.length > 0) {
-        try {
-          await loadMetrics(data.map(c => c.id));
-        } catch (metricsError) {
-          // Si la tabla de métricas no existe, continuar sin métricas
-          logger.warn('Error loading metrics (table may not exist)', metricsError);
-        }
-      }
-    } catch (err) {
-      logger.error('Error loading campaigns', err);
-      // No lanzar error, simplemente mostrar lista vacía
-      setCampaigns([]);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function loadMetrics(campaignIds: string[]) {
-    try {
-      const { data, error } = await supabase
-        .from('campaign_metrics')
-        .select('*')
-        .in('campaign_id', campaignIds)
-        .order('date', { ascending: false });
-
-      // Si la tabla no existe, simplemente retornar sin métricas
-      if (error) {
-        if (error.code === '42P01' || error.code === 'PGRST301' || error.message?.includes('does not exist')) {
-          logger.warn('Campaign metrics table does not exist', error);
-          setMetrics({});
-          return;
-        }
-        throw error;
-      }
-
-      // Agrupar métricas por campaign_id
-      const grouped: Record<string, CampaignMetrics[]> = {};
-      (data || []).forEach((metric: CampaignMetrics) => {
-        if (!grouped[metric.campaign_id]) {
-          grouped[metric.campaign_id] = [];
-        }
-        grouped[metric.campaign_id].push(metric);
-      });
-
-      setMetrics(grouped);
-    } catch (err) {
-      logger.error('Error loading metrics', err);
-      // No fallar, simplemente no mostrar métricas
-      setMetrics({});
-    }
-  }
 
   async function syncCatalog() {
     try {
       setSyncingCatalog(true);
-      const response = await fetch('/api/catalog/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ platforms: ['meta', 'tiktok', 'google'] }),
-      });
-
-      // Si la ruta no existe (404), mostrar mensaje amigable
-      if (response.status === 404) {
-        toast.error('La funcionalidad de sincronización de catálogo aún no está disponible.');
-        return;
-      }
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || result.message || 'Error sincronizando catálogo');
-      }
-
-      toast.success('Sincronización de catálogo iniciada. Esto puede tardar unos minutos.');
+      toast.error('La sincronización masiva de catálogo aún no está disponible. Por favor, sincroniza productos individualmente desde la página de productos.');
     } catch (err) {
       logger.error('Error syncing catalog', err);
-      // Si es un error de red o 404, mostrar mensaje más amigable
-      if (err instanceof TypeError || (err as any).message?.includes('fetch')) {
-        toast.error('No se pudo conectar con el servidor. Verifica tu conexión.');
-      } else {
-        const errorMessage = err instanceof Error ? err.message : 'Error desconocido';
-        toast.error(`Error al sincronizar catálogo: ${errorMessage}`);
-      }
+      toast.error('Error al sincronizar catálogo');
     } finally {
       setSyncingCatalog(false);
     }
@@ -332,62 +325,13 @@ export default function MarketingPage() {
     };
   }
 
-  // Mostrar loading SOLO si está cargando la autenticación inicialmente (primeros 2 segundos)
-  // Después de eso, mostrar la página con catálogos aunque las campañas estén cargando
-  const [initialLoad, setInitialLoad] = useState(true);
-  
-  useEffect(() => {
-    // Después de 2 segundos, permitir mostrar la página aunque authLoading sea true
-    const timer = setTimeout(() => {
-      setInitialLoad(false);
-    }, 2000);
-    
-    return () => clearTimeout(timer);
-  }, []);
-
-  // Solo mostrar loading si es carga inicial Y está cargando autenticación Y no hay usuario
-  // PERO solo por máximo 2 segundos, después mostrar la página siempre
-  if (initialLoad && authLoading && !user) {
+  // Loading inicial
+  if (authLoading && !user) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Cargando...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // IMPORTANTE: Si pasaron 2 segundos, mostrar la página SIEMPRE, incluso si authLoading es true
-  // Esto evita que la página se quede bloqueada
-
-  // Verificar si realmente no hay sesión (dar más tiempo antes de redirigir)
-  useEffect(() => {
-    if (!authLoading && !user) {
-      // Esperar un poco más antes de verificar sesión
-      const timer = setTimeout(() => {
-        supabase.auth.getSession().then(({ data: { session } }) => {
-          if (!session) {
-            setShowRedirect(true);
-            setTimeout(() => {
-              window.location.href = '/auth/sign-in';
-            }, 1000);
-          }
-        });
-      }, 3000); // Esperar 3 segundos más
-      
-      return () => clearTimeout(timer);
-    } else {
-      // Si hay usuario, asegurar que no se muestre el redirect
-      setShowRedirect(false);
-    }
-  }, [authLoading, user]);
-
-  if (showRedirect) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-gray-600 mb-4">Redirigiendo al inicio de sesión...</p>
         </div>
       </div>
     );
@@ -485,6 +429,32 @@ export default function MarketingPage() {
         </div>
       </div>
 
+      {/* Mensaje de error si existe */}
+      {error && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-6">
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-yellow-800">{error}</p>
+              {stores.length === 0 && (
+                <p className="text-sm text-yellow-700 mt-2">
+                  Necesitas tener una tienda activa para usar las funciones de marketing. 
+                  <Link href="/dashboard/become-seller" className="underline ml-1">
+                    Crear tienda
+                  </Link>
+                </p>
+              )}
+            </div>
+            <button
+              onClick={() => setError(null)}
+              className="text-yellow-600 hover:text-yellow-800"
+            >
+              <XCircle className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Separador */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-6">
         <div className="border-t border-gray-200"></div>
@@ -499,7 +469,11 @@ export default function MarketingPage() {
             </label>
             <select
               value={selectedStore || ''}
-              onChange={(e) => setSelectedStore(e.target.value || null)}
+              onChange={(e) => {
+                const newStoreId = e.target.value || null;
+                currentStoreIdRef.current = newStoreId;
+                setSelectedStore(newStoreId);
+              }}
               className="w-full md:w-64 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Todas las tiendas</option>
@@ -515,7 +489,12 @@ export default function MarketingPage() {
 
       {/* Lista de campañas */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {campaigns.length === 0 ? (
+        {loading ? (
+          <div className="bg-white rounded-lg shadow p-12 text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Cargando campañas...</p>
+          </div>
+        ) : campaigns.length === 0 ? (
           <div className="bg-white rounded-lg shadow p-12 text-center">
             <Target className="w-12 h-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">No hay campañas</h3>
@@ -666,4 +645,3 @@ export default function MarketingPage() {
     </div>
   );
 }
-

@@ -78,23 +78,6 @@ export interface SearchSuggestion {
   count?: number;
   category?: string;
   location?: string;
-  // Datos completos del producto (si type === 'product')
-  product?: {
-    id: string;
-    title: string;
-    price: number;
-    compare_price?: number;
-    image_url?: string;
-    condition: string;
-    sale_type: string;
-    store: {
-      name: string;
-      slug: string;
-    };
-    category?: {
-      name: string;
-    };
-  };
 }
 
 // ============================================
@@ -116,7 +99,7 @@ export class SearchService {
           sale_type,
           image_url:cover_url,
           created_at,
-          store:stores!inner(
+          store:stores(
             id,
             name,
             slug,
@@ -127,7 +110,7 @@ export class SearchService {
             name
           )
         `)
-        .eq('status', 'active');
+        .or('status.is.null,status.eq.active');
 
       // Aplicar filtros
       if (filters.query) {
@@ -199,8 +182,6 @@ export class SearchService {
   }
 
   // Buscar tiendas
-  // NOTA: Las tiendas fallback (is_fallback_store = true) se incluyen normalmente
-  // si están activas. El flag is_fallback_store NO afecta la visibilidad de la tienda.
   static async searchStores(filters: SearchFilters): Promise<SearchResult<StoreSearchResult>> {
     try {
       let query = supabase
@@ -217,8 +198,6 @@ export class SearchService {
           created_at,
           updated_at
         `)
-        // IMPORTANTE: Solo filtrar por is_active, NO excluir tiendas fallback
-        // Las tiendas pausadas se filtran después de obtener los datos
         .eq('is_active', true);
 
       // Aplicar filtros
@@ -247,16 +226,11 @@ export class SearchService {
 
       if (error) throw error;
 
-      // Filtrar tiendas pausadas (settings.is_paused = true)
-      const filteredData = (data || []).filter((store: any) => {
-        return !store.settings?.is_paused;
-      });
-
-      const total = filteredData.length;
+      const total = count || 0;
       const totalPages = Math.ceil(total / limit);
 
       return {
-        data: filteredData,
+        data: data || [],
         pagination: {
           page,
           limit,
@@ -275,42 +249,15 @@ export class SearchService {
     try {
       if (query.length < 2) return [];
 
-      // Buscar productos que coincidan (con mismos criterios que searchProducts)
+      // Buscar productos que coincidan
       const { data: products, error: productsError } = await supabase
         .from('products')
-        .select(`
-          id,
-          title,
-          price,
-          compare_price,
-          condition,
-          sale_type,
-          cover_url,
-          category:categories(
-            id,
-            name
-          ),
-          store:stores(
-            id,
-            name,
-            slug,
-            is_active
-          )
-        `)
+        .select('title, category:categories(name)')
         .ilike('title', `%${query}%`)
-        .or('status.is.null,status.eq.active')
-        .limit(8);
-      
-      // Filtrar productos con tienda activa en el cliente (más flexible que !inner)
-      const filteredProducts = products?.filter((p: any) => {
-        if (!p.store || !p.store.is_active) return false;
-        return true;
-      }) || [];
+        .eq('status', 'active')
+        .limit(5);
 
-      if (productsError) {
-        console.error('Error loading product suggestions:', productsError);
-        // Continuar sin productos si hay error
-      }
+      if (productsError) throw productsError;
 
       // Buscar categorías que coincidan
       const { data: categories, error: categoriesError } = await supabase
@@ -334,29 +281,13 @@ export class SearchService {
 
       const suggestions: SearchSuggestion[] = [];
 
-      // Agregar productos con datos completos
-      filteredProducts.forEach((product: any) => {
+      // Agregar productos
+      products?.forEach((product, index) => {
         suggestions.push({
-          id: product.id || `product-${product.title}`,
-          text: product.title,
+          id: `product-${index}`,
+          text: (product as any).title,
           type: 'product',
-          category: product.category?.name,
-          product: {
-            id: product.id,
-            title: product.title,
-            price: product.price,
-            compare_price: product.compare_price,
-            image_url: product.cover_url,
-            condition: product.condition,
-            sale_type: product.sale_type,
-            store: {
-              name: product.store?.name || 'Tienda',
-              slug: product.store?.slug || '',
-            },
-            category: product.category ? {
-              name: product.category.name,
-            } : undefined,
-          },
+          category: (product as any).category?.name,
         });
       });
 

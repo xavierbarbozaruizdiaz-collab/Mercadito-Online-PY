@@ -16,6 +16,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // No bloquear el checkout si el servicio de email no está configurado
+    if (!process.env.RESEND_API_KEY) {
+      console.warn('RESEND_API_KEY no configurada. Se omite envío de email de confirmación.');
+      return NextResponse.json({
+        success: false,
+        message: 'Email no enviado (configuración faltante)',
+      });
+    }
+
     const success = await EmailService.sendOrderConfirmation(
       email,
       orderNumber,
@@ -25,10 +34,11 @@ export async function POST(request: NextRequest) {
     if (success) {
       return NextResponse.json({ success: true, message: 'Email enviado' });
     } else {
-      return NextResponse.json(
-        { error: 'Error al enviar email' },
-        { status: 500 }
-      );
+      console.error('No se pudo enviar el email de confirmación, pero el pedido se creó correctamente.');
+      return NextResponse.json({
+        success: false,
+        message: 'No se pudo enviar el email, pero el pedido quedó confirmado',
+      });
     }
   } catch (error: any) {
     console.error('Error en API de order confirmation:', error);

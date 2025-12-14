@@ -262,7 +262,9 @@ export default function CatalogoMercaditoPage() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {products.map((product) => {
+                {Array.isArray(products) && products.map((product) => {
+                  if (!product || !product.id) return null;
+                  
                   const isActive = isProductCurrentlyActive(product);
                   const isUpdating = updatingId === product.id;
 
@@ -288,13 +290,13 @@ export default function CatalogoMercaditoPage() {
                           </div>
                           <div className="min-w-0 flex-1">
                             <p className="text-sm font-medium text-gray-900 truncate">
-                              {product.title}
+                              {product.title || 'Sin título'}
                             </p>
                             <p className="text-xs text-gray-500">
                               {product.status === 'active' ? (
                                 <span className="text-green-600">Activo</span>
                               ) : (
-                                <span className="text-gray-500">{product.status}</span>
+                                <span className="text-gray-500">{product.status || 'N/A'}</span>
                               )}
                             </p>
                           </div>
@@ -304,7 +306,7 @@ export default function CatalogoMercaditoPage() {
                       {/* Precio */}
                       <td className="px-6 py-4 whitespace-nowrap">
                         <p className="text-sm font-medium text-gray-900">
-                          {formatCurrency(product.price)}
+                          {formatCurrency(product.price || 0)}
                         </p>
                       </td>
 

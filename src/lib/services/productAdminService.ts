@@ -90,26 +90,55 @@ export async function getAllProducts(options: {
       category_id
     `, { count: 'exact' });
 
-  // Aplicar filtros
+  // IMPORTANTE: Excluir productos eliminados (soft delete) por defecto
+  // Solo mostrarlos si el filtro es explícitamente 'archived' (que muestra eliminados)
+  // 'all' también excluye eliminados para mantener consistencia
+  // También excluir productos con status NULL (por seguridad)
+  if (options.filter !== 'archived') {
+    query = query.neq('status', 'deleted').not('status', 'is', null);
+  }
+
+  // Aplicar filtros según lógica correcta
   if (options.filter) {
     switch (options.filter) {
       case 'pending':
+        // Pendientes: productos que necesitan revisión del admin
+        // approval_status = 'pending' AND status != 'deleted'
         query = query.eq('approval_status', 'pending');
+        // Ya excluimos 'deleted' arriba si filter !== 'all'
         break;
       case 'approved':
+        // Aprobados: approval_status = 'approved' AND status != 'deleted'
         query = query.eq('approval_status', 'approved');
+        // Ya excluimos 'deleted' arriba si filter !== 'all'
         break;
       case 'rejected':
+        // Rechazados: approval_status = 'rejected' AND status != 'deleted'
         query = query.eq('approval_status', 'rejected');
+        // Ya excluimos 'deleted' arriba si filter !== 'all'
         break;
       case 'active':
-        query = query.eq('status', 'active');
+        // Activos: productos realmente publicados (como en la vitrina pública)
+        // status = 'active' AND approval_status = 'approved' AND status != 'deleted'
+        query = query
+          .eq('status', 'active')
+          .eq('approval_status', 'approved');
+        // Ya excluimos 'deleted' arriba si filter !== 'all'
         break;
       case 'paused':
+        // Pausados: status = 'paused' AND status != 'deleted'
         query = query.eq('status', 'paused');
+        // Ya excluimos 'deleted' arriba si filter !== 'all'
         break;
       case 'archived':
-        query = query.eq('status', 'archived');
+        // Archivados/Eliminados: status = 'deleted'
+        // Para este filtro, NO excluimos 'deleted', solo mostramos eliminados
+        query = query.eq('status', 'deleted');
+        break;
+      // 'all' muestra todos EXCEPTO eliminados (útil para admin)
+      case 'all':
+        // Ya excluimos 'deleted' arriba si filter !== 'all'
+        // Mostrar todos los productos no eliminados
         break;
     }
   }
@@ -202,6 +231,20 @@ export async function approveProduct(
     console.error('Error approving product:', error);
     throw new Error(error.message);
   }
+
+  // Invalidar cache del producto y listados relacionados
+  try {
+    const { invalidateProductCache } = await import('@/lib/utils/cache');
+    invalidateProductCache(productId);
+    // Invalidar también listados generales que puedan incluir este producto
+    const { cache } = await import('@/lib/utils/cache');
+    cache.delete(`products:*`);
+    cache.delete(`featured:*`);
+    cache.delete(`recent:*`);
+  } catch (cacheError) {
+    console.warn('Error invalidating cache after approval:', cacheError);
+    // No fallar si hay error en cache
+  }
 }
 
 /**
@@ -225,6 +268,20 @@ export async function rejectProduct(
   if (error) {
     console.error('Error rejecting product:', error);
     throw new Error(error.message);
+  }
+
+  // Invalidar cache del producto y listados relacionados
+  try {
+    const { invalidateProductCache } = await import('@/lib/utils/cache');
+    invalidateProductCache(productId);
+    // Invalidar también listados generales
+    const { cache } = await import('@/lib/utils/cache');
+    cache.delete(`products:*`);
+    cache.delete(`featured:*`);
+    cache.delete(`recent:*`);
+  } catch (cacheError) {
+    console.warn('Error invalidating cache after rejection:', cacheError);
+    // No fallar si hay error en cache
   }
 }
 
@@ -255,46 +312,27 @@ export async function updateProduct(
 }
 
 /**
- * Elimina un producto (admin)
+ * Elimina un producto (admin) - SOFT DELETE
+ * Marca el producto como eliminado (status = 'deleted') en lugar de eliminarlo físicamente
  */
 export async function deleteProduct(productId: string): Promise<void> {
-  // Primero obtener imágenes para eliminarlas del storage
-  const { data: images } = await supabase
-    .from('product_images')
-    .select('url')
-    .eq('product_id', productId);
-
-  // Eliminar producto (esto eliminará imágenes por CASCADE)
+  // SOFT DELETE: Marcar producto como eliminado
   const { error } = await supabase
     .from('products')
-    .delete()
+    .update({ 
+      status: 'deleted',
+      updated_at: new Date().toISOString()
+    })
     .eq('id', productId);
 
   if (error) {
-    console.error('Error deleting product:', error);
+    console.error('Error marking product as deleted:', error);
     throw new Error(error.message);
   }
 
-  // Eliminar imágenes del storage si existen
-  if (images && images.length > 0) {
-    const fileNames = images
-      .map((img: { url: string }) => {
-        const url = img.url;
-        const match = url.match(/products\/([^/]+)\/(.+)$/);
-        return match ? `${match[1]}/${match[2]}` : null;
-      })
-      .filter((fileName): fileName is string => fileName !== null);
-
-    if (fileNames.length > 0) {
-      const { error: storageError } = await supabase.storage
-        .from('products')
-        .remove(fileNames);
-
-      if (storageError) {
-        console.warn('Error deleting product images from storage:', storageError);
-      }
-    }
-  }
+  // NOTA: No eliminamos imágenes del storage en soft delete
+  // Las imágenes se mantienen por si el producto se restaura en el futuro
+  // Si se necesita eliminación física completa, crear una función separada
 }
 
 /**
@@ -311,13 +349,45 @@ export async function getProductStats(): Promise<ProductStats> {
       pausedResult,
       archivedResult,
     ] = await Promise.all([
-      supabase.from('products').select('id', { count: 'exact', head: true }),
-      supabase.from('products').select('id', { count: 'exact', head: true }).eq('approval_status', 'pending'),
-      supabase.from('products').select('id', { count: 'exact', head: true }).eq('approval_status', 'approved'),
-      supabase.from('products').select('id', { count: 'exact', head: true }).eq('approval_status', 'rejected'),
-      supabase.from('products').select('id', { count: 'exact', head: true }).eq('status', 'active'),
-      supabase.from('products').select('id', { count: 'exact', head: true }).eq('status', 'paused'),
-      supabase.from('products').select('id', { count: 'exact', head: true }).eq('status', 'archived'),
+      // Total: excluir productos eliminados (soft delete) y status NULL
+      supabase.from('products').select('id', { count: 'exact', head: true }).neq('status', 'deleted').not('status', 'is', null),
+      
+      // Pendientes: productos que necesitan revisión del admin
+      // approval_status = 'pending' AND status != 'deleted'
+      supabase.from('products').select('id', { count: 'exact', head: true })
+        .eq('approval_status', 'pending')
+        .neq('status', 'deleted')
+        .not('status', 'is', null),
+      
+      // Aprobados: approval_status = 'approved' AND status != 'deleted'
+      supabase.from('products').select('id', { count: 'exact', head: true })
+        .eq('approval_status', 'approved')
+        .neq('status', 'deleted')
+        .not('status', 'is', null),
+      
+      // Rechazados: approval_status = 'rejected' AND status != 'deleted'
+      supabase.from('products').select('id', { count: 'exact', head: true })
+        .eq('approval_status', 'rejected')
+        .neq('status', 'deleted')
+        .not('status', 'is', null),
+      
+      // Activos: productos realmente publicados (como en la vitrina pública)
+      // status = 'active' AND approval_status = 'approved' AND status != 'deleted'
+      supabase.from('products').select('id', { count: 'exact', head: true })
+        .eq('status', 'active')
+        .eq('approval_status', 'approved')
+        .neq('status', 'deleted')
+        .not('status', 'is', null),
+      
+      // Pausados: status = 'paused' AND status != 'deleted'
+      supabase.from('products').select('id', { count: 'exact', head: true })
+        .eq('status', 'paused')
+        .neq('status', 'deleted')
+        .not('status', 'is', null),
+      
+      // Archivados/Eliminados: status = 'deleted'
+      supabase.from('products').select('id', { count: 'exact', head: true })
+        .eq('status', 'deleted'),
     ]);
 
     // Calcular ventas y revenue (simulado por ahora)

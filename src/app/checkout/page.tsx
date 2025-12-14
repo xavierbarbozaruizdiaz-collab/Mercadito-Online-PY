@@ -67,6 +67,7 @@ function CheckoutContent() {
     zipCode: ''
   });
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'transfer' | 'card' | 'pagopar'>('cash');
+  const [allowedPaymentMethods, setAllowedPaymentMethods] = useState<string[] | null>(null);
   const [notes, setNotes] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<CouponValidationResult | null>(null);
   const [pagoparLoading, setPagoparLoading] = useState(false);
@@ -123,8 +124,9 @@ function CheckoutContent() {
       }
 
       // Verificar que la subasta terminó y el usuario es el ganador
-      const { data: session } = await supabase.auth.getSession();
-      if (!session?.session?.user?.id) {
+      const sessionResponse = await supabase.auth.getSession();
+      const session = (sessionResponse.data as any)?.session;
+      if (!session?.user?.id) {
         toast.error('Debes iniciar sesión para continuar');
         router.push('/auth/sign-in');
         return;
@@ -140,15 +142,45 @@ function CheckoutContent() {
         return;
       }
 
-      if (auction.winner_id !== session.session.user.id) {
+      if (auction.winner_id !== (session as any)?.user?.id) {
         logger.warn('Intento de checkout de subasta no ganada', { 
           auctionProductId, 
           winnerId: auction.winner_id,
-          userId: session.session.user.id 
+          userId: (session as any)?.user?.id 
         });
         toast.error('No eres el ganador de esta subasta');
         router.push(`/auctions/${auctionProductId}`);
         return;
+      }
+
+      // Verificar si ya existe un pedido para esta subasta
+      const { data: existingOrder, error: orderCheckError } = await (supabase as any)
+        .from('orders')
+        .select('id, status, total_amount, created_at')
+        .eq('buyer_id', (session as any)?.user?.id)
+        .eq('order_type', 'auction')
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (!orderCheckError && existingOrder && existingOrder.length > 0) {
+        // Verificar si el pedido es para esta subasta específica
+        const { data: orderItems } = await (supabase as any)
+          .from('order_items')
+          .select('product_id')
+          .eq('order_id', existingOrder[0].id)
+          .eq('product_id', auctionProductId)
+          .limit(1);
+
+        if (orderItems && orderItems.length > 0) {
+          // Ya existe un pedido para esta subasta, redirigir a ver el pedido
+          logger.info('Pedido ya existe para esta subasta', { 
+            orderId: existingOrder[0].id,
+            auctionId: auctionProductId 
+          });
+          toast.success('Ya tienes un pedido para esta subasta');
+          router.push(`/orders`);
+          return;
+        }
       }
 
       // Calcular comisiones de la subasta
@@ -238,10 +270,53 @@ function CheckoutContent() {
     }
   }
 
+  // Cargar métodos de pago permitidos desde site_settings
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('site_settings')
+          .select('key, value')
+          .eq('key', 'payment_methods')
+          .maybeSingle();
+
+        if (error) {
+          logger.warn('No se pudo cargar payment_methods, se usarán todos', error);
+          return;
+        }
+
+        const raw = (data as any)?.value;
+        let parsed: string[] | null = null;
+        if (typeof raw === 'string') {
+          try {
+            parsed = JSON.parse(raw);
+          } catch {
+            parsed = null;
+          }
+        } else if (Array.isArray(raw)) {
+          parsed = raw as string[];
+        } else if (raw && typeof raw === 'object') {
+          parsed = Object.values(raw);
+        }
+
+        if (parsed && parsed.length > 0) {
+          setAllowedPaymentMethods(parsed);
+          // Si el método actual no está permitido, seleccionar el primero permitido
+          if (!parsed.includes(paymentMethod)) {
+            setPaymentMethod(parsed[0] as any);
+          }
+        }
+      } catch (err) {
+        logger.warn('Error cargando métodos de pago', err);
+      }
+    })();
+  }, []);
+
   async function loadCartItems() {
     try {
-      const { data: session } = await supabase.auth.getSession();
-      if (!session?.session?.user?.id) {
+      const sessionResponse = await supabase.auth.getSession();
+      const session = (sessionResponse.data as any)?.session;
+      if (!session?.user?.id) {
         router.push('/auth/sign-in');
         return;
       }
@@ -250,11 +325,18 @@ function CheckoutContent() {
       const { data: cartData, error } = await (supabase as any)
         .from('cart_items')
         .select('id, product_id, quantity')
-        .eq('user_id', session.session.user.id);
+        .eq('user_id', (session as any)?.user?.id);
 
       if (error) throw error;
       if (!cartData || cartData.length === 0) {
-        router.push('/cart');
+        // Solo redirigir al carrito si NO es un checkout de subasta o membresía
+        // Si es subasta o membresía, el usuario puede estar completando un pedido válido
+        if (!auctionProductId && !checkoutType) {
+          router.push('/cart');
+          return;
+        }
+        // Si es subasta o membresía pero el carrito está vacío, simplemente no cargar items
+        // pero permitir que el checkout continúe con la subasta/membresía
         return;
       }
 
@@ -338,22 +420,23 @@ function CheckoutContent() {
         return;
       }
 
-      const { data: session } = await supabase.auth.getSession();
-      if (!session?.session?.user?.id) {
+      const sessionResponse = await supabase.auth.getSession();
+      const session = (sessionResponse.data as any)?.session;
+      if (!session?.user?.id) {
         router.push('/auth/sign-in');
         return;
       }
       
-      const buyerId = session.session.user.id;
+      const buyerId = (session as any)?.user?.id;
 
       // Procesar membresía si es checkout de membresía
       if (checkoutType === 'membership' && planId && subscriptionType) {
         try {
-          const { activateMembershipSubscription } = await import('@/lib/services/membershipService');
+          const { createPendingMembershipSubscription } = await import('@/lib/services/membershipService');
           const paymentAmount = membershipAmount ? parseFloat(membershipAmount) : 0;
           
-          // Activar membresía directamente
-          const subscriptionId = await activateMembershipSubscription(
+          // Crear suscripción pendiente (requiere aprobación del admin)
+          const subscriptionId = await createPendingMembershipSubscription(
             buyerId,
             planId,
             subscriptionType,
@@ -362,7 +445,7 @@ function CheckoutContent() {
             `checkout-${Date.now()}`
           );
 
-          logger.info('Membresía activada exitosamente', {
+          logger.info('Solicitud de membresía creada exitosamente (pendiente de aprobación)', {
             subscriptionId,
             userId: buyerId,
             planId,
@@ -370,12 +453,12 @@ function CheckoutContent() {
             amount: paymentAmount,
           });
 
-          toast.success('¡Membresía activada exitosamente!');
-          router.push(`/checkout/success?membership=${subscriptionId}`);
+          toast.success('¡Solicitud de membresía enviada! Será revisada por el administrador.');
+          router.push(`/checkout/success?membership=${subscriptionId}&pending=true`);
           return;
         } catch (membershipErr: any) {
-          logger.error('Error activando membresía', membershipErr);
-          toast.error('Error al activar membresía: ' + (membershipErr.message || 'Error desconocido'));
+          logger.error('Error creando solicitud de membresía', membershipErr);
+          toast.error('Error al crear solicitud de membresía: ' + (membershipErr.message || 'Error desconocido'));
           throw membershipErr;
         }
       }
@@ -417,7 +500,7 @@ function CheckoutContent() {
       // Crear orden
       logger.debug('Datos del pedido a crear', {
         buyer_id: buyerId,
-        buyer_email: session.session.user.email,
+        buyer_email: (session as any)?.user?.email,
         cartItems_count: cartItems.length,
         total: totalPrice,
         address: address.fullName,
@@ -447,21 +530,28 @@ function CheckoutContent() {
       let orderId: string | undefined;
       let error: any = null;
 
-      // Si es orden de subasta, usar función especial
+      // Si es orden de subasta, usar endpoint server-side
       if (auctionProductId && auctionProduct) {
-        const { data: auctionOrderId, error: auctionOrderError } = await (supabase as any).rpc('create_auction_order', {
-          p_buyer_id: buyerId,
-          p_auction_id: auctionProductId,
-          p_shipping_address: address,
-          p_payment_method: paymentMethod,
-          p_notes: notes.trim() || null,
-          p_total_amount: totalPrice,
+        // Las cookies se envían automáticamente con credentials: 'include'
+        const res = await fetch('/api/orders/auction-create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include', // Incluir cookies en la petición
+          body: JSON.stringify({
+            auctionId: auctionProductId,
+            shippingAddress: address,
+            paymentMethod,
+            notes: notes.trim() || null,
+            totalAmount: totalPrice,
+          }),
         });
 
-        if (auctionOrderError) {
-          error = auctionOrderError;
+        if (!res.ok) {
+          const errJson = await res.json().catch(() => ({}));
+          error = errJson;
         } else {
-          orderId = auctionOrderId;
+          const json = await res.json();
+          orderId = json.orderId;
         }
       } else {
         // Orden normal desde carrito
@@ -648,7 +738,7 @@ function CheckoutContent() {
       logger.debug('Datos del pedido creado', { orderId, orderData });
 
       // Enviar email de confirmación (en segundo plano, no bloquea)
-      const buyerEmail = session.session.user.email;
+      const buyerEmail = (session as any)?.user?.email;
       if (buyerEmail) {
         fetch('/api/email/order-confirmation', {
           method: 'POST',
@@ -663,7 +753,14 @@ function CheckoutContent() {
                 price: item.product.price * item.quantity,
               })),
               total: totalPrice,
-              shippingAddress: address,
+              // Mapear al formato que espera el template de email
+              shippingAddress: {
+                name: address.fullName,
+                address: address.address,
+                city: address.city,
+                department: address.department,
+                phone: address.phone,
+              },
             },
           }),
         }).catch(err => logger.error('Error enviando email', err, { orderId, email: buyerEmail }));
@@ -714,7 +811,7 @@ function CheckoutContent() {
         setPagoparLoading(true);
         try {
           // Obtener datos del comprador
-          const buyerEmail = session.session.user.email || '';
+          const buyerEmail = (session as any)?.user?.email || '';
           const buyerProfile = await (supabase as any)
             .from('profiles')
             .select('first_name, last_name, phone')
@@ -936,49 +1033,57 @@ function CheckoutContent() {
             <div className="bg-white rounded-lg shadow-sm border p-6">
               <h2 className="text-xl font-semibold mb-4">Método de pago</h2>
               <div className="space-y-3">
-                <label className="flex items-center">
-                  <input
-                    type="radio"
-                    value="cash"
-                    checked={paymentMethod === 'cash'}
-                    onChange={(e) => setPaymentMethod(e.target.value as any)}
-                    className="mr-3"
-                  />
-                  <span>Efectivo contra entrega</span>
-                </label>
-                <label className="flex items-center">
-                  <input
-                    type="radio"
-                    value="transfer"
-                    checked={paymentMethod === 'transfer'}
-                    onChange={(e) => setPaymentMethod(e.target.value as any)}
-                    className="mr-3"
-                  />
-                  <span>Transferencia bancaria</span>
-                </label>
-                <label className="flex items-center">
-                  <input
-                    type="radio"
-                    value="card"
-                    checked={paymentMethod === 'card'}
-                    onChange={(e) => setPaymentMethod(e.target.value as any)}
-                    className="mr-3"
-                  />
-                  <span>Tarjeta de crédito/débito</span>
-                </label>
-                <label className="flex items-center">
-                  <input
-                    type="radio"
-                    value="pagopar"
-                    checked={paymentMethod === 'pagopar'}
-                    onChange={(e) => setPaymentMethod(e.target.value as any)}
-                    className="mr-3"
-                  />
-                  <span className="flex items-center gap-2">
-                    <span>Pago con Pagopar</span>
-                    <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded">Seguro</span>
-                  </span>
-                </label>
+                {(allowedPaymentMethods || ['cash', 'transfer', 'card', 'pagopar']).includes('cash') && (
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      value="cash"
+                      checked={paymentMethod === 'cash'}
+                      onChange={(e) => setPaymentMethod(e.target.value as any)}
+                      className="mr-3"
+                    />
+                    <span>Efectivo contra entrega</span>
+                  </label>
+                )}
+                {(allowedPaymentMethods || ['cash', 'transfer', 'card', 'pagopar']).includes('transfer') && (
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      value="transfer"
+                      checked={paymentMethod === 'transfer'}
+                      onChange={(e) => setPaymentMethod(e.target.value as any)}
+                      className="mr-3"
+                    />
+                    <span>Transferencia bancaria</span>
+                  </label>
+                )}
+                {(allowedPaymentMethods || ['cash', 'transfer', 'card', 'pagopar']).includes('card') && (
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      value="card"
+                      checked={paymentMethod === 'card'}
+                      onChange={(e) => setPaymentMethod(e.target.value as any)}
+                      className="mr-3"
+                    />
+                    <span>Tarjeta de crédito/débito</span>
+                  </label>
+                )}
+                {(allowedPaymentMethods || ['cash', 'transfer', 'card', 'pagopar']).includes('pagopar') && (
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      value="pagopar"
+                      checked={paymentMethod === 'pagopar'}
+                      onChange={(e) => setPaymentMethod(e.target.value as any)}
+                      className="mr-3"
+                    />
+                    <span className="flex items-center gap-2">
+                      <span>Pago con Pagopar</span>
+                      <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded">Seguro</span>
+                    </span>
+                  </label>
+                )}
               </div>
               {paymentMethod === 'pagopar' && (
                 <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">

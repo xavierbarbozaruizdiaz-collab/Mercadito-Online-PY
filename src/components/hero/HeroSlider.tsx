@@ -128,7 +128,9 @@ export default function HeroSlider({ slides, ...rest }: Props) {
                       priority={i < 3} // Pre-cargar las primeras 3 imágenes
                       sizes="100vw"
                       className="object-cover"
-                      unoptimized={imageUrl?.includes('supabase.co')} // Desactivar optimización para URLs de Supabase
+                      // Deshabilitar optimización para URLs de Supabase para evitar 404
+                      // El loader personalizado maneja estas URLs directamente
+                      unoptimized={typeof imageUrl === 'string' && imageUrl.includes('supabase.co/storage')}
                       onError={(e) => {
                         console.error('[HeroSlider] Error loading image:', imageUrl);
                         // Fallback a gradiente si falla la carga

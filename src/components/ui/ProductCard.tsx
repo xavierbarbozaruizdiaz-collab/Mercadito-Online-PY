@@ -46,6 +46,7 @@ interface Product {
   condition: string;
   sale_type: string;
   image_url?: string;
+  thumbnail_url?: string; // [IMAGES LEVEL2] Thumbnail optimizado para listados
   created_at: string;
   seller_id?: string; // ID del vendedor
   stock_quantity?: number | null;
@@ -304,11 +305,14 @@ export default function ProductCard({
           <div className="flex items-center space-x-4">
             {/* Imagen del producto */}
             <div className="relative w-24 h-24 flex-shrink-0">
+              {/* [IMAGES LEVEL2] Usar thumbnail_url en listados cuando esté disponible */}
               <Image
-                src={product.image_url || '/placeholder-product.png'}
+                src={product.thumbnail_url ?? product.image_url ?? '/placeholder-product.png'}
                 alt={product.title}
                 fill
+                sizes="96px"
                 className="object-cover rounded-md"
+                loading="lazy"
               />
               {discount > 0 && (
                 <Badge 
@@ -435,11 +439,14 @@ export default function ProductCard({
     >
       <CardHeader className="p-0">
         <div className="relative w-full h-48">
+          {/* [IMAGES LEVEL2] Usar thumbnail_url en listados cuando esté disponible */}
           <Image
-            src={product.image_url || '/placeholder-product.png'}
+            src={product.thumbnail_url ?? product.image_url ?? '/placeholder-product.png'}
             alt={product.title}
             fill
+            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
             className="object-cover rounded-t-md"
+            loading="lazy"
           />
           
           {/* Badges - OCULTOS */}

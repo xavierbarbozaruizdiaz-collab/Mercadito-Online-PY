@@ -9,7 +9,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabaseClient';
 import { logger } from '@/lib/utils/logger';
-import { ArrowLeft, Crown, User, Search, Edit, Save, X, Calendar, DollarSign } from 'lucide-react';
+import { ArrowLeft, Crown, User, Search, Edit, Save, X, Calendar, DollarSign, Clock } from 'lucide-react';
 
 type MembershipLevel = 'free' | 'bronze' | 'silver' | 'gold';
 type UserMembership = {
@@ -213,13 +213,22 @@ export default function AdminMembershipsPage() {
                 Administra las membresías de usuarios para participar en subastas
               </p>
             </div>
-            <Link
-              href="/admin/memberships/plans"
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
-            >
-              <Crown className="h-5 w-5" />
-              Gestionar Planes
-            </Link>
+            <div className="flex items-center gap-3">
+              <Link
+                href="/admin/memberships/pending"
+                className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 flex items-center gap-2"
+              >
+                <Clock className="h-5 w-5" />
+                Solicitudes Pendientes
+              </Link>
+              <Link
+                href="/admin/memberships/plans"
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+              >
+                <Crown className="h-5 w-5" />
+                Gestionar Planes
+              </Link>
+            </div>
           </div>
         </div>
 

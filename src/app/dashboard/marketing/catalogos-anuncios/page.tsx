@@ -269,16 +269,18 @@ export default function CatalogosAnunciosPage() {
         <>
           {/* Lista de Catálogos */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-            {catalogs.map((catalog) => (
+            {Array.isArray(catalogs) && catalogs.map((catalog) => {
+              if (!catalog || !catalog.id) return null;
+              return (
               <div
                 key={catalog.id}
                 className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-lg transition-shadow"
               >
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-1">{catalog.name}</h3>
-                    <p className="text-sm text-gray-500">Slug: {catalog.slug}</p>
-                    <p className="text-sm text-gray-500">Tipo: {catalog.type}</p>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-1">{catalog.name || 'Sin nombre'}</h3>
+                    <p className="text-sm text-gray-500">Slug: {catalog.slug || 'N/A'}</p>
+                    <p className="text-sm text-gray-500">Tipo: {catalog.type || 'N/A'}</p>
                   </div>
                   <div className="flex items-center gap-2">
                     {catalog.is_active ? (
@@ -302,7 +304,7 @@ export default function CatalogosAnunciosPage() {
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-gray-600">Última regeneración:</span>
                       <span className="text-gray-900">
-                        {formatDate(catalog.last_generated_at)}
+                        {catalog.last_generated_at ? formatDate(catalog.last_generated_at) : 'N/A'}
                       </span>
                     </div>
                   )}
@@ -359,7 +361,8 @@ export default function CatalogosAnunciosPage() {
                   </button>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         </>
       )}
@@ -391,13 +394,49 @@ export default function CatalogosAnunciosPage() {
           onRegenerate={() => handleRegenerateCatalog(viewingCatalog.id)}
           onAddProduct={async (productId) => {
             try {
+              // Validación adicional antes de llamar al servicio
+              const isAlreadyInCatalog = viewingCatalog.products.some(
+                cp => cp.product_id === productId
+              );
+              
+              if (isAlreadyInCatalog) {
+                toast.error('Este producto ya está en el catálogo');
+                return;
+              }
+
               await addProductToCatalog(viewingCatalog.id, productId, store.id);
               const updatedCatalog = await getStoreAdCatalogById(viewingCatalog.id, store.id);
               setViewingCatalog(updatedCatalog);
-              toast.success('Producto agregado al catálogo');
+              toast.success('Producto agregado al catálogo exitosamente');
             } catch (err: any) {
               console.error('Error adding product to catalog:', err);
-              toast.error(err.message || 'Error al agregar el producto');
+              
+              // Mensajes de error más específicos
+              let errorMessage = 'Error al agregar el producto';
+              
+              // Manejar error 406 específicamente
+              if (err.status === 406 || 
+                  err.code === 'PGRST301' || 
+                  err.message?.includes('406') || 
+                  err.message?.includes('Not Acceptable')) {
+                errorMessage = 'Error de permisos. Verifica que el producto pertenece a tu tienda y que tienes acceso al catálogo.';
+              } else if (err.message?.includes('ya está en este catálogo') || 
+                         err.message?.includes('already in this catalog')) {
+                errorMessage = 'Este producto ya está en el catálogo';
+              } else if (err.message?.includes('pertenece a otra tienda') || 
+                         err.message?.includes('no pertenece a tu tienda')) {
+                errorMessage = 'Este producto no pertenece a tu tienda';
+              } else if (err.message?.includes('permiso') || 
+                         err.message?.includes('permission')) {
+                errorMessage = 'No tienes permiso para agregar este producto';
+              } else if (err.message?.includes('no existe')) {
+                errorMessage = 'El producto no existe o fue eliminado';
+              } else if (err.message) {
+                errorMessage = err.message;
+              }
+              
+              toast.error(errorMessage);
+              throw err; // Re-lanzar para que el componente pueda manejarlo
             }
           }}
           onRemoveProduct={async (productId) => {
@@ -638,6 +677,7 @@ function ViewCatalogModal({
   const [showAddProduct, setShowAddProduct] = useState(false);
   const [availableProducts, setAvailableProducts] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [addingProductId, setAddingProductId] = useState<string | null>(null);
 
   // Obtener IDs de productos ya en el catálogo (se actualiza cuando cambia el catálogo)
   const catalogProductIds = useMemo(
@@ -668,6 +708,31 @@ function ViewCatalogModal({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showAddProduct, searchQuery, catalog.products.length]);
+
+  // Función helper para manejar la adición de productos con mejor UX
+  async function handleAddProduct(productId: string) {
+    // Validación en el frontend antes de llamar al servicio
+    if (catalogProductIds.has(productId)) {
+      toast.error('Este producto ya está en el catálogo');
+      return;
+    }
+
+    if (addingProductId === productId) {
+      return; // Ya se está procesando
+    }
+
+    setAddingProductId(productId);
+    try {
+      await onAddProduct(productId);
+      // Remover de la lista de disponibles después de agregarlo exitosamente
+      setAvailableProducts(prev => prev.filter(p => p.id !== productId));
+    } catch (err) {
+      // El error ya se maneja en onAddProduct, solo resetear el estado
+      console.error('Error in handleAddProduct:', err);
+    } finally {
+      setAddingProductId(null);
+    }
+  }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
@@ -765,10 +830,22 @@ function ViewCatalogModal({
                       </div>
                     </div>
                     <button
-                      onClick={() => onAddProduct(product.id)}
-                      className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 transition-colors"
+                      onClick={() => handleAddProduct(product.id)}
+                      disabled={addingProductId === product.id || catalogProductIds.has(product.id)}
+                      className={`px-3 py-1 rounded text-sm transition-colors ${
+                        catalogProductIds.has(product.id)
+                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                          : addingProductId === product.id
+                          ? 'bg-blue-400 text-white cursor-wait'
+                          : 'bg-blue-600 text-white hover:bg-blue-700'
+                      }`}
+                      title={catalogProductIds.has(product.id) ? 'Este producto ya está en el catálogo' : ''}
                     >
-                      Agregar
+                      {addingProductId === product.id 
+                        ? 'Agregando...' 
+                        : catalogProductIds.has(product.id) 
+                        ? 'Ya agregado' 
+                        : 'Agregar'}
                     </button>
                   </div>
                 ))

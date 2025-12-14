@@ -372,7 +372,7 @@ export default function MyBidsPage() {
                           </Link>
                         )}
                         {status === 'won' && (
-                          <Link href={`/products/${bid.product_id}`}>
+                          <Link href={`/checkout?auctionId=${bid.product_id}`}>
                             <button className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm flex items-center gap-2 hover:bg-emerald-700">
                               Completar compra
                               <CheckCircle className="h-4 w-4" />

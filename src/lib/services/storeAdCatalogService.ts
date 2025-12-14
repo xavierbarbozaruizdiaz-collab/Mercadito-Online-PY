@@ -85,6 +85,22 @@ export async function getStoreAdCatalogs(
     const { data, error } = await query;
 
     if (error) {
+      // Si es error 406, puede ser problema de RLS o headers
+      if (error.code === 'PGRST301' || error.message?.includes('406') || error.message?.includes('Not Acceptable')) {
+        console.warn('[StoreAdCatalogService] Error 406 al obtener catálogos, intentando sin filtros:', error);
+        // Intentar sin filtros de is_active
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from('store_ad_catalogs')
+          .select('*')
+          .eq('store_id', storeId)
+          .order('created_at', { ascending: false });
+        
+        if (fallbackError) {
+          console.error('[StoreAdCatalogService] Error en fallback:', fallbackError);
+          return []; // Retornar array vacío en lugar de lanzar error
+        }
+        return (fallbackData || []) as StoreAdCatalog[];
+      }
       console.error('[StoreAdCatalogService] Error fetching catalogs:', error);
       throw error;
     }
@@ -92,7 +108,8 @@ export async function getStoreAdCatalogs(
     return (data || []) as StoreAdCatalog[];
   } catch (error) {
     console.error('[StoreAdCatalogService] Error:', error);
-    throw error;
+    // En caso de error, retornar array vacío en lugar de lanzar
+    return [];
   }
 }
 
@@ -224,40 +241,109 @@ export async function createStoreAdCatalog(
   payload: CreateCatalogPayload
 ): Promise<StoreAdCatalog> {
   try {
-    // Verificar que el slug no exista para esta tienda
-    const { data: existing } = await supabase
+    // Validar slug
+    if (!payload.slug || payload.slug.trim().length === 0) {
+      throw new Error('El slug es requerido');
+    }
+
+    // Normalizar slug (eliminar espacios, convertir a minúsculas, reemplazar espacios con guiones)
+    const normalizedSlug = payload.slug
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, '-')
+      .replace(/[^a-z0-9-]/g, '');
+
+    if (normalizedSlug.length === 0) {
+      throw new Error('El slug debe contener al menos un carácter válido');
+    }
+
+    // Verificar que el slug no exista para esta tienda (con mejor manejo de errores)
+    const { data: existing, error: checkError } = await supabase
       .from('store_ad_catalogs')
-      .select('id')
+      .select('id, slug')
       .eq('store_id', storeId)
-      .eq('slug', payload.slug)
-      .single();
+      .eq('slug', normalizedSlug)
+      .maybeSingle();
+
+    if (checkError && checkError.code !== 'PGRST116') {
+      // PGRST116 es "no rows returned", que es esperado si no existe
+      console.error('[StoreAdCatalogService] Error checking existing catalog:', checkError);
+      throw new Error('Error al verificar si el catálogo existe');
+    }
 
     if (existing) {
-      throw new Error('Ya existe un catálogo con ese slug para tu tienda');
+      throw new Error(`Ya existe un catálogo con el slug "${existing.slug}" para tu tienda. Por favor, usa un slug diferente.`);
     }
 
-    const { data, error } = await supabase
-      .from('store_ad_catalogs')
-      .insert({
-        store_id: storeId,
-        slug: payload.slug,
-        name: payload.name,
-        type: payload.type || 'default',
-        filters: payload.filters || {},
-        is_active: payload.is_active !== undefined ? payload.is_active : true,
-      })
-      .select()
-      .single();
+    // Intentar crear con el slug normalizado
+    // Si hay conflicto de slug, agregar un número al final
+    let finalSlug = normalizedSlug;
+    let attempts = 0;
+    const maxAttempts = 10;
 
-    if (error) {
-      console.error('[StoreAdCatalogService] Error creating catalog:', error);
+    while (attempts < maxAttempts) {
+      try {
+        const { data, error } = await supabase
+          .from('store_ad_catalogs')
+          .insert({
+            store_id: storeId,
+            slug: finalSlug,
+            name: payload.name,
+            type: payload.type || 'default',
+            filters: payload.filters || {},
+            is_active: payload.is_active !== undefined ? payload.is_active : true,
+          })
+          .select()
+          .single();
+
+        if (error) {
+          // Si es error de constraint único (slug duplicado), intentar con otro slug
+          if (error.code === '23505' || error.message?.includes('duplicate key') || error.message?.includes('unique constraint')) {
+            attempts++;
+            if (attempts < maxAttempts) {
+              finalSlug = `${normalizedSlug}-${attempts}`;
+              continue; // Intentar de nuevo con nuevo slug
+            } else {
+              throw new Error(`No se pudo crear el catálogo. El slug "${normalizedSlug}" y sus variantes ya están en uso. Por favor, usa un slug diferente.`);
+            }
+          }
+          // Para otros errores, lanzar directamente
+          console.error('[StoreAdCatalogService] Error creating catalog:', error);
+          if (error.message?.includes('Ya existe')) {
+            throw new Error(error.message);
+          }
+          throw new Error(error.message || 'Error al crear el catálogo');
+        }
+
+        return data as StoreAdCatalog;
+      } catch (insertError: any) {
+        // Si ya es nuestro error personalizado, relanzarlo
+        if (insertError.message && !insertError.code) {
+          throw insertError;
+        }
+        // Si es error de constraint, continuar el loop
+        if (insertError.code === '23505' || insertError.message?.includes('duplicate key')) {
+          attempts++;
+          if (attempts < maxAttempts) {
+            finalSlug = `${normalizedSlug}-${attempts}`;
+            continue;
+          }
+        }
+        throw insertError;
+      }
+    }
+
+    throw new Error('No se pudo crear el catálogo después de varios intentos');
+  } catch (error: any) {
+    console.error('[StoreAdCatalogService] Error creating catalog:', error);
+    // Mejorar mensajes de error
+    if (error.message) {
       throw error;
     }
-
-    return data as StoreAdCatalog;
-  } catch (error: any) {
-    console.error('[StoreAdCatalogService] Error:', error);
-    throw error;
+    if (error.code === '23505') {
+      throw new Error('Ya existe un catálogo con ese slug para tu tienda. Por favor, usa un slug diferente.');
+    }
+    throw new Error(error.message || 'Error al crear el catálogo');
   }
 }
 
@@ -343,28 +429,66 @@ export async function addProductToCatalog(
     }
 
     // Verificar que el producto pertenece a la tienda
-    const { data: product } = await supabase
+    // Algunos productos pueden tener store_id, otros solo seller_id
+    // Necesitamos verificar ambos casos
+    const { data: product, error: productError } = await supabase
       .from('products')
-      .select('id, store_id')
+      .select('id, store_id, seller_id')
       .eq('id', productId)
-      .single();
+      .maybeSingle();
 
-    if (!product || product.store_id !== storeId) {
-      throw new Error('No tienes permiso para agregar este producto');
+    if (productError && productError.code !== 'PGRST116') {
+      console.error('[StoreAdCatalogService] Error checking product:', productError);
+      // Si es error 406, puede ser problema de RLS o headers
+      if (productError.code === 'PGRST301' || productError.message?.includes('406') || productError.message?.includes('Not Acceptable')) {
+        throw new Error('Error al verificar el producto. Por favor, verifica que el producto existe y pertenece a tu tienda.');
+      }
+      throw new Error('Error al verificar el producto');
     }
 
-    // Verificar que no esté duplicado
-    const { data: existing } = await supabase
+    if (!product) {
+      throw new Error('El producto no existe o no tienes permiso para agregarlo');
+    }
+
+    // Verificar que el producto pertenece a la tienda
+    // Opción 1: El producto tiene store_id y coincide
+    // Opción 2: El producto tiene seller_id y la tienda tiene ese seller_id
+    if (product.store_id && product.store_id !== storeId) {
+      throw new Error('Este producto pertenece a otra tienda');
+    }
+
+    // Si no tiene store_id, verificar por seller_id
+    if (!product.store_id && product.seller_id) {
+      const { data: store } = await supabase
+        .from('stores')
+        .select('seller_id')
+        .eq('id', storeId)
+        .single();
+
+      if (!store || store.seller_id !== product.seller_id) {
+        throw new Error('Este producto no pertenece a tu tienda');
+      }
+    }
+
+    // Verificar que no esté duplicado (usar maybeSingle para evitar error si no existe)
+    const { data: existing, error: checkError } = await supabase
       .from('store_ad_catalog_products')
       .select('id')
       .eq('catalog_id', catalogId)
       .eq('product_id', productId)
-      .single();
+      .maybeSingle();
+
+    // Si hay error diferente a "no rows returned", lanzarlo
+    if (checkError && checkError.code !== 'PGRST116') {
+      console.error('[StoreAdCatalogService] Error checking duplicate product:', checkError);
+      throw new Error('Error al verificar si el producto ya está en el catálogo');
+    }
 
     if (existing) {
       throw new Error('El producto ya está en este catálogo');
     }
 
+    // Intentar insertar con manejo mejorado de errores
     const { data, error } = await supabase
       .from('store_ad_catalog_products')
       .insert({
@@ -376,7 +500,35 @@ export async function addProductToCatalog(
 
     if (error) {
       console.error('[StoreAdCatalogService] Error adding product:', error);
-      throw error;
+      
+      // Manejar error 406 (Not Acceptable) - puede ser problema de RLS o headers
+      if (error.code === 'PGRST301' || 
+          error.status === 406 || 
+          error.message?.includes('406') || 
+          error.message?.includes('Not Acceptable')) {
+        // Verificar si es un problema de permisos RLS
+        throw new Error('No tienes permiso para agregar este producto. Verifica que el producto pertenece a tu tienda y que el catálogo es tuyo.');
+      }
+      
+      // Manejar errores específicos de constraint único (duplicado)
+      if (error.code === '23505' || 
+          error.message?.includes('duplicate key') || 
+          error.message?.includes('unique constraint') ||
+          error.message?.includes('already exists')) {
+        throw new Error('El producto ya está en este catálogo');
+      }
+      
+      // Manejar errores de permisos (403)
+      if (error.status === 403 || error.code === '42501') {
+        throw new Error('No tienes permiso para agregar productos a este catálogo');
+      }
+      
+      // Para otros errores, lanzar el error original pero con mensaje más claro
+      if (error.message) {
+        throw new Error(`Error al agregar el producto: ${error.message}`);
+      }
+      
+      throw new Error('Error al agregar el producto al catálogo. Por favor, intenta nuevamente.');
     }
 
     // Actualizar contador de productos

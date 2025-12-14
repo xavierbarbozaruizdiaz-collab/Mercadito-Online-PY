@@ -77,11 +77,9 @@ export default function UserOrdersPage() {
         } : null
       });
 
-      // Verificación adicional: consultar todos los pedidos (sin filtro) para debugging
-      if (simpleData?.length === 0) {
-        console.log('⚠️ No se encontraron pedidos para este usuario. Verificando...');
-        
-        // Llamar a API de debug
+      // Verificación adicional (solo en desarrollo) para evitar 403 en producción
+      if (process.env.NODE_ENV !== 'production' && simpleData?.length === 0) {
+        console.log('⚠️ No se encontraron pedidos para este usuario. Verificando (dev)...');
         try {
           const debugResponse = await fetch(`/api/debug/check-orders?userId=${userId}`);
           const debugData = await debugResponse.json();

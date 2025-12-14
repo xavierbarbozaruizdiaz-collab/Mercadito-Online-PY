@@ -13,7 +13,8 @@ const getRedisClient = (): Redis | null => {
 
   // Si no hay configuración, retornar null (degradación elegante)
   if (!url || !token) {
-    if (process.env.NODE_ENV === 'production') {
+    // Solo mostrar warning en desarrollo, no en producción para evitar ruido en consola
+    if (process.env.NODE_ENV === 'development') {
       console.warn('[Redis] ⚠️ Variables de entorno de Upstash no configuradas. Locks y rate limiting no funcionarán en producción.');
     }
     return null;

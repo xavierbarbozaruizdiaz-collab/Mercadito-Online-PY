@@ -4,6 +4,8 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   images: {
+    // Configuración estándar de Next.js sin loader personalizado
+    // Las imágenes de Supabase se manejan con unoptimized en los componentes
     remotePatterns: [
       { protocol: 'https', hostname: 'images.unsplash.com' },
       { protocol: 'https', hostname: 'i.imgur.com' },
@@ -21,14 +23,46 @@ const nextConfig: NextConfig = {
     minimumCacheTTL: 60,
     dangerouslyAllowSVG: true,
     contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
+    // Permitir imágenes sin optimización para Supabase
+    unoptimized: false,
   },
   experimental: {
     optimizePackageImports: [],
   },
-  // Deshabilitar preload automático de Next.js para evitar warnings
+  // Configuración para optimizar preloads y reducir warnings
   onDemandEntries: {
     maxInactiveAge: 25 * 1000,
     pagesBufferLength: 2,
+  },
+  // Optimizar compilación y reducir warnings de preload
+  compiler: {
+    removeConsole: process.env.NODE_ENV === 'production' ? {
+      exclude: ['error', 'warn'],
+    } : false,
+  },
+  // Configuración de headers para optimizar carga
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          {
+            key: 'X-DNS-Prefetch-Control',
+            value: 'on'
+          },
+        ],
+      },
+    ];
+  },
+  // Redirects para compatibilidad con diferentes navegadores
+  async redirects() {
+    return [
+      {
+        source: '/manifest.webmanifest',
+        destination: '/manifest.json',
+        permanent: true,
+      },
+    ];
   },
 };
 

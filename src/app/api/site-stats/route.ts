@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabaseClient';
+import { createServerClient } from '@/lib/supabase/server';
 
 async function countLive() {
   // Ajustar estas condiciones a tu esquema real
@@ -65,6 +66,29 @@ export async function GET() {
 }
 
 export async function PATCH(_req: NextRequest) {
+  // [SECURITY PATCH FASE3] Verificación explícita de admin en PATCH /api/site-stats
+  const supabase = await createServerClient();
+  const { data: { session } } = await supabase.auth.getSession();
+  
+  if (!session?.user) {
+    return NextResponse.json({ ok: false, error: 'No autenticado' }, { status: 401 });
+  }
+
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', session.user.id)
+    .single();
+
+  if (profileError || !profile) {
+    return NextResponse.json({ ok: false, error: 'Error verificando permisos' }, { status: 500 });
+  }
+
+  const profileData = profile as { role?: string };
+  if (profileData.role !== 'admin') {
+    return NextResponse.json({ ok: false, error: 'No autorizado. Se requiere rol de administrador.' }, { status: 403 });
+  }
+
   // Sólo admin: rely en RLS, si no es admin, UPDATE fallará
   try {
     const live = await countLive();

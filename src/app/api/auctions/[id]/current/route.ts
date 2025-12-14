@@ -56,17 +56,20 @@ export async function GET(
       );
     }
 
+    // Type assertion para TypeScript
+    const auctionData = dbData as CurrentAuctionData;
+
     // VALIDACIÓN CRÍTICA: Verificar tiempo usando PostgreSQL NOW()
     // Si la subasta expiró según el servidor, forzar estado "ended"
     // También refrescar desde DB si está cerca de expirar (últimos 30 segundos)
     // para evitar datos obsoletos bajo alta concurrencia
-    let finalStatus = dbData.auction_status as 'scheduled' | 'active' | 'ended' | 'cancelled';
+    let finalStatus = auctionData.auction_status;
     let needsRefresh = false;
     
-    if (dbData.auction_end_at && finalStatus === 'active') {
+    if (auctionData.auction_end_at && finalStatus === 'active') {
       // Verificar si está cerca de expirar (últimos 30 segundos)
       // Si es así, refrescar desde DB para obtener estado más reciente
-      const endAt = new Date(dbData.auction_end_at);
+      const endAt = new Date(auctionData.auction_end_at);
       const timeUntilEnd = endAt.getTime() - Date.now();
       
       if (timeUntilEnd > 0 && timeUntilEnd < 30000) {
@@ -86,12 +89,13 @@ export async function GET(
         
         if (!refreshError && refreshedData) {
           // Usar datos refrescados
-          dbData.auction_status = refreshedData.auction_status;
-          dbData.auction_end_at = refreshedData.auction_end_at;
-          dbData.current_bid = refreshedData.current_bid;
-          dbData.winner_id = refreshedData.winner_id;
-          dbData.auction_version = refreshedData.auction_version;
-          finalStatus = refreshedData.auction_status as any;
+          const refreshed = refreshedData as Partial<CurrentAuctionData>;
+          auctionData.auction_status = (refreshed.auction_status || auctionData.auction_status) as any;
+          auctionData.auction_end_at = refreshed.auction_end_at || auctionData.auction_end_at;
+          auctionData.current_bid = refreshed.current_bid ?? auctionData.current_bid;
+          auctionData.winner_id = refreshed.winner_id ?? auctionData.winner_id;
+          auctionData.auction_version = refreshed.auction_version ?? auctionData.auction_version;
+          finalStatus = refreshed.auction_status || finalStatus;
         }
       }
       
@@ -101,7 +105,7 @@ export async function GET(
       
       if (!timeError && serverTimeData) {
         const serverNow = new Date(serverTimeData);
-        const endAtDate = new Date(dbData.auction_end_at);
+        const endAtDate = new Date(auctionData.auction_end_at);
         
         // Si el tiempo del servidor indica que expiró, forzar estado "ended"
         if (serverNow >= endAtDate) {
@@ -113,7 +117,7 @@ export async function GET(
           finalStatus = 'ended';
           
           // Actualizar estado en DB si está desactualizado (asíncrono, no bloquea respuesta)
-          supabaseAdmin
+          (supabaseAdmin as any)
             .from('products')
             .update({ auction_status: 'ended' })
             .eq('id', auctionId)
@@ -130,7 +134,7 @@ export async function GET(
         // Si falla obtener tiempo del servidor, usar comparación local como fallback
         logger.warn('[Auction Current API] Error obteniendo tiempo del servidor, usando fallback local', timeError, { auctionId });
         const localNow = new Date();
-        const endAtDate = new Date(dbData.auction_end_at);
+        const endAtDate = new Date(auctionData.auction_end_at);
         if (localNow >= endAtDate) {
           finalStatus = 'ended';
         }
@@ -138,24 +142,24 @@ export async function GET(
     }
 
     // Si el estado en DB ya es "ended", respetarlo
-    if (dbData.auction_status === 'ended') {
+    if (auctionData.auction_status === 'ended') {
       finalStatus = 'ended';
     }
 
     const response: CurrentAuctionData = {
-      current_bid: dbData.current_bid,
-      winner_id: dbData.winner_id,
+      current_bid: auctionData.current_bid,
+      winner_id: auctionData.winner_id,
       auction_status: finalStatus,
-      auction_end_at: dbData.auction_end_at,
-      total_bids: dbData.total_bids || 0,
-      auction_version: dbData.auction_version || null,
+      auction_end_at: auctionData.auction_end_at,
+      total_bids: auctionData.total_bids || 0,
+      auction_version: auctionData.auction_version || null,
     };
 
     // Logging mínimo: solo cuando detectamos estado cerrado o cerca de expirar
     if (finalStatus === 'ended') {
       logger.info('[Auction Current API] Subasta cerrada', { auctionId, status: finalStatus });
-    } else if (dbData.auction_end_at) {
-      const endAt = new Date(dbData.auction_end_at);
+    } else if (auctionData.auction_end_at) {
+      const endAt = new Date(auctionData.auction_end_at);
       const timeUntilEnd = endAt.getTime() - Date.now();
       // Solo loguear si está muy cerca de expirar (últimos 10 segundos)
       if (timeUntilEnd > 0 && timeUntilEnd < 10000) {

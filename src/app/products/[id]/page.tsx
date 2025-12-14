@@ -57,6 +57,8 @@ export async function generateMetadata(
         cover_url,
         condition,
         sale_type,
+        approval_status,
+        status,
         categories (name)
       `)
       .eq('id', id)
@@ -142,6 +144,8 @@ export default async function ProductPage(
       category_id,
       seller_id,
       store_id,
+      approval_status,
+      status,
       wholesale_enabled,
       wholesale_min_quantity,
       wholesale_discount_percent,
@@ -185,6 +189,8 @@ export default async function ProductPage(
   // El tipo correcto es que categories viene como array desde Supabase
   const p = data as Product & { 
     categories: Category[];
+    approval_status?: string;
+    status?: string;
     stores?: Array<{
       id: string;
       name: string;
@@ -193,6 +199,7 @@ export default async function ProductPage(
       description: string | null;
     }> | null;
   };
+
   
   // Obtener la primera categoría (debería ser solo una)
   const category = p.categories && p.categories.length > 0 ? p.categories[0] : null;

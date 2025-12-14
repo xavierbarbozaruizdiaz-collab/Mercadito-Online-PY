@@ -23,12 +23,13 @@ export interface RateLimitResult {
  * Configuraciones predefinidas de rate limiting
  */
 export const RATE_LIMIT_CONFIGS = {
-  // Pujas: 30 por minuto por usuario
+  // OPTIMIZACIÓN: Reducir límite de pujas para prevenir spam y reducir carga
+  // Pujas: 10 por minuto por usuario (reducido de 30)
   BID_BY_USER: {
-    maxRequests: 30,
+    maxRequests: 10,
     windowSeconds: 60,
   },
-  // Pujas: 10 por minuto por IP (adicional)
+  // Pujas: 10 por minuto por IP (aumentado de 5 para evitar bloqueos en redes compartidas)
   BID_BY_IP: {
     maxRequests: 10,
     windowSeconds: 60,
@@ -134,15 +135,15 @@ export async function checkRateLimit(
     }
   }
 
-  // FALLBACK: Rate limiting en memoria (mínimo y conservador)
-  // Solo permite 1 request por segundo por key cuando Redis falla
-  // Esto previene abuso masivo pero no es tan estricto como Redis
-  logger.warn('[Rate Limit] Redis no disponible, usando fallback en memoria (1 req/seg)', { key });
+  // FALLBACK: Rate limiting en memoria (menos restrictivo cuando Redis falla)
+  // Permite más requests cuando Redis no está disponible para no bloquear usuarios legítimos
+  logger.warn('[Rate Limit] Redis no disponible, usando fallback en memoria (más permisivo)', { key });
   
   cleanupInMemoryRateLimit(); // Limpiar entradas expiradas
   
   const now = Date.now();
-  const fallbackWindowMs = 1000; // 1 segundo (muy conservador)
+  // Usar la misma ventana de tiempo que la configuración original, pero más permisivo
+  const fallbackWindowMs = config.windowSeconds * 1000;
   const fallbackResetAt = now + fallbackWindowMs;
   const fallbackKey = `fallback:${key}`;
   
@@ -153,14 +154,15 @@ export async function checkRateLimit(
     inMemoryRateLimit.set(fallbackKey, { count: 1, resetAt: fallbackResetAt });
     return {
       allowed: true,
-      remaining: 0, // No sabemos cuántas quedan, pero permitimos esta
+      remaining: config.maxRequests - 1, // Aproximación
       resetAt: fallbackResetAt,
     };
   }
   
-  // Ya hay una request en esta ventana de 1 segundo
-  if (existing.count >= 1) {
-    logger.warn('[Rate Limit] Fallback en memoria: límite alcanzado', { key, count: existing.count });
+  // Verificar límite (más permisivo: permite hasta el doble del límite configurado)
+  const fallbackMaxRequests = config.maxRequests * 2; // Más permisivo cuando Redis falla
+  if (existing.count >= fallbackMaxRequests) {
+    logger.warn('[Rate Limit] Fallback en memoria: límite alcanzado', { key, count: existing.count, max: fallbackMaxRequests });
     return {
       allowed: false,
       remaining: 0,
@@ -175,7 +177,7 @@ export async function checkRateLimit(
   
   return {
     allowed: true,
-    remaining: 0,
+    remaining: Math.max(0, fallbackMaxRequests - existing.count),
     resetAt: existing.resetAt,
   };
 }

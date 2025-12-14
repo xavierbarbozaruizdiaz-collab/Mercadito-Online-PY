@@ -206,15 +206,17 @@ export default function DashboardSidebar({ isOpen: controlledIsOpen, onClose, on
       {/* Sidebar */}
       <aside
         className={`
-          bg-[#1F1F1F] border-r border-gray-800 min-h-screen fixed left-0 top-0 z-40
+          bg-[#1F1F1F] border-r border-gray-800 h-screen fixed left-0 top-0 z-40
           transition-all duration-300 ease-in-out
           md:translate-x-0
           ${isOpen ? 'translate-x-0' : '-translate-x-full'}
           ${isDesktopCollapsed ? 'md:w-16' : 'md:w-64'}
           w-64
+          flex flex-col
         `}
       >
-        <div className={`p-4 border-b border-gray-800 flex items-center ${isDesktopCollapsed ? 'justify-center' : 'justify-between'}`}>
+        {/* Header fijo */}
+        <div className={`p-4 border-b border-gray-800 flex items-center flex-shrink-0 ${isDesktopCollapsed ? 'justify-center' : 'justify-between'}`}>
           <Link 
             href="/dashboard" 
             className={`flex items-center gap-2 ${isDesktopCollapsed ? 'justify-center' : ''}`} 
@@ -238,64 +240,65 @@ export default function DashboardSidebar({ isOpen: controlledIsOpen, onClose, on
           </button>
         </div>
       
-      <nav className="p-4 space-y-1">
-        {getVisibleItemsOptimized().map((item) => {
-          const Icon = item.icon;
-          const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname?.startsWith(item.href));
+        {/* Navegación scrollable */}
+        <nav className="flex-1 overflow-y-auto overflow-x-hidden p-4 space-y-1">
+          {getVisibleItemsOptimized().map((item) => {
+            const Icon = item.icon;
+            const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname?.startsWith(item.href));
+            
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setIsOpen(false)}
+                className={`flex items-center ${isDesktopCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3 min-h-[44px] rounded-lg transition-colors ${
+                  isActive
+                    ? 'bg-blue-600 text-white'
+                    : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+                }`}
+                title={isDesktopCollapsed ? item.label : ''}
+              >
+                <Icon className="w-5 h-5 flex-shrink-0" />
+                {!isDesktopCollapsed && (
+                  <span className="font-medium whitespace-nowrap">{item.label}</span>
+                )}
+              </Link>
+            );
+          })}
           
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={() => setIsOpen(false)}
-              className={`flex items-center ${isDesktopCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3 min-h-[44px] rounded-lg transition-colors ${
-                isActive
-                  ? 'bg-blue-600 text-white'
-                  : 'text-gray-300 hover:bg-gray-800 hover:text-white'
-              }`}
-              title={isDesktopCollapsed ? item.label : ''}
+          {/* Botón de Estadísticas (solo para vendedores/admin) */}
+          {(isSeller || isAdmin) && onStatsClick && (
+            <button
+              onClick={() => {
+                setIsOpen(false);
+                onStatsClick();
+              }}
+              className={`flex items-center ${isDesktopCollapsed ? 'justify-center' : 'gap-3'} w-full px-4 py-3 min-h-[44px] rounded-lg transition-colors text-gray-300 hover:bg-gray-800 hover:text-white`}
+              title={isDesktopCollapsed ? 'Estadísticas' : ''}
             >
-              <Icon className="w-5 h-5 flex-shrink-0" />
+              <BarChart3 className="w-5 h-5 flex-shrink-0" />
               {!isDesktopCollapsed && (
-                <span className="font-medium whitespace-nowrap">{item.label}</span>
+                <span className="font-medium whitespace-nowrap">Estadísticas</span>
               )}
-            </Link>
-          );
-        })}
-        
-        {/* Botón de Estadísticas (solo para vendedores/admin) */}
-        {(isSeller || isAdmin) && onStatsClick && (
-          <button
-            onClick={() => {
-              setIsOpen(false);
-              onStatsClick();
-            }}
-            className={`flex items-center ${isDesktopCollapsed ? 'justify-center' : 'gap-3'} w-full px-4 py-3 min-h-[44px] rounded-lg transition-colors text-gray-300 hover:bg-gray-800 hover:text-white`}
-            title={isDesktopCollapsed ? 'Estadísticas' : ''}
-          >
-            <BarChart3 className="w-5 h-5 flex-shrink-0" />
-            {!isDesktopCollapsed && (
-              <span className="font-medium whitespace-nowrap">Estadísticas</span>
-            )}
-          </button>
-        )}
-      </nav>
-      
-      {/* Sección de usuario en la parte inferior */}
-      <div className={`absolute bottom-0 left-0 right-0 p-4 border-t border-gray-800 ${isDesktopCollapsed ? 'flex justify-center' : ''}`}>
-        <div className={`flex items-center ${isDesktopCollapsed ? 'justify-center' : 'gap-3'} text-gray-400`}>
-          <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center flex-shrink-0">
-            <User className="w-4 h-4" />
-          </div>
-          {!isDesktopCollapsed && (
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-white truncate">Usuario</p>
-              <p className="text-xs text-gray-500 truncate">{userEmail || 'Cargando...'}</p>
-            </div>
+            </button>
           )}
+        </nav>
+      
+        {/* Sección de usuario fija en la parte inferior */}
+        <div className={`p-4 border-t border-gray-800 flex-shrink-0 ${isDesktopCollapsed ? 'flex justify-center' : ''}`}>
+          <div className={`flex items-center ${isDesktopCollapsed ? 'justify-center' : 'gap-3'} text-gray-400`}>
+            <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center flex-shrink-0">
+              <User className="w-4 h-4" />
+            </div>
+            {!isDesktopCollapsed && (
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-white truncate">Usuario</p>
+                <p className="text-xs text-gray-500 truncate">{userEmail || 'Cargando...'}</p>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
-    </aside>
+      </aside>
     </>
   );
 }

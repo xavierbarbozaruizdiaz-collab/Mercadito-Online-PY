@@ -18,6 +18,9 @@ export default function SignInPage() {
   const router = useRouter();
   const toast = useToast();
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Feature flag para mostrar/ocultar el botón de Facebook
+  const enableFacebookLogin = process.env.NEXT_PUBLIC_ENABLE_FACEBOOK_LOGIN === 'true';
 
   // Limpiar timeout al desmontar el componente o cambiar entre sign-in/sign-up
   useEffect(() => {
@@ -208,15 +211,25 @@ export default function SignInPage() {
         ? `${window.location.origin}/auth/callback`
         : `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/auth/callback`;
       
+      // Configurar opciones según el proveedor
+      const options: any = {
+        redirectTo,
+      };
+      
+      // Solo agregar queryParams para Google si es necesario
+      // Nota: Estos parámetros pueden causar errores 400 si Google no los acepta
+      // o si la configuración en Google Cloud Console no los permite
+      if (provider === 'google') {
+        // Comentar queryParams si causan problemas
+        // options.queryParams = {
+        //   access_type: 'offline',
+        //   prompt: 'consent',
+        // };
+      }
+      
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
-        options: {
-          redirectTo,
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'consent',
-          },
-        },
+        options,
       });
 
       if (error) {
@@ -443,7 +456,7 @@ export default function SignInPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className={`grid gap-3 ${enableFacebookLogin ? 'grid-cols-2' : 'grid-cols-1'}`}>
               <button
                 type="button"
                 onClick={() => signInWithOAuth('google')}
@@ -466,24 +479,26 @@ export default function SignInPage() {
                 <span className="text-sm font-medium text-gray-700">Google</span>
               </button>
 
-              <button
-                type="button"
-                onClick={() => signInWithOAuth('facebook')}
-                disabled={loading || oauthLoading !== null}
-                className="flex items-center justify-center gap-2 px-4 py-3 border-2 border-gray-200 rounded-xl hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {oauthLoading === 'facebook' ? (
-                  <svg className="animate-spin h-5 w-5 text-gray-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                ) : (
-                  <svg className="w-5 h-5" fill="#1877F2" viewBox="0 0 24 24">
-                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-                  </svg>
-                )}
-                <span className="text-sm font-medium text-gray-700">Facebook</span>
-              </button>
+              {enableFacebookLogin && (
+                <button
+                  type="button"
+                  onClick={() => signInWithOAuth('facebook')}
+                  disabled={loading || oauthLoading !== null}
+                  className="flex items-center justify-center gap-2 px-4 py-3 border-2 border-gray-200 rounded-xl hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {oauthLoading === 'facebook' ? (
+                    <svg className="animate-spin h-5 w-5 text-gray-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  ) : (
+                    <svg className="w-5 h-5" fill="#1877F2" viewBox="0 0 24 24">
+                      <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                    </svg>
+                  )}
+                  <span className="text-sm font-medium text-gray-700">Facebook</span>
+                </button>
+              )}
             </div>
           </div>
 

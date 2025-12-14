@@ -8,7 +8,7 @@
 // ============================================
 
 export type UserRole = 'buyer' | 'seller' | 'admin';
-export type MembershipLevel = 'free' | 'bronze' | 'silver' | 'gold';
+export type MembershipLevel = 'free' | 'bronze' | 'silver' | 'gold' | 'store';
 export type ProductCondition = 'new' | 'like_new' | 'used' | 'refurbished';
 export type SaleType = 'fixed' | 'auction' | 'negotiable';
 export type ProductStatus = 'active' | 'paused' | 'archived' | 'sold';

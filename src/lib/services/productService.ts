@@ -691,6 +691,7 @@ class ProductServiceImpl implements ProductService {
             const response = await fetch('/api/products/upload-images', {
               method: 'POST',
               body: formData,
+              credentials: 'include',
             });
 
             if (!response.ok) {

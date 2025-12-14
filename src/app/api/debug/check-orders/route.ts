@@ -1,11 +1,53 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabaseClient';
+import { createServerClient } from '@/lib/supabase/server';
 
 /**
  * API Route para debug: Verificar pedidos en la base de datos
  * GET /api/debug/check-orders?userId=xxx
  */
 export async function GET(request: NextRequest) {
+  // [SECURITY PATCH FASE2] Proteger endpoint de debug con autenticación y deshabilitar en producción
+  if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json(
+      { error: 'Endpoint deshabilitado en producción' },
+      { status: 403 }
+    );
+  }
+
+  // Verificar autenticación
+  const supabaseServer = await createServerClient();
+  const { data: { session } } = await supabaseServer.auth.getSession();
+  
+  if (!session?.user) {
+    return NextResponse.json(
+      { error: 'No autenticado' },
+      { status: 401 }
+    );
+  }
+
+  // Verificar rol admin
+  const { data: profile, error: profileError } = await supabaseServer
+    .from('profiles')
+    .select('role')
+    .eq('id', session.user.id)
+    .single();
+
+  if (profileError || !profile) {
+    return NextResponse.json(
+      { error: 'Error verificando permisos' },
+      { status: 500 }
+    );
+  }
+
+  const profileData = profile as { role?: string };
+  if (profileData.role !== 'admin') {
+    return NextResponse.json(
+      { error: 'No autorizado. Se requiere rol de administrador.' },
+      { status: 403 }
+    );
+  }
+
   try {
     const searchParams = request.nextUrl.searchParams;
     const userId = searchParams.get('userId');

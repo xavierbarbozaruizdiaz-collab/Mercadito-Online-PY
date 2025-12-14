@@ -74,7 +74,26 @@ export async function getSetting(key: string, defaultValue: any = null): Promise
     .eq('key', key)
     .single();
 
-  if (error || !data) {
+  if (error) {
+    // Si es error de acceso (RLS), retornar defaultValue silenciosamente (no lanzar error)
+    // Esto evita errores 406 en consola cuando la política RLS no permite acceso
+    if (error.code === 'PGRST301' || error.status === 406 || error.status === 403) {
+      // No loggear ni lanzar - solo retornar defaultValue
+      // El caller puede verificar si el valor es el default si necesita
+      return defaultValue;
+    }
+    // Si es 404 o "no encontrado", retornar defaultValue (dato realmente no existe)
+    if (error.code === 'PGRST116' || error.message?.includes('No rows') || error.message?.includes('not found')) {
+      return defaultValue;
+    }
+    // Otros errores: loggear solo en desarrollo y retornar defaultValue
+    if (process.env.NODE_ENV === 'development') {
+      console.warn(`[getSetting] Error fetching setting '${key}':`, error);
+    }
+    return defaultValue;
+  }
+
+  if (!data) {
     return defaultValue;
   }
 
@@ -123,5 +142,63 @@ export async function updateSettings(settings: Record<string, any>, adminId: str
   for (const [key, value] of Object.entries(settings)) {
     await updateSetting(key, value, adminId);
   }
+}
+
+/**
+ * Normaliza un número de teléfono para WhatsApp (wa.me)
+ * - Elimina espacios y caracteres no numéricos
+ * - Si empieza con 0, lo convierte a 595 + resto
+ * - Ejemplo: "0981 123 456" → "595981123456"
+ */
+export function normalizePhoneNumber(phone: string): string {
+  // Eliminar espacios y caracteres no numéricos
+  let cleaned = phone.replace(/\D/g, '');
+  
+  // Si empieza con 0, convertir a formato internacional (595)
+  if (cleaned.startsWith('0')) {
+    cleaned = '595' + cleaned.substring(1);
+  }
+  
+  // Si ya tiene código de país pero no empieza con 595, asegurar que tenga
+  if (!cleaned.startsWith('595') && cleaned.length > 9) {
+    // Si tiene código de país diferente, mantenerlo
+    // Si no tiene código, agregar 595
+    if (cleaned.length === 9) {
+      cleaned = '595' + cleaned;
+    }
+  }
+  
+  return cleaned;
+}
+
+/**
+ * Obtiene el número de WhatsApp del sitio con fallback inteligente
+ * Orden de prioridad: whatsapp_number -> contact_phone -> fallback hardcodeado
+ * 
+ * @returns Número de teléfono normalizado para WhatsApp (formato wa.me)
+ */
+export async function getWhatsappNumber(): Promise<string> {
+  // 1. Intentar whatsapp_number
+  try {
+    const whatsapp = await getSetting('whatsapp_number', '');
+    if (whatsapp && typeof whatsapp === 'string' && whatsapp.trim()) {
+      return normalizePhoneNumber(whatsapp);
+    }
+  } catch (error) {
+    console.warn('[getWhatsappNumber] Error leyendo whatsapp_number, intentando contact_phone', error);
+  }
+
+  // 2. Intentar contact_phone como fallback
+  try {
+    const contactPhone = await getSetting('contact_phone', '');
+    if (contactPhone && typeof contactPhone === 'string' && contactPhone.trim()) {
+      return normalizePhoneNumber(contactPhone);
+    }
+  } catch (error) {
+    console.warn('[getWhatsappNumber] Error leyendo contact_phone, usando fallback', error);
+  }
+
+  // 3. Fallback hardcodeado (número temporal por defecto)
+  return '595981123456';
 }
 

@@ -312,3 +312,22 @@ Por ahora, el GPT solo:
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

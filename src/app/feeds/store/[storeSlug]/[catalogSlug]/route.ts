@@ -204,6 +204,7 @@ export async function GET(
       .map((cp) => {
         const product = cp.product as any;
         
+        // SIEMPRE generar campos en inglés (requerido por Facebook/Meta/TikTok)
         return {
           id: product.id,
           title: product.title || 'Sin título',
@@ -223,11 +224,14 @@ export async function GET(
       });
 
     // 4. Retornar JSON con headers apropiados para feeds
+    // Asegurar que no haya caché para evitar datos inconsistentes
     return NextResponse.json(feedProducts, {
       status: 200,
       headers: {
         'Content-Type': 'application/json',
-        'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600', // Cache 5 min, stale 10 min
+        'Cache-Control': 'no-cache, no-store, must-revalidate', // Sin caché para evitar inconsistencias
+        'Pragma': 'no-cache',
+        'Expires': '0',
         'Access-Control-Allow-Origin': '*', // Permitir CORS para plataformas externas
         'Access-Control-Allow-Methods': 'GET',
       },

@@ -2,21 +2,15 @@ import type { Metadata, Viewport } from "next";
 import Script from "next/script";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import Link from "next/link";
-import UserMenu from "@/components/UserMenu";
-import CartButton from "@/components/CartButton";
-import MobileMenu from "@/components/MobileMenu";
-import AuctionsNavLink from "@/components/AuctionsNavLink";
-import RafflesNavLink from "@/components/RafflesNavLink";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import ToastProvider from "@/components/ui/ToastProvider";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import AnalyticsProvider from "@/components/AnalyticsProvider";
-import { Gavel, Ticket } from "lucide-react";
-import Logo from "@/components/Logo";
 import FooterWrapper from "@/components/FooterWrapper";
+import HeaderWrapper from "@/components/HeaderWrapper";
 import { SITE_URL } from "@/lib/config/site";
 import MercaditoAssistantWidget from "@/components/MercaditoAssistantWidget";
+import { getSiteSettings } from "@/lib/services/siteSettingsServer";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -28,78 +22,94 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: {
-    default: 'Mercadito Online PY - Marketplace de Paraguay',
-    template: '%s | Mercadito Online PY',
-  },
-  description: 'El mejor marketplace de Paraguay. Compra y vende productos nuevos y usados de forma segura. Encuentra las mejores ofertas en tecnología, hogar, deportes y más.',
-  keywords: [
-    'marketplace',
-    'Paraguay',
-    'comprar',
-    'vender',
-    'productos',
-    'usados',
-    'nuevos',
-    'tecnología',
-    'hogar',
-    'deportes',
-    'automóviles',
-    'ropa',
-    'accesorios',
-    'Mercadito Online PY'
-  ],
-  authors: [{ name: 'Mercadito Online PY' }],
-  creator: 'Mercadito Online PY',
-  publisher: 'Mercadito Online PY',
-  formatDetection: {
-    email: false,
-    address: false,
-    telephone: false,
-  },
-  metadataBase: new URL(SITE_URL),
-  alternates: {
-    canonical: '/',
-    languages: {
-      'es-PY': '/',
+/**
+ * Genera metadata dinámica usando los settings del sitio
+ * Esto permite que el nombre del sitio y descripción se actualicen desde el admin
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const settings = await getSiteSettings();
+  
+  const siteName = settings.siteName || 'Mercadito Online PY';
+  const title = `${siteName} - Marketplace de Paraguay`;
+  const description = settings.siteDescription ?? 
+    'El mejor marketplace de Paraguay. Compra y vende productos nuevos y usados de forma segura. Encuentra las mejores ofertas en tecnología, hogar, deportes y más.';
+
+  return {
+    title: {
+      default: title,
+      template: `%s | ${siteName}`,
     },
-  },
-  openGraph: {
-    type: 'website',
-    locale: 'es_PY',
-    url: SITE_URL,
-    siteName: 'Mercadito Online PY',
-    title: 'Mercadito Online PY - Marketplace de Paraguay',
-    description: 'El mejor marketplace de Paraguay. Compra y vende productos nuevos y usados de forma segura.',
-    images: [
-      {
-        url: '/og-image.jpg',
-        width: 1200,
-        height: 630,
-        alt: 'Mercadito Online PY',
+    description,
+    keywords: [
+      'marketplace',
+      'Paraguay',
+      'comprar',
+      'vender',
+      'productos',
+      'usados',
+      'nuevos',
+      'tecnología',
+      'hogar',
+      'deportes',
+      'automóviles',
+      'ropa',
+      'accesorios',
+      siteName,
+    ],
+    authors: [{ name: siteName }],
+    creator: siteName,
+    publisher: siteName,
+    formatDetection: {
+      email: false,
+      address: false,
+      telephone: false,
+    },
+    metadataBase: new URL(SITE_URL),
+    alternates: {
+      canonical: '/',
+      languages: {
+        'es-PY': '/',
       },
-    ],
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title: 'Mercadito Online PY - Marketplace de Paraguay',
-    description: 'El mejor marketplace de Paraguay. Compra y vende productos nuevos y usados de forma segura.',
-    images: ['/og-image.jpg'],
-  },
-  icons: {
-    icon: [
-      { url: '/icons/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
-      { url: '/icons/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
-    ],
-    apple: [
-      { url: '/icons/apple-touch-icon-152x152.png', sizes: '152x152', type: 'image/png' },
-      { url: '/icons/apple-touch-icon-167x167.png', sizes: '167x167', type: 'image/png' },
-      { url: '/icons/apple-touch-icon-180x180.png', sizes: '180x180', type: 'image/png' },
-    ],
-  },
-  manifest: '/manifest.json',
-};
+    },
+    openGraph: {
+      type: 'website',
+      locale: 'es_PY',
+      url: SITE_URL,
+      siteName,
+      title,
+      description,
+      images: [
+        {
+          url: '/og-image.jpg',
+          width: 1200,
+          height: 630,
+          alt: siteName,
+        },
+      ],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: ['/og-image.jpg'],
+    },
+    icons: {
+      icon: [
+        { url: '/favicon.ico', sizes: 'any' },
+        { url: '/favicon.svg', type: 'image/svg+xml' },
+        { url: '/icons/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
+        { url: '/icons/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
+      ],
+      apple: [
+        { url: '/icons/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
+        { url: '/icons/apple-touch-icon-152x152.png', sizes: '152x152', type: 'image/png' },
+        { url: '/icons/apple-touch-icon-167x167.png', sizes: '167x167', type: 'image/png' },
+        { url: '/icons/apple-touch-icon-180x180.png', sizes: '180x180', type: 'image/png' },
+      ],
+    },
+    manifest: '/manifest.json',
+  };
+}
 
 export const viewport: Viewport = {
   width: 'device-width',
@@ -143,8 +153,11 @@ export default function RootLayout({
           }}
         />
 
+        <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
         <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16x16.png" />
         <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png" />
+        <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
         {/* Deshabilitar preload automático problemático */}
         <meta name="next-head-count" content="0" />
       </head>
@@ -162,64 +175,8 @@ export default function RootLayout({
         <ErrorBoundary>
           <ThemeProvider>
             <AnalyticsProvider>
-            {/* Header mejorado */}
-            <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-sm border-b border-gray-200 shadow-md">
-              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="flex items-center justify-between h-16 gap-2 sm:gap-4">
-                  {/* Menú móvil y Logo */}
-                  <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0 min-w-0">
-                    <MobileMenu />
-                    <Link 
-                      href="/" 
-                      className="flex items-center gap-2 sm:gap-3 min-w-0 group"
-                    >
-                      {/* Logo PWA - con fallback si no existe la imagen */}
-                      <div className="relative">
-                        <Logo />
-                        <div className="absolute inset-0 bg-blue-500/0 group-hover:bg-blue-500/10 rounded-full transition-colors"></div>
-                      </div>
-                      <span className="text-base sm:text-xl md:text-2xl font-bold text-blue-600 group-hover:text-blue-700 transition-colors truncate">
-                        <span className="hidden sm:inline">Mercadito Online PY</span>
-                        <span className="sm:hidden">Mercadito PY</span>
-                      </span>
-                    </Link>
-                  </div>
-                  
-                  {/* Navegación central (solo desktop) */}
-                  <div className="hidden md:flex flex-1 justify-center items-center gap-4">
-                    <AuctionsNavLink />
-                    <RafflesNavLink />
-                  </div>
-                  
-                  {/* Iconos de subastas/sorteos y acciones derecha juntos */}
-                  <div className="flex items-center gap-0.5 sm:gap-1 md:gap-2 flex-shrink-0">
-                    {/* Iconos en móvil */}
-                    <div className="md:hidden flex items-center gap-1">
-                      <Link
-                        href="/auctions"
-                        className="flex items-center justify-center p-2 min-h-[44px] min-w-[44px] text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-all"
-                        aria-label="Subastas"
-                      >
-                        <Gavel className="w-5 h-5 sm:w-6 sm:h-6" />
-                      </Link>
-                      <Link
-                        href="/raffles"
-                        className="flex items-center justify-center p-2 min-h-[44px] min-w-[44px] text-gray-600 hover:text-yellow-600 hover:bg-yellow-50 rounded-lg transition-all"
-                        aria-label="Sorteos"
-                      >
-                        <Ticket className="w-5 h-5 sm:w-6 sm:h-6" />
-                      </Link>
-                    </div>
-                    
-                    {/* Acciones derecha */}
-                    <div className="flex items-center gap-0.5 sm:gap-1 md:gap-2">
-                      <CartButton />
-                      <UserMenu />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </header>
+            {/* Header dinámico */}
+            <HeaderWrapper />
 
             {/* Toast Provider */}
             <ToastProvider />

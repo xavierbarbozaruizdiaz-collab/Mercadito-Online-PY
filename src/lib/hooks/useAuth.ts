@@ -68,6 +68,23 @@ export function useAuth() {
     loadUser();
   }, [loadUser]);
 
+  // Escuchar cambios en membresías (para recargar perfil cuando se aprueba)
+  useEffect(() => {
+    const handleMembershipUpdate = async (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const { userId } = customEvent.detail || {};
+      if (userId && user?.id === userId) {
+        // Si es el usuario actual, recargar perfil
+        await loadUser();
+      }
+    };
+
+    window.addEventListener('membership-updated', handleMembershipUpdate);
+    return () => {
+      window.removeEventListener('membership-updated', handleMembershipUpdate);
+    };
+  }, [user, loadUser]);
+
   // Escuchar cambios en la autenticación
   useEffect(() => {
     let mounted = true;

@@ -19,7 +19,7 @@ export interface Database {
           bio?: string;
           location?: string;
           verified: boolean;
-          membership_level: 'free' | 'bronze' | 'silver' | 'gold';
+          membership_level: 'free' | 'bronze' | 'silver' | 'gold' | 'store';
           membership_expires_at?: string;
           created_at: string;
           updated_at: string;

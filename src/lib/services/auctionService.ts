@@ -286,7 +286,7 @@ export async function getActiveAuctions(filters?: {
 /**
  * Verifica y actualiza el estado de una subasta según las fechas
  */
-async function checkAndUpdateAuctionStatus(productId: string): Promise<void> {
+export async function checkAndUpdateAuctionStatus(productId: string): Promise<void> {
   try {
     const now = new Date().toISOString();
     

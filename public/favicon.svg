@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Mercadito Online PY - Favicon -->
+  <!-- Versión ultra-simplificada para máxima legibilidad en 16×16 -->
+  
+  <g transform="translate(512, 512)">
+    
+    <!-- Carrito (formas más gruesas y simples) -->
+    <rect x="-220" y="-30" width="440" height="270" rx="35" fill="#1D4ED8"/>
+    <rect x="-220" y="-30" width="440" height="110" rx="35" fill="#1D4ED8"/>
+    
+    <!-- Ruedas (más grandes) -->
+    <circle cx="-150" cy="290" r="55" fill="#1D4ED8"/>
+    <circle cx="150" cy="290" r="55" fill="#1D4ED8"/>
+    <circle cx="-150" cy="290" r="35" fill="#FFFFFF"/>
+    <circle cx="150" cy="290" r="35" fill="#FFFFFF"/>
+    
+    <!-- Asa (más gruesa) -->
+    <path d="M -190 -30 Q -190 -200 0 -200 Q 190 -200 190 -30" 
+          stroke="#1D4ED8" 
+          stroke-width="55" 
+          fill="none" 
+          stroke-linecap="round"/>
+    
+    <!-- Pin (más grande y prominente para favicon) -->
+    <g transform="translate(0, 50)">
+      <path d="M 0 -120 L -70 15 Q -70 60 0 105 Q 70 60 70 15 Z" fill="#FACC15"/>
+      <circle cx="0" cy="0" r="45" fill="#1D4ED8"/>
+      <circle cx="0" cy="0" r="24" fill="#FFFFFF"/>
+    </g>
+    
+    <!-- Productos (solo 2 círculos para simplicidad) -->
+    <circle cx="-100" cy="90" r="30" fill="#FACC15"/>
+    <circle cx="100" cy="90" r="30" fill="#FACC15"/>
+    
+  </g>
+</svg>

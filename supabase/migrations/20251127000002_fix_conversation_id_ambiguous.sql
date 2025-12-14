@@ -28,3 +28,22 @@ CREATE POLICY "Users can send messages in their conversations" ON public.message
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

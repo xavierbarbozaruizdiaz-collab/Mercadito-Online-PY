@@ -6,6 +6,7 @@
 'use client';
 
 import React from 'react';
+import Image from 'next/image';
 import { cn } from '@/lib/utils';
 import { Card } from './Card';
 import ButtonDefault from './Button';
@@ -298,10 +299,13 @@ export function StoreCard({ store, productCount, onClick }: StoreCardProps) {
       onClick={onClick}
     >
       <div className="relative h-32 overflow-hidden rounded-t-lg">
-        <img
+        {/* [PERF PATCH IMAGES_FASE1] Usar Next/Image para logos de tiendas */}
+        <Image
           src={store.cover_image_url || 'https://placehold.co/600x200?text=Tienda'}
           alt={store.name}
-          className="w-full h-full object-cover"
+          fill
+          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+          className="object-cover"
         />
         <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/50 to-transparent p-4">
           <div className="flex items-center space-x-3">

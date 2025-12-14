@@ -6,7 +6,6 @@ import { supabase, getSessionWithTimeout } from '@/lib/supabaseClient';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { logger } from '@/lib/utils/logger';
-import { Trash2 } from 'lucide-react';
 
 const MAX_IMAGES = 10;
 
@@ -52,7 +51,6 @@ export default function EditProduct() {
   const [hoveredImage, setHoveredImage] = useState<number | null>(null);
 
   const [categories, setCategories] = useState<Category[]>([]);
-  const [deleting, setDeleting] = useState(false);
 
   // Cargar datos del producto
   useEffect(() => {
@@ -373,8 +371,8 @@ export default function EditProduct() {
         
         finalPrice = Number(auctionStartingPrice);
         
-        // Calcular fecha de fin (5 minutos para pruebas, igual que new-product)
-        const durationMinutes = 5; // 5 minutos para pruebas - cambiar a 1440 para producción
+        // Calcular fecha de fin (2 minutos para pruebas, igual que new-product)
+        const durationMinutes = 2; // 2 minutos para pruebas - cambiar a 1440 para producción
         const endDate = new Date(startDate.getTime() + durationMinutes * 60 * 1000);
         
         // Preparar atributos de subasta (para compatibilidad, pero usaremos campos directos)
@@ -430,7 +428,7 @@ export default function EditProduct() {
           diferenciaConParaguay: timezoneOffset - paraguayOffset
         });
         
-        const durationMinutes = 5; // 5 minutos para pruebas
+        const durationMinutes = 2; // 2 minutos para pruebas
         const endDate = new Date(startDate.getTime() + durationMinutes * 60 * 1000);
         
         updateData.auction_status = 'scheduled';
@@ -462,6 +460,50 @@ export default function EditProduct() {
         .eq('id', productId);
 
       if (updateError) throw updateError;
+
+      // [STOCK ALERTS SYNC] Actualizar stock_alerts si se cambió stock_quantity
+      if (updateData.stock_quantity !== undefined && updateData.stock_management_enabled) {
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user?.id) return; // No hay usuario, saltar sincronización
+          
+          const newStock = updateData.stock_quantity || 0;
+          const threshold = updateData.low_stock_threshold || 5;
+          
+          if (newStock <= threshold) {
+            // Crear o actualizar alerta activa
+            const { error: alertError } = await (supabase as any)
+              .from('stock_alerts')
+              .upsert({
+                product_id: productId,
+                seller_id: user.id,
+                threshold: threshold,
+                current_stock: newStock,
+                is_active: true
+              }, {
+                onConflict: 'product_id'
+              });
+            
+            if (alertError) {
+              logger.warn('Error actualizando stock_alerts (no crítico)', alertError, { productId });
+            }
+          } else {
+            // Desactivar alertas si el stock está por encima del umbral
+            const { error: alertError } = await (supabase as any)
+              .from('stock_alerts')
+              .update({ is_active: false, current_stock: newStock })
+              .eq('product_id', productId)
+              .eq('is_active', true);
+            
+            if (alertError) {
+              logger.warn('Error desactivando stock_alerts (no crítico)', alertError, { productId });
+            }
+          }
+        } catch (syncError) {
+          logger.warn('Error en sincronización de stock_alerts (no crítico)', syncError, { productId });
+          // No fallar la actualización del producto por esto
+        }
+      }
 
       // 2. Si hay imágenes nuevas, subirlas
       if (imagePreviews.length > 0) {
@@ -522,117 +564,6 @@ export default function EditProduct() {
       showMsg('error', '❌ ' + (err?.message ?? 'Error al actualizar'));
     } finally {
       setLoading(false);
-    }
-  }
-
-  // Función para eliminar producto
-  async function handleDeleteProduct() {
-    if (!confirm('¿Estás seguro de que quieres eliminar este producto? Esta acción no se puede deshacer.')) {
-      return;
-    }
-
-    setDeleting(true);
-    
-    try {
-      logger.debug('Eliminando producto', { productId });
-      
-      // Verificar que el producto existe y que el usuario es el dueño
-      const { data: session } = await supabase.auth.getSession();
-      if (!session?.session?.user?.id) {
-        throw new Error('No hay sesión activa');
-      }
-      
-      const userId = session.session.user.id;
-      
-      // Verificar que el producto existe y pertenece al usuario
-      const { data: productToDelete, error: checkError } = await supabase
-        .from('products')
-        .select('id, seller_id, title')
-        .eq('id', productId)
-        .single();
-      
-      if (checkError || !productToDelete) {
-        logger.error('Producto no encontrado o error al verificar', checkError, { productId });
-        throw new Error('Producto no encontrado');
-      }
-      
-      if (productToDelete.seller_id !== userId) {
-        throw new Error('No tienes permiso para eliminar este producto');
-      }
-      
-      // Obtener imágenes del producto para eliminarlas del storage
-      const { data: images } = await supabase
-        .from('product_images')
-        .select('url')
-        .eq('product_id', productId);
-
-      // Eliminar producto
-      let deleteError: any = null;
-      let count: number | null = null;
-      
-      try {
-        const deleteResult = await supabase
-          .from('products')
-          .delete({ count: 'exact' })
-          .eq('id', productId);
-        
-        deleteError = deleteResult.error;
-        count = deleteResult.count;
-        
-        // Si count es 0 o null, intentar usar función SQL que evita problemas de RLS
-        if ((count === 0 || count === null) && !deleteError) {
-          logger.warn('DELETE retornó count: 0. Intentando con función SQL', { productId });
-          
-          const { data: rpcResult, error: rpcError } = await (supabase as any)
-            .rpc('delete_user_product', { product_id_to_delete: productId });
-          
-          if (rpcError) {
-            logger.error('Error al usar función SQL', rpcError, { productId });
-          } else if (rpcResult === true) {
-            logger.info('Producto eliminado usando función SQL', { productId });
-            count = 1;
-          }
-        }
-      } catch (err: any) {
-        deleteError = err;
-        logger.error('Error capturado en DELETE', err, { productId });
-      }
-
-      if (deleteError) {
-        throw deleteError;
-      }
-
-      // Eliminar imágenes del storage
-      if (images && images.length > 0) {
-        const filePaths = images.map((img: any) => {
-          const url = img.url;
-          const match = url.match(/products\/([^\/]+)\/(.+)$/);
-          return match ? `${match[1]}/${match[2]}` : null;
-        }).filter(Boolean);
-        
-        if (filePaths.length > 0) {
-          const { error: storageError } = await supabase.storage
-            .from('product-images')
-            .remove(filePaths);
-
-          if (storageError) {
-            logger.error('Error al eliminar imágenes del storage', storageError, { productId, filePaths });
-          }
-        }
-      }
-
-      showMsg('success', '✅ Producto eliminado exitosamente. Redirigiendo...');
-      
-      // Redirigir al dashboard después de un breve delay
-      setTimeout(() => {
-        router.push('/dashboard');
-      }, 1500);
-      
-    } catch (err: any) {
-      logger.error('Error completo al eliminar producto', err, { productId });
-      showMsg('error', '❌ Error al eliminar producto: ' + (err.message || 'Error desconocido'));
-    } finally {
-      setDeleting(false);
     }
   }
 
@@ -888,7 +819,7 @@ export default function EditProduct() {
                     // min={new Date().toISOString().slice(0, 16)}
                   />
                   <p className="text-xs text-gray-500 mt-1">
-                    La subasta comenzará automáticamente en esta fecha y hora. Duración para pruebas: 5 minutos desde el inicio. Puedes seleccionar una fecha pasada para iniciar inmediatamente.
+                    La subasta comenzará automáticamente en esta fecha y hora. Duración para pruebas: 2 minutos desde el inicio. Puedes seleccionar una fecha pasada para iniciar inmediatamente.
                   </p>
                 </div>
               </div>
@@ -896,7 +827,7 @@ export default function EditProduct() {
                 <h4 className="font-semibold text-yellow-900 mb-2">¿Cómo funcionan las subastas?</h4>
                 <ul className="text-sm text-yellow-800 space-y-1 list-disc list-inside">
                   <li>Los compradores pujan incrementando el precio</li>
-                  <li>Duración: 5 minutos desde la fecha de inicio (modo prueba)</li>
+                  <li>Duración: 2 minutos desde la fecha de inicio (modo prueba)</li>
                   <li>Quien ofrezca el precio más alto al finalizar gana</li>
                   <li>Si configuraste "Compra ahora", alguien puede comprarlo inmediatamente</li>
                   <li>Puedes usar una fecha pasada para iniciar la subasta inmediatamente</li>
@@ -1172,34 +1103,18 @@ export default function EditProduct() {
           )}
         </div>
 
-        {/* Submit y Eliminar */}
-        <div className="flex gap-4 items-center">
-          <button
-            type="submit"
-            disabled={loading || !isFormValid}
-            className={`px-6 py-3 rounded font-medium transition-colors ${
-              isFormValid && !loading
-                ? 'bg-black text-white hover:bg-gray-800'
-                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-            }`}
-          >
-            {loading ? 'Actualizando…' : isFormValid ? 'Actualizar producto' : 'Completa todos los campos'}
-          </button>
-          
-          <button
-            type="button"
-            onClick={handleDeleteProduct}
-            disabled={deleting || loading}
-            className={`px-6 py-3 rounded font-medium transition-colors flex items-center gap-2 ${
-              deleting || loading
-                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                : 'bg-red-600 text-white hover:bg-red-700'
-            }`}
-          >
-            <Trash2 className="w-4 h-4" />
-            {deleting ? 'Eliminando…' : 'Eliminar producto'}
-          </button>
-        </div>
+        {/* Submit */}
+        <button
+          type="submit"
+          disabled={loading || !isFormValid}
+          className={`px-6 py-3 rounded font-medium transition-colors ${
+            isFormValid && !loading
+              ? 'bg-black text-white hover:bg-gray-800'
+              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+          }`}
+        >
+          {loading ? 'Actualizando…' : isFormValid ? 'Actualizar producto' : 'Completa todos los campos'}
+        </button>
       </form>
     </main>
   );
