@@ -7,7 +7,7 @@
   },
   "packageManager": "npm@10",
   "scripts": {
-    "postinstall": "npm rebuild lightningcss --no-save 2>$null || exit 0; npm rebuild @tailwindcss/oxide --no-save 2>$null || exit 0",
+    "postinstall": "npm rebuild lightningcss --no-save 2>/dev/null 2>&1 || true; npm rebuild @tailwindcss/oxide --no-save 2>/dev/null 2>&1 || true",
     "dev": "next dev --webpack",
     "build": "next build --webpack",
     "start": "next start",
