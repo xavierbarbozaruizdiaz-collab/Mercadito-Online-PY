@@ -1,5 +1,10 @@
 {
   "version": 2,
+  "buildCommand": "npm run build",
+  "devCommand": "npm run dev",
+  "installCommand": "npm install",
+  "framework": "nextjs",
+  "regions": ["iad1"],
   "routes": [
     {
       "src": "/api/(.*)",
@@ -20,12 +25,6 @@
       "maxDuration": 30
     }
   },
-  "regions": ["iad1"],
-  "framework": "nextjs",
-  "outputDirectory": ".next",
-  "buildCommand": "npm run build",
-  "installCommand": "npm install",
-  "devCommand": "npm run dev",
   "crons": [
     {
       "path": "/api/cron/backup-database",
