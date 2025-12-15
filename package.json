@@ -7,7 +7,7 @@
   },
   "packageManager": "npm@10",
   "scripts": {
-    "postinstall": "npm rebuild lightningcss --no-save 2>/dev/null || true",
+    "postinstall": "npm rebuild lightningcss --no-save 2>$null || exit 0",
     "dev": "next dev --webpack",
     "build": "next build --webpack",
     "start": "next start",
