@@ -3,6 +3,18 @@ import type { NextConfig } from 'next';
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  webpack: (config, { isServer }) => {
+    // Manejar módulos nativos de Tailwind v4 en Vercel
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        net: false,
+        tls: false,
+      };
+    }
+    return config;
+  },
   images: {
     // Configuración estándar de Next.js sin loader personalizado
     // Las imágenes de Supabase se manejan con unoptimized en los componentes
