@@ -9,7 +9,7 @@
   "scripts": {
     "postinstall": "npm rebuild lightningcss --no-save || true",
     "dev": "next dev --webpack",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint .",
     "lint:ci": "eslint \"src/lib/**/*.{ts,tsx,js,jsx}\" --max-warnings=0 --quiet",
