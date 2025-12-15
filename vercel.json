@@ -4,6 +4,7 @@
   "devCommand": "npm run dev",
   "installCommand": "npm install",
   "framework": "nextjs",
+  "nodeVersion": "22.x",
   "regions": ["iad1"],
   "routes": [
     {
