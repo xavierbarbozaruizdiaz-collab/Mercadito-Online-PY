@@ -5,18 +5,20 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   webpack: (config, { isServer }) => {
     // Manejar módulos nativos de Tailwind v4 en Vercel
-    config.resolve.fallback = {
-      ...config.resolve.fallback,
-      fs: false,
-      net: false,
-      tls: false,
-    };
-    
-    // Excluir @tailwindcss/oxide del bundle del servidor si causa problemas
-    if (isServer) {
-      config.externals = config.externals || [];
-      config.externals.push('@tailwindcss/oxide');
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        net: false,
+        tls: false,
+      };
     }
+    
+    // Ignorar errores de módulos nativos durante el build
+    config.ignoreWarnings = [
+      ...(config.ignoreWarnings || []),
+      { module: /@tailwindcss\/oxide/ },
+    ];
     
     return config;
   },
