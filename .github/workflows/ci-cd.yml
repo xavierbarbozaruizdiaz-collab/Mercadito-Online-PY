@@ -190,3 +190,41 @@ jobs:
           text: '❌ Mercadito Online PY deployment failed!'
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+name: 🔍 CI (PR/Feature Branches)
+
+on:
+  pull_request:
+    branches: [main, dev]
+  push:
+    branches: [feat/*, fix/*, chore/*, dev, develop]
+
+jobs:
+  lint-and-build:
+    name: 🔍 Lint, Type & Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: 🔍 Run ESLint
+        run: npm run lint --if-present || true
+        continue-on-error: true
+
+      - name: 🔍 Run TypeScript check
+        run: npm run typecheck --if-present || true
+        continue-on-error: true
+
+      - name: 🏗️ Build application
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key' }}
