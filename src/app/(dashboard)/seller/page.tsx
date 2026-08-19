@@ -111,18 +111,24 @@ export default function SellerDashboard() {
         setError(null);
 
         // Cargar estadísticas
+        // IMPORTANTE: Excluir productos eliminados (soft delete)
         // Intentar primero con stock_quantity, si falla intentar sin él
         let productsResult = await supabase
           .from('products')
           .select('id, status, stock_quantity, price, created_at')
-          .eq('store_id', store.id);
+          .eq('store_id', store.id)
+          .neq('status', 'deleted') // Excluir productos eliminados
+          .not('status', 'is', null); // Excluir productos sin status
 
         if (productsResult.error && productsResult.error.message?.includes('stock_quantity')) {
           // Si stock_quantity no existe, intentar sin él
+          // IMPORTANTE: Excluir productos eliminados (soft delete)
           productsResult = await supabase
             .from('products')
             .select('id, status, price, created_at')
-            .eq('store_id', store.id);
+            .eq('store_id', store.id)
+            .neq('status', 'deleted') // Excluir productos eliminados
+            .not('status', 'is', null); // Excluir productos sin status
         }
 
         const ordersResult = await supabase

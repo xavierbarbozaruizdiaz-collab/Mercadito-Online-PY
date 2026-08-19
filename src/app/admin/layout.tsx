@@ -14,6 +14,7 @@ const NAV = [
   { href: '/admin/stores', label: 'Tiendas' },
   { href: '/admin/users', label: 'Usuarios' },
   { href: '/admin/raffles', label: 'Sorteos' },
+  { href: '/admin/marketing/catalogo-vitrina', label: 'Vitrina' },
   { href: '/admin/settings', label: 'Ajustes' },
 ];
 

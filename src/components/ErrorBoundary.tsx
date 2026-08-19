@@ -58,11 +58,11 @@ export class ErrorBoundary extends Component<Props, State> {
             <button
               onClick={() => {
                 this.setState({ hasError: false, error: null });
-                window.location.reload();
+                window.location.href = '/';
               }}
               className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
             >
-              Recargar Página
+              Ir a página principal
             </button>
             {process.env.NODE_ENV === 'development' && this.state.error && (
               <details className="mt-6 text-left">

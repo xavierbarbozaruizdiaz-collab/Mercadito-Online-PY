@@ -289,3 +289,10 @@ export default async function Home() {
 **Última actualización:** Ahora
 **Comparación:** Local (HEAD) vs Producción (origin/dev)
 
+
+
+
+
+
+
+

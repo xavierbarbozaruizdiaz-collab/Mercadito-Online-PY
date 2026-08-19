@@ -99,7 +99,7 @@ export class SearchService {
           sale_type,
           image_url:cover_url,
           created_at,
-          store:stores!inner(
+          store:stores(
             id,
             name,
             slug,
@@ -110,7 +110,7 @@ export class SearchService {
             name
           )
         `)
-        .eq('status', 'active');
+        .or('status.is.null,status.eq.active');
 
       // Aplicar filtros
       if (filters.query) {

@@ -386,3 +386,10 @@ COMMENT ON FUNCTION public.place_bid IS
 
 
 
+
+
+
+
+
+
+

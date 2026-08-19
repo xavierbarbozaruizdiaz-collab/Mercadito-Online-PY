@@ -199,6 +199,52 @@ export default function Dashboard() {
         
         const allProductsData = (data || []) as Product[];
         
+        // [FALLBACK] Si algún producto no tiene cover_url, obtenerlo desde product_images
+        const productsWithoutCover = allProductsData.filter(p => !p.cover_url || p.cover_url === '');
+        if (productsWithoutCover.length > 0) {
+          try {
+            const productIds = productsWithoutCover.map(p => p.id);
+            const { data: imagesData } = await supabase
+              .from('product_images')
+              .select('product_id, url, thumbnail_url, is_cover, sort_order, created_at')
+              .in('product_id', productIds)
+              .order('is_cover', { ascending: false })
+              .order('sort_order', { ascending: true })
+              .order('created_at', { ascending: true });
+
+            if (imagesData && imagesData.length > 0) {
+              // Agrupar imágenes por product_id y tomar la primera (cover o primera por orden)
+              const imagesByProduct = new Map<string, any>();
+              imagesData.forEach((img: any) => {
+                if (!imagesByProduct.has(img.product_id)) {
+                  imagesByProduct.set(img.product_id, img);
+                }
+              });
+
+              // Actualizar cover_url en los productos
+              allProductsData.forEach(product => {
+                if (!product.cover_url && imagesByProduct.has(product.id)) {
+                  const img = imagesByProduct.get(product.id);
+                  product.cover_url = img.url || null;
+                  // También actualizar en BD (fire and forget para no bloquear)
+                  supabase
+                    .from('products')
+                    .update({ cover_url: img.url, thumbnail_url: img.thumbnail_url || img.url })
+                    .eq('id', product.id)
+                    .then(({ error }) => {
+                      if (error) {
+                        logger.warn('Error actualizando cover_url desde fallback', error, { productId: product.id });
+                      }
+                    });
+                }
+              });
+            }
+          } catch (fallbackError) {
+            logger.warn('Error en fallback de cover_url', fallbackError);
+            // Continuar sin fallback
+          }
+        }
+        
         // Primero, actualizar estados de subastas que deberían estar finalizadas
         const now = new Date();
         const auctionsToUpdate: { id: string; title: string }[] = [];
@@ -554,23 +600,41 @@ export default function Dashboard() {
       try {
         const { data: stockAlerts } = await (supabase as any)
           .from('stock_alerts')
-          .select('id, product_id, current_stock, threshold, product:products(id, title, stock_quantity)')
+          .select('id, product_id, current_stock, threshold, product:products(id, title, stock_quantity, stock_management_enabled, low_stock_threshold)')
           .eq('seller_id', sellerId)
           .eq('is_active', true)
           .order('created_at', { ascending: false })
           .limit(10);
 
-        // Agregar notificaciones de stock bajo
+        // Agregar notificaciones de stock bajo (con verificación en tiempo real)
         if (stockAlerts && stockAlerts.length > 0) {
           stockAlerts.forEach((alert: any) => {
             const product = alert.product;
             if (product && product.id) {
-              notifications.push({
-                type: 'stock' as const,
-                message: `⚠️ Stock bajo: "${product.title}" tiene ${alert.current_stock} unidades (umbral: ${alert.threshold})`,
-                priority: alert.current_stock === 0 ? 'high' as const : 'medium' as const,
-                link: `/dashboard/edit-product/${product.id}`,
-              });
+              // [FALLBACK] Verificar stock real desde products (puede estar desincronizado)
+              const realStock = product.stock_quantity || 0;
+              const threshold = product.low_stock_threshold || alert.threshold || 5;
+              
+              // Solo mostrar alerta si realmente está bajo el umbral
+              if (product.stock_management_enabled && realStock <= threshold) {
+                notifications.push({
+                  type: 'stock' as const,
+                  message: `⚠️ Stock bajo: "${product.title}" tiene ${realStock} unidades (umbral: ${threshold})`,
+                  priority: realStock === 0 ? 'high' as const : 'medium' as const,
+                  link: `/dashboard/edit-product/${product.id}`,
+                });
+              } else {
+                // Si el stock real ya no está bajo, desactivar la alerta (fallback)
+                (supabase as any)
+                  .from('stock_alerts')
+                  .update({ is_active: false, current_stock: realStock })
+                  .eq('id', alert.id)
+                  .then(({ error }: any) => {
+                    if (error) {
+                      logger.warn('Error desactivando alerta desincronizada', error, { alertId: alert.id });
+                    }
+                  });
+              }
             }
           });
         }
@@ -740,20 +804,85 @@ export default function Dashboard() {
   }
 
   async function toggleShowcase(productId: string, currentStatus: boolean) {
+    // Validar límite antes de agregar
+    if (!currentStatus && showcaseProducts.length >= 2) {
+      toast.error('Ya tienes 2 productos en la vitrina. Quita uno primero para agregar otro.');
+      return;
+    }
+
+    // Validar que el vendedor tenga tienda activa (requerido por la vitrina)
+    if (!storeId || storeStatus !== 'active') {
+      toast.error('Necesitas tener una tienda activa para usar la vitrina.');
+      return;
+    }
+
+    // Validar que el producto esté activo
+    const product = allProducts.find(p => p.id === productId);
+    if (!currentStatus && product && product.status !== 'active') {
+      toast.error('Solo puedes agregar productos activos a la vitrina.');
+      return;
+    }
+
     setUpdatingShowcase(productId);
+    
     try {
+      const newStatus = !currentStatus;
+      const newPosition = newStatus ? (showcaseProducts.length + 1) : null;
+
       const { error } = await supabase
         .from('products')
         .update({
-          in_showcase: !currentStatus,
-          showcase_position: !currentStatus ? null : undefined,
+          in_showcase: newStatus,
+          showcase_position: newStatus ? newPosition : null,
         })
         .eq('id', productId);
 
       if (error) throw error;
 
-      // Recargar productos
-      window.location.reload();
+      // Actualizar estado local sin reload
+      setAllProducts(prev => prev.map(p => 
+        p.id === productId 
+          ? { ...p, in_showcase: newStatus, showcase_position: newPosition }
+          : p
+      ));
+
+      setProducts(prev => prev.map(p => 
+        p.id === productId 
+          ? { ...p, in_showcase: newStatus, showcase_position: newPosition }
+          : p
+      ));
+
+      // Actualizar showcaseProducts
+      if (newStatus) {
+        // Agregar a vitrina
+        if (product) {
+          setShowcaseProducts(prev => [...prev, { ...product, in_showcase: true, showcase_position: newPosition }]);
+        }
+      } else {
+        // Quitar de vitrina y reordenar posiciones de los productos restantes
+        setShowcaseProducts(prev => {
+          const filtered = prev.filter(p => p.id !== productId);
+          // Actualizar posiciones en la base de datos para los productos restantes
+          filtered.forEach((p, idx) => {
+            const newPos = idx + 1;
+            if (p.showcase_position !== newPos) {
+              // Actualizar posición en BD (sin await, fire and forget)
+              supabase
+                .from('products')
+                .update({ showcase_position: newPos })
+                .eq('id', p.id)
+                .then(({ error }) => {
+                  if (error) {
+                    logger.warn('Error actualizando posición en vitrina', error, { productId: p.id });
+                  }
+                });
+            }
+          });
+          return filtered.map((p, idx) => ({ ...p, showcase_position: idx + 1 }));
+        });
+      }
+
+      toast.success(newStatus ? 'Producto agregado a la vitrina' : 'Producto quitado de la vitrina');
     } catch (err: any) {
       logger.error('Error al actualizar vitrina', err);
       toast.error('Error: ' + (err.message || 'No se pudo actualizar la vitrina'));
@@ -797,6 +926,52 @@ export default function Dashboard() {
 
     setDeletingId(productId);
     
+    try {
+      // Intentar vía API interna con service role (bypasa RLS) y abortar el flujo anterior
+      const { data: session } = await supabase.auth.getSession();
+      const token = session?.session?.access_token;
+      const resp = await fetch('/api/products/delete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        credentials: 'include', // Importante: enviar cookies de sesión
+        body: JSON.stringify({ productId })
+      });
+
+      const result = await resp.json().catch(() => ({}));
+
+      if (!resp.ok) {
+        const errorMsg = result?.error || 'No se pudo eliminar el producto';
+        logger.error('[delete-product] Error del endpoint', { 
+          status: resp.status, 
+          error: errorMsg, 
+          productId 
+        });
+        alert(`Error al eliminar producto: ${errorMsg}`);
+        setDeletingId(null);
+        return;
+      }
+
+      if (!result.success) {
+        logger.error('[delete-product] Endpoint retornó success=false', { result, productId });
+        alert(`Error al eliminar producto: ${result.error || 'Error desconocido'}`);
+        setDeletingId(null);
+        return;
+      }
+
+      logger.info('[delete-product] ✅ Producto eliminado correctamente', { productId, deleted: result.deleted });
+      alert('Producto eliminado exitosamente');
+      window.location.reload();
+      return;
+    } catch (apiErr: any) {
+      logger.error('[delete-product] Error en llamada API', apiErr, { productId });
+      alert(`Error al eliminar producto: ${apiErr?.message || 'Error desconocido'}`);
+      setDeletingId(null);
+      return;
+    }
+
     try {
       logger.debug('Eliminando producto', { productId });
       
@@ -964,10 +1139,8 @@ export default function Dashboard() {
         }
       }
       
-      // Si llegamos aquí, la eliminación fue exitosa (count > 0)
-      if (count > 0) {
-        logger.info('Producto eliminado correctamente', { productId, count });
-      }
+      // Si llegamos aquí, la eliminación fue exitosa
+      logger.info('Producto eliminado correctamente', { productId, count });
 
       // Esperar un momento para que la transacción se complete
       await new Promise(resolve => setTimeout(resolve, 500));
@@ -1034,7 +1207,7 @@ export default function Dashboard() {
             if (product.sale_type === 'auction' && 
                 product.auction_status === 'active' && 
                 product.auction_end_at) {
-              const endDate = new Date(product.auction_end_at);
+              const endDate = new Date(product.auction_end_at as string);
               if (endDate <= now) {
                 try {
                   await (supabase as any)
@@ -1107,14 +1280,9 @@ export default function Dashboard() {
         .single();
       
       if (finalVerify) {
-        // El producto todavía existe - verificar si count indica éxito
-        if (count && count > 0) {
-          logger.error('El producto todavía existe después del DELETE', undefined, { productId });
-          alert('⚠️ No se pudo confirmar la eliminación. Por favor, verifica en la base de datos o contacta al administrador.');
-        } else {
-          // Count es 0 pero el producto existe - hubo un error real
-          throw new Error('No se pudo eliminar el producto. El producto todavía existe en la base de datos.');
-        }
+        // El producto todavía existe - hubo un error real
+        logger.error('El producto todavía existe después del DELETE', undefined, { productId, count });
+        throw new Error('No se pudo eliminar el producto. El producto todavía existe en la base de datos.');
       } else {
         // El producto fue eliminado exitosamente (verificado en la base de datos)
         logger.info('Eliminación confirmada: el producto ya no existe en la base de datos', { productId });
@@ -1371,7 +1539,7 @@ export default function Dashboard() {
               <Star className="w-12 h-12 text-gray-600 mx-auto mb-3" />
               <p className="text-gray-400 mb-2">No tienes productos en la vitrina</p>
               <p className="text-sm text-gray-500">
-                Puedes destacar hasta 2 productos. Los productos activos aparecerán disponibles para agregar.
+                Puedes destacar hasta 2 productos. Usa el botón de estrella (☆) en tus productos activos para agregarlos a la vitrina.
               </p>
             </div>
           ) : (
@@ -1426,52 +1594,7 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* Lista de productos disponibles para agregar */}
-          {showcaseProducts.length < 2 && allProducts.length > 0 && (
-            <div className="mt-6">
-              <h4 className="text-sm font-medium text-gray-300 mb-3">
-                Productos disponibles para destacar
-              </h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-64 overflow-y-auto">
-                {allProducts
-                  .filter(p => !p.in_showcase && p.status === 'active')
-                  .slice(0, 6)
-                  .map((product) => (
-                    <div
-                      key={product.id}
-                      className="bg-[#1A1A1A]/50 rounded-lg border border-gray-700 p-3 flex items-center gap-3"
-                    >
-                      <div className="relative w-12 h-12 rounded overflow-hidden bg-gray-700 flex-shrink-0">
-                        {product.cover_url ? (
-                          <Image
-                            src={product.cover_url}
-                            alt={product.title}
-                            fill
-                            className="object-cover"
-                            sizes="48px"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <Package className="w-6 h-6 text-gray-500" />
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h5 className="font-medium text-gray-200 text-sm truncate">{product.title}</h5>
-                        <p className="text-xs text-gray-400">{product.price.toLocaleString('es-PY')} Gs.</p>
-                      </div>
-                      <button
-                        onClick={() => toggleShowcase(product.id, false)}
-                        disabled={updatingShowcase === product.id || showcaseProducts.length >= 2}
-                        className="px-3 py-1.5 bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
-                      >
-                        {updatingShowcase === product.id ? '⏳' : '⭐ Agregar'}
-                      </button>
-                    </div>
-                  ))}
-              </div>
-            </div>
-          )}
+          {/* Sección de productos disponibles eliminada - Ahora se agregan directamente desde las cards de "Mis productos" */}
         </div>
       )}
 
@@ -1914,8 +2037,15 @@ export default function Dashboard() {
                 <div key={product.id} className={`bg-[#252525] rounded-lg shadow-sm border overflow-hidden relative ${
                   isFinishedAuction ? 'opacity-75 border-gray-700' :
                   isPaused ? 'border-orange-700 border-2' :
+                  product.in_showcase ? 'border-purple-500 border-2' :
                   'border-gray-700'
                 }`}>
+                  {product.in_showcase && !isPaused && !isFinishedAuction && (
+                    <div className="absolute top-2 left-2 bg-purple-600 text-white text-xs font-bold px-2 py-1 rounded z-10 flex items-center gap-1">
+                      <Star className="w-3 h-3 fill-current" />
+                      VITRINA #{product.showcase_position || ''}
+                    </div>
+                  )}
                   {isPaused && (
                     <div className="absolute top-2 right-2 bg-orange-600 text-white text-xs font-bold px-2 py-1 rounded z-10">
                       ⏸️ PAUSADO
@@ -1926,7 +2056,7 @@ export default function Dashboard() {
                       ✓ FINALIZADA
                     </div>
                   )}
-                  {isAuction && !isFinishedAuction && !isPaused && (
+                  {isAuction && !isFinishedAuction && !isPaused && !product.in_showcase && (
                     <div className="absolute top-2 right-2 bg-yellow-500 text-white text-xs font-bold px-2 py-1 rounded z-10">
                       🔨 SUBASTA
                     </div>
@@ -2001,6 +2131,21 @@ export default function Dashboard() {
                           >
                             👁️ Ver
                           </Link>
+                          {/* Botón de vitrina - Solo para productos activos */}
+                          {!isFinishedAuction && product.status === 'active' && (
+                            <button
+                              onClick={() => toggleShowcase(product.id, product.in_showcase || false)}
+                              disabled={updatingShowcase === product.id || (!product.in_showcase && showcaseProducts.length >= 2)}
+                              className={`px-3 py-2 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm ${
+                                product.in_showcase
+                                  ? 'bg-yellow-500 text-white hover:bg-yellow-600'
+                                  : 'bg-purple-500 text-white hover:bg-purple-600'
+                              }`}
+                              title={product.in_showcase ? 'Quitar de vitrina' : (showcaseProducts.length >= 2 ? 'Límite alcanzado (2 productos)' : 'Agregar a vitrina')}
+                            >
+                              {updatingShowcase === product.id ? '⏳' : (product.in_showcase ? '⭐' : '☆')}
+                            </button>
+                          )}
                           {!isFinishedAuction && (
                             <button
                               onClick={() => deleteProduct(product.id)}

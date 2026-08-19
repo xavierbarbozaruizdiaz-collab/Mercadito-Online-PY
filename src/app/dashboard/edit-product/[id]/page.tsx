@@ -5,6 +5,7 @@ import imageCompression from 'browser-image-compression';
 import { supabase, getSessionWithTimeout } from '@/lib/supabaseClient';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
+import { logger } from '@/lib/utils/logger';
 
 const MAX_IMAGES = 10;
 
@@ -370,8 +371,8 @@ export default function EditProduct() {
         
         finalPrice = Number(auctionStartingPrice);
         
-        // Calcular fecha de fin (5 minutos para pruebas, igual que new-product)
-        const durationMinutes = 5; // 5 minutos para pruebas - cambiar a 1440 para producción
+        // Calcular fecha de fin (2 minutos para pruebas, igual que new-product)
+        const durationMinutes = 2; // 2 minutos para pruebas - cambiar a 1440 para producción
         const endDate = new Date(startDate.getTime() + durationMinutes * 60 * 1000);
         
         // Preparar atributos de subasta (para compatibilidad, pero usaremos campos directos)
@@ -427,7 +428,7 @@ export default function EditProduct() {
           diferenciaConParaguay: timezoneOffset - paraguayOffset
         });
         
-        const durationMinutes = 5; // 5 minutos para pruebas
+        const durationMinutes = 2; // 2 minutos para pruebas
         const endDate = new Date(startDate.getTime() + durationMinutes * 60 * 1000);
         
         updateData.auction_status = 'scheduled';
@@ -459,6 +460,50 @@ export default function EditProduct() {
         .eq('id', productId);
 
       if (updateError) throw updateError;
+
+      // [STOCK ALERTS SYNC] Actualizar stock_alerts si se cambió stock_quantity
+      if (updateData.stock_quantity !== undefined && updateData.stock_management_enabled) {
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user?.id) return; // No hay usuario, saltar sincronización
+          
+          const newStock = updateData.stock_quantity || 0;
+          const threshold = updateData.low_stock_threshold || 5;
+          
+          if (newStock <= threshold) {
+            // Crear o actualizar alerta activa
+            const { error: alertError } = await (supabase as any)
+              .from('stock_alerts')
+              .upsert({
+                product_id: productId,
+                seller_id: user.id,
+                threshold: threshold,
+                current_stock: newStock,
+                is_active: true
+              }, {
+                onConflict: 'product_id'
+              });
+            
+            if (alertError) {
+              logger.warn('Error actualizando stock_alerts (no crítico)', alertError, { productId });
+            }
+          } else {
+            // Desactivar alertas si el stock está por encima del umbral
+            const { error: alertError } = await (supabase as any)
+              .from('stock_alerts')
+              .update({ is_active: false, current_stock: newStock })
+              .eq('product_id', productId)
+              .eq('is_active', true);
+            
+            if (alertError) {
+              logger.warn('Error desactivando stock_alerts (no crítico)', alertError, { productId });
+            }
+          }
+        } catch (syncError) {
+          logger.warn('Error en sincronización de stock_alerts (no crítico)', syncError, { productId });
+          // No fallar la actualización del producto por esto
+        }
+      }
 
       // 2. Si hay imágenes nuevas, subirlas
       if (imagePreviews.length > 0) {
@@ -774,7 +819,7 @@ export default function EditProduct() {
                     // min={new Date().toISOString().slice(0, 16)}
                   />
                   <p className="text-xs text-gray-500 mt-1">
-                    La subasta comenzará automáticamente en esta fecha y hora. Duración para pruebas: 5 minutos desde el inicio. Puedes seleccionar una fecha pasada para iniciar inmediatamente.
+                    La subasta comenzará automáticamente en esta fecha y hora. Duración para pruebas: 2 minutos desde el inicio. Puedes seleccionar una fecha pasada para iniciar inmediatamente.
                   </p>
                 </div>
               </div>
@@ -782,7 +827,7 @@ export default function EditProduct() {
                 <h4 className="font-semibold text-yellow-900 mb-2">¿Cómo funcionan las subastas?</h4>
                 <ul className="text-sm text-yellow-800 space-y-1 list-disc list-inside">
                   <li>Los compradores pujan incrementando el precio</li>
-                  <li>Duración: 5 minutos desde la fecha de inicio (modo prueba)</li>
+                  <li>Duración: 2 minutos desde la fecha de inicio (modo prueba)</li>
                   <li>Quien ofrezca el precio más alto al finalizar gana</li>
                   <li>Si configuraste "Compra ahora", alguien puede comprarlo inmediatamente</li>
                   <li>Puedes usar una fecha pasada para iniciar la subasta inmediatamente</li>

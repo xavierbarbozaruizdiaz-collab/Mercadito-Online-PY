@@ -15,6 +15,7 @@ type Store = {
   department: string | null;
   city: string | null;
   is_active: boolean;
+  is_fallback_store: boolean;
   settings: any;
   created_at: string;
   seller: {
@@ -24,6 +25,11 @@ type Store = {
     last_name: string | null;
   } | null;
 };
+
+// Helper para verificar si una tienda está pausada
+function isStorePaused(store: Store): boolean {
+  return store.settings?.is_paused === true;
+}
 
 export default function AdminStoresPage() {
   const [stores, setStores] = useState<Store[]>([]);
@@ -51,6 +57,7 @@ export default function AdminStoresPage() {
           department,
           city,
           is_active,
+          is_fallback_store,
           settings,
           created_at,
           seller_id
@@ -170,6 +177,130 @@ export default function AdminStoresPage() {
     }
   }
 
+  async function togglePauseStore(storeId: string, currentPaused: boolean) {
+    const newValue = !currentPaused;
+    const confirmMessage = newValue 
+      ? '¿Pausar esta tienda? La tienda no aparecerá en la página mientras esté pausada.'
+      : '¿Despausar esta tienda? La tienda volverá a aparecer en la página.';
+    
+    if (!confirm(confirmMessage)) return;
+
+    setProcessing(storeId);
+    try {
+      // Obtener la tienda actual para preservar otros settings
+      const { data: currentStore } = await (supabase as any)
+        .from('stores')
+        .select('settings')
+        .eq('id', storeId)
+        .single();
+
+      const currentSettings = currentStore?.settings || {};
+      
+      // Actualizar el estado de pausa
+      const { error } = await (supabase as any)
+        .from('stores')
+        .update({ 
+          settings: {
+            ...currentSettings,
+            is_paused: newValue,
+            paused_at: newValue ? new Date().toISOString() : null,
+          }
+        })
+        .eq('id', storeId);
+
+      if (error) throw error;
+
+      await loadStores();
+      alert(newValue 
+        ? '✅ Tienda pausada exitosamente. No aparecerá en la página mientras esté pausada.'
+        : '✅ Tienda despausada exitosamente. Volverá a aparecer en la página.'
+      );
+    } catch (err: any) {
+      console.error('Error actualizando estado de pausa:', err);
+      alert('Error al actualizar estado de pausa: ' + (err?.message || 'Error desconocido'));
+    } finally {
+      setProcessing(null);
+    }
+  }
+
+  async function toggleFallbackStore(storeId: string, currentValue: boolean) {
+    const newValue = !currentValue;
+    const confirmMessage = newValue 
+      ? '¿Marcar esta tienda como tienda fallback? Los pedidos "por conseguir" se asignarán a esta tienda. La tienda seguirá siendo visible normalmente.'
+      : '¿Desmarcar esta tienda como tienda fallback?';
+    
+    if (!confirm(confirmMessage)) return;
+
+    setProcessing(storeId);
+    try {
+      // Si se está marcando como fallback, primero desmarcar todas las demás
+      if (newValue) {
+        const { error: unsetError } = await (supabase as any)
+          .from('stores')
+          .update({ is_fallback_store: false })
+          .neq('id', storeId)
+          .eq('is_fallback_store', true);
+
+        if (unsetError) throw unsetError;
+      }
+
+      // Actualizar esta tienda - IMPORTANTE: mantener is_active = true
+      // Las tiendas fallback deben seguir siendo tiendas activas y visibles
+      const { error } = await (supabase as any)
+        .from('stores')
+        .update({ 
+          is_fallback_store: newValue,
+          is_active: true // Asegurar que la tienda se mantenga activa
+        })
+        .eq('id', storeId);
+
+      if (error) throw error;
+
+      await loadStores();
+      alert(newValue 
+        ? '✅ Tienda marcada como fallback exitosamente. La tienda seguirá siendo visible normalmente.'
+        : '✅ Tienda desmarcada como fallback exitosamente'
+      );
+    } catch (err: any) {
+      console.error('Error actualizando tienda fallback:', err);
+      alert('Error al actualizar tienda fallback: ' + (err?.message || 'Error desconocido'));
+    } finally {
+      setProcessing(null);
+    }
+  }
+
+  async function toggleStoreActive(storeId: string, currentActive: boolean) {
+    const newValue = !currentActive;
+    const confirmMessage = newValue 
+      ? '¿Activar esta tienda? La tienda aparecerá en la página y podrá recibir pedidos.'
+      : '¿Desactivar esta tienda? La tienda no aparecerá en la página y no podrá recibir pedidos.';
+    
+    if (!confirm(confirmMessage)) return;
+
+    setProcessing(storeId);
+    try {
+      const { error } = await (supabase as any)
+        .from('stores')
+        .update({ 
+          is_active: newValue
+        })
+        .eq('id', storeId);
+
+      if (error) throw error;
+
+      await loadStores();
+      alert(newValue 
+        ? '✅ Tienda activada exitosamente'
+        : '✅ Tienda desactivada exitosamente'
+      );
+    } catch (err: any) {
+      console.error('Error actualizando estado de tienda:', err);
+      alert('Error al actualizar estado de tienda: ' + (err?.message || 'Error desconocido'));
+    } finally {
+      setProcessing(null);
+    }
+  }
+
   return (
     <main className="min-h-screen bg-gray-50 p-4 sm:p-8">
       <div className="max-w-7xl mx-auto">
@@ -237,12 +368,24 @@ export default function AdminStoresPage() {
                         Solicitado: {new Date(store.created_at).toLocaleDateString('es-PY')}
                       </p>
                     </div>
-                    <div className={`px-3 py-1 rounded-full text-sm ${
-                      status === 'active' ? 'bg-green-100 text-green-800' :
-                      status === 'rejected' ? 'bg-red-100 text-red-800' :
-                      'bg-yellow-100 text-yellow-800'
-                    }`}>
-                      {status === 'active' ? '✅ Aprobada' : status === 'rejected' ? '❌ Rechazada' : '⏳ Pendiente'}
+                    <div className="flex items-center gap-2">
+                      {store.is_fallback_store && (
+                        <div className="px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800 font-medium">
+                          🏪 Tienda Fallback
+                        </div>
+                      )}
+                      {isStorePaused(store) && (
+                        <div className="px-3 py-1 rounded-full text-sm bg-orange-100 text-orange-800 font-medium">
+                          ⏸️ Pausada
+                        </div>
+                      )}
+                      <div className={`px-3 py-1 rounded-full text-sm ${
+                        status === 'active' ? 'bg-green-100 text-green-800' :
+                        status === 'rejected' ? 'bg-red-100 text-red-800' :
+                        'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        {status === 'active' ? '✅ Aprobada' : status === 'rejected' ? '❌ Rechazada' : '⏳ Pendiente'}
+                      </div>
                     </div>
                   </div>
 
@@ -274,31 +417,86 @@ export default function AdminStoresPage() {
                     </div>
                   )}
 
-                  {status === 'pending' && (
-                    <div className="flex gap-3 pt-4 border-t">
+                  <div className="flex gap-3 pt-4 border-t flex-wrap">
+                    {status === 'pending' && (
+                      <>
+                        <button
+                          onClick={() => approveStore(store.id)}
+                          disabled={processing === store.id}
+                          className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {processing === store.id ? 'Procesando...' : '✅ Aprobar'}
+                        </button>
+                        <button
+                          onClick={() => rejectStore(store.id)}
+                          disabled={processing === store.id}
+                          className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {processing === store.id ? 'Procesando...' : '❌ Rechazar'}
+                        </button>
+                      </>
+                    )}
+                    
+                    {status === 'active' && (
+                      <>
+                        <button
+                          onClick={() => toggleStoreActive(store.id, store.is_active)}
+                          disabled={processing === store.id}
+                          className={`px-4 py-2 rounded hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed ${
+                            store.is_active
+                              ? 'bg-red-600 text-white'
+                              : 'bg-green-600 text-white'
+                          }`}
+                        >
+                          {processing === store.id ? 'Procesando...' : store.is_active ? '❌ Desactivar' : '✅ Activar'}
+                        </button>
+                        <button
+                          onClick={() => togglePauseStore(store.id, isStorePaused(store))}
+                          disabled={processing === store.id}
+                          className={`px-4 py-2 rounded hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed ${
+                            isStorePaused(store)
+                              ? 'bg-green-600 text-white'
+                              : 'bg-orange-600 text-white'
+                          }`}
+                        >
+                          {processing === store.id ? 'Procesando...' : isStorePaused(store) ? '▶️ Despausar' : '⏸️ Pausar'}
+                        </button>
+                        <button
+                          onClick={() => toggleFallbackStore(store.id, store.is_fallback_store)}
+                          disabled={processing === store.id}
+                          className={`px-4 py-2 rounded hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed ${
+                            store.is_fallback_store
+                              ? 'bg-blue-600 text-white'
+                              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                          }`}
+                        >
+                          {processing === store.id ? 'Procesando...' : store.is_fallback_store ? '🏪 Es Fallback' : '🏪 Marcar como Fallback'}
+                        </button>
+                      </>
+                    )}
+                    
+                    {status === 'rejected' && (
                       <button
-                        onClick={() => approveStore(store.id)}
+                        onClick={() => toggleStoreActive(store.id, store.is_active)}
                         disabled={processing === store.id}
-                        className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className={`px-4 py-2 rounded hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed ${
+                          store.is_active
+                            ? 'bg-red-600 text-white'
+                            : 'bg-green-600 text-white'
+                        }`}
                       >
-                        {processing === store.id ? 'Procesando...' : '✅ Aprobar'}
+                        {processing === store.id ? 'Procesando...' : store.is_active ? '❌ Desactivar' : '✅ Activar'}
                       </button>
-                      <button
-                        onClick={() => rejectStore(store.id)}
-                        disabled={processing === store.id}
-                        className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {processing === store.id ? 'Procesando...' : '❌ Rechazar'}
-                      </button>
-                      <Link
-                        href={`/store/${store.slug}?admin=true`}
-                        className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
-                        target="_blank"
-                      >
-                        👁️ Ver tienda
-                      </Link>
-                    </div>
-                  )}
+                    )}
+                    
+                    <Link
+                      href={`/store/${store.slug}?admin=true`}
+                      className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                      target="_blank"
+                    >
+                      👁️ Ver tienda
+                    </Link>
+                  </div>
                 </div>
               );
             })}

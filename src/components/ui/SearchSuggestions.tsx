@@ -6,6 +6,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import Image from 'next/image';
 import { 
   Badge
 } from '@/components/ui';
@@ -20,6 +22,7 @@ import {
   Star,
   TrendingDown
 } from 'lucide-react';
+import { formatCurrency } from '@/lib/utils';
 
 // ============================================
 // TIPOS
@@ -33,6 +36,22 @@ interface SearchSuggestion {
   trend?: 'up' | 'down' | 'stable';
   category?: string;
   location?: string;
+  product?: {
+    id: string;
+    title: string;
+    price: number;
+    compare_price?: number;
+    image_url?: string;
+    condition: string;
+    sale_type: string;
+    store: {
+      name: string;
+      slug: string;
+    };
+    category?: {
+      name: string;
+    };
+  };
 }
 
 interface SearchSuggestionsProps {
@@ -79,76 +98,30 @@ export default function SearchSuggestions({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Simular carga de sugerencias (en una implementación real, esto vendría de un API)
+  // Cargar sugerencias reales desde el servicio
   const loadSuggestions = async (searchQuery: string) => {
     setLoading(true);
     try {
-      // Simular delay de API
-      await new Promise(resolve => setTimeout(resolve, 300));
+      // Usar el servicio real de búsqueda
+      const { SearchService } = await import('@/lib/services/searchService');
+      const realSuggestions = await SearchService.getSearchSuggestions(searchQuery);
       
-      // Sugerencias simuladas
-      const mockSuggestions: SearchSuggestion[] = [
-        {
-          id: '1',
-          text: `${searchQuery} iPhone 15`,
-          type: 'product',
-          count: 45,
-          category: 'Electrónicos',
-        },
-        {
-          id: '2',
-          text: `${searchQuery} Samsung Galaxy`,
-          type: 'product',
-          count: 32,
-          category: 'Electrónicos',
-        },
-        {
-          id: '3',
-          text: `${searchQuery} MacBook Pro`,
-          type: 'product',
-          count: 18,
-          category: 'Computadoras',
-        },
-        {
-          id: '4',
-          text: `${searchQuery} AirPods`,
-          type: 'product',
-          count: 67,
-          category: 'Accesorios',
-        },
-        {
-          id: '5',
-          text: `${searchQuery} PlayStation 5`,
-          type: 'product',
-          count: 23,
-          category: 'Gaming',
-        },
-        {
-          id: '6',
-          text: `${searchQuery} Nintendo Switch`,
-          type: 'product',
-          count: 41,
-          category: 'Gaming',
-        },
-        {
-          id: '7',
-          text: `${searchQuery} iPad`,
-          type: 'product',
-          count: 29,
-          category: 'Tablets',
-        },
-        {
-          id: '8',
-          text: `${searchQuery} Apple Watch`,
-          type: 'product',
-          count: 15,
-          category: 'Wearables',
-        },
-      ];
+      // Mapear a formato de componente (preservar campo product si existe)
+      const mappedSuggestions: SearchSuggestion[] = realSuggestions.map((s, index) => ({
+        id: s.id || `suggestion-${index}`,
+        text: s.text,
+        type: s.type as 'product' | 'category' | 'store' | 'location',
+        count: s.count,
+        category: s.category,
+        location: s.location,
+        product: (s as any).product, // Preservar datos completos del producto
+      }));
 
-      setSuggestions(mockSuggestions.slice(0, maxSuggestions));
+      setSuggestions(mappedSuggestions.slice(0, maxSuggestions));
     } catch (error) {
       console.error('Error loading suggestions:', error);
+      // Si falla, no mostrar sugerencias en lugar de mostrar datos incorrectos
+      setSuggestions([]);
     } finally {
       setLoading(false);
     }
@@ -336,40 +309,113 @@ export default function SearchSuggestions({
               ))}
             </div>
           ) : suggestions.length > 0 ? (
-            <div className="space-y-2">
-              {suggestions.map((suggestion) => (
-                <button
-                  key={suggestion.id}
-                  onClick={() => handleSuggestionClick(suggestion)}
-                  className="w-full text-left px-3 py-2 hover:bg-gray-100 rounded-md text-sm flex items-center justify-between"
-                >
-                  <div className="flex items-center space-x-2">
-                    <span className="text-gray-400">
-                      {getSuggestionIcon(suggestion.type)}
-                    </span>
-                    <span className="text-gray-900">{suggestion.text}</span>
-                    {suggestion.category && (
-                      <span className="text-gray-500 text-xs">
-                        en {suggestion.category}
-                      </span>
-                    )}
-                  </div>
-                  
-                  <div className="flex items-center space-x-2">
-                    {suggestion.count && (
-                      <Badge variant="default" size="sm">
-                        {suggestion.count}
-                      </Badge>
-                    )}
-                    <Badge 
-                      variant={getSuggestionBadgeColor(suggestion.type)}
-                      size="sm"
+            <div className="space-y-3">
+              {suggestions.map((suggestion) => {
+                // Si es un producto con datos completos, mostrar ProductCard
+                if (suggestion.type === 'product' && suggestion.product) {
+                  return (
+                    <Link
+                      key={suggestion.id}
+                      href={`/products/${suggestion.product.id}`}
+                      className="block w-full"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (onSuggestionClick) {
+                          handleSuggestionClick(suggestion);
+                        }
+                      }}
                     >
-                      {suggestion.type}
-                    </Badge>
-                  </div>
-                </button>
-              ))}
+                      <div className="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg border border-gray-200 transition-colors">
+                        {/* Imagen del producto */}
+                        <div className="relative w-16 h-16 flex-shrink-0 rounded-md overflow-hidden bg-gray-100">
+                          {suggestion.product.image_url ? (
+                            <Image
+                              src={suggestion.product.image_url}
+                              alt={suggestion.product.title}
+                              fill
+                              className="object-cover"
+                              sizes="64px"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center bg-gray-200">
+                              <Package className="w-6 h-6 text-gray-400" />
+                            </div>
+                          )}
+                        </div>
+                        
+                        {/* Información del producto */}
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-medium text-gray-900 truncate text-sm">
+                            {suggestion.product.title}
+                          </h4>
+                          {suggestion.product.category && (
+                            <p className="text-xs text-gray-500 mt-0.5">
+                              {suggestion.product.category.name}
+                            </p>
+                          )}
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-sm font-bold text-green-600">
+                              {formatCurrency(suggestion.product.price)}
+                            </span>
+                            {suggestion.product.compare_price && (
+                              <span className="text-xs text-gray-400 line-through">
+                                {formatCurrency(suggestion.product.compare_price)}
+                              </span>
+                            )}
+                          </div>
+                          {suggestion.product.store && (
+                            <p className="text-xs text-gray-500 mt-0.5">
+                              🏪 {suggestion.product.store.name}
+                            </p>
+                          )}
+                        </div>
+                        
+                        {/* Badge de tipo */}
+                        <div className="flex-shrink-0">
+                          <Badge variant="info" size="sm">
+                            Ver
+                          </Badge>
+                        </div>
+                      </div>
+                    </Link>
+                  );
+                }
+                
+                // Para otros tipos, mostrar formato simple
+                return (
+                  <button
+                    key={suggestion.id}
+                    onClick={() => handleSuggestionClick(suggestion)}
+                    className="w-full text-left px-3 py-2 hover:bg-gray-100 rounded-md text-sm flex items-center justify-between"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <span className="text-gray-400">
+                        {getSuggestionIcon(suggestion.type)}
+                      </span>
+                      <span className="text-gray-900">{suggestion.text}</span>
+                      {suggestion.category && (
+                        <span className="text-gray-500 text-xs">
+                          en {suggestion.category}
+                        </span>
+                      )}
+                    </div>
+                    
+                    <div className="flex items-center space-x-2">
+                      {suggestion.count && (
+                        <Badge variant="default" size="sm">
+                          {suggestion.count}
+                        </Badge>
+                      )}
+                      <Badge 
+                        variant={getSuggestionBadgeColor(suggestion.type)}
+                        size="sm"
+                      >
+                        {suggestion.type}
+                      </Badge>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           ) : (
             <p className="text-gray-500 text-sm">No se encontraron sugerencias.</p>

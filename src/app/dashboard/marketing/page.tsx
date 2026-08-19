@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { supabase } from '@/lib/supabase/client';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { logger } from '@/lib/utils/logger';
+import { useToast } from '@/lib/hooks/useToast';
 import {
   Plus,
   TrendingUp,
@@ -23,10 +24,11 @@ import {
   XCircle,
   AlertCircle,
   ExternalLink,
-  Settings
+  Settings,
+  Package,
+  Star
 } from 'lucide-react';
 import Link from 'next/link';
-import { getAuthHeaders } from '@/lib/auth/clientAuthHeaders';
 
 // ============================================
 // TIPOS
@@ -76,6 +78,7 @@ interface Store {
 
 export default function MarketingPage() {
   const { user, loading: authLoading } = useAuth();
+  const toast = useToast();
   const [campaigns, setCampaigns] = useState<MarketingCampaign[]>([]);
   const [stores, setStores] = useState<Store[]>([]);
   const [selectedStore, setSelectedStore] = useState<string | null>(null);
@@ -85,194 +88,204 @@ export default function MarketingPage() {
   const [syncingCatalog, setSyncingCatalog] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Refs para control absoluto - SIN dependencias circulares
+  const initializedRef = useRef(false);
+  const loadingRef = useRef(false);
+  const currentStoreIdRef = useRef<string | null>(null);
+
+  // UN SOLO useEffect para toda la inicialización
+  useEffect(() => {
+    // Si ya se inicializó, no hacer nada
+    if (initializedRef.current) return;
+    
+    // Si está cargando auth, esperar
+    if (authLoading) return;
+    
+    // Si no hay usuario, no hacer nada
+    if (!user?.id) {
+      setLoading(false);
+      return;
+    }
+
+    // Marcar como inicializado INMEDIATAMENTE para evitar ejecuciones múltiples
+    initializedRef.current = true;
+    loadingRef.current = true;
+
+    (async () => {
+      try {
+        setLoading(true);
+        const userId = user.id;
+
+        // 1. Cargar tiendas
+        const { data: storesData, error: storesError } = await supabase
+          .from('stores')
+          .select('id, name, slug, is_fallback_store')
+          .eq('seller_id', userId)
+          .eq('is_active', true);
+
+        if (storesError && storesError.code !== 'PGRST116') {
+          logger.error('Error loading stores', storesError);
+          setStores([]);
+        } else {
+          const storesList = storesData || [];
+          setStores(storesList);
+
+          // 2. Seleccionar tienda inicial si hay tiendas
+          if (storesList.length > 0) {
+            const fallbackStore = storesList.find((s: any) => s.is_fallback_store === true);
+            const storeToSelect = fallbackStore || storesList[0];
+            currentStoreIdRef.current = storeToSelect.id;
+            setSelectedStore(storeToSelect.id);
+          }
+        }
+
+        // 3. Cargar campañas (solo si hay tienda seleccionada)
+        const storeIdToLoad = currentStoreIdRef.current;
+        if (storeIdToLoad) {
+          let query = supabase
+            .from('marketing_campaigns')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+          query = query.eq('store_id', storeIdToLoad);
+
+          const { data: campaignsData, error: campaignsError } = await query;
+
+          if (campaignsError && campaignsError.code !== 'PGRST116' && campaignsError.code !== '42P01' && campaignsError.code !== 'PGRST301') {
+            logger.error('Error loading campaigns', campaignsError);
+            setCampaigns([]);
+          } else {
+            setCampaigns(campaignsData || []);
+            
+            // Cargar métricas si hay campañas
+            if (campaignsData && campaignsData.length > 0) {
+              try {
+                const { data: metricsData } = await supabase
+                  .from('campaign_metrics')
+                  .select('*')
+                  .in('campaign_id', campaignsData.map(c => c.id))
+                  .order('date', { ascending: false });
+
+                if (metricsData) {
+                  const grouped: Record<string, CampaignMetrics[]> = {};
+                  metricsData.forEach((metric: CampaignMetrics) => {
+                    if (!grouped[metric.campaign_id]) {
+                      grouped[metric.campaign_id] = [];
+                    }
+                    grouped[metric.campaign_id].push(metric);
+                  });
+                  setMetrics(grouped);
+                }
+              } catch (metricsErr) {
+                logger.warn('Error loading metrics', metricsErr);
+              }
+            }
+          }
+        }
+      } catch (err) {
+        logger.error('Error in initialization', err);
+        setError('Ocurrió un error al cargar los datos. Por favor, recarga la página.');
+      } finally {
+        setLoading(false);
+        loadingRef.current = false;
+      }
+    })();
+  }, [user?.id, authLoading]); // Solo estas dos dependencias
+
+  // useEffect SEPARADO solo para cuando cambia selectedStore manualmente
+  useEffect(() => {
+    // Solo ejecutar si ya se inicializó y el store cambió manualmente
+    if (!initializedRef.current) return;
+    if (!user?.id || authLoading) return;
+    if (loadingRef.current) return;
+
+    const newStoreId = selectedStore;
+    
+    // Si no cambió realmente, no hacer nada
+    if (newStoreId === currentStoreIdRef.current) return;
+    
+    // Si es null, no cargar
+    if (!newStoreId) {
+      setCampaigns([]);
+      return;
+    }
+
+    // Actualizar ref
+    currentStoreIdRef.current = newStoreId;
+    loadingRef.current = true;
+
+    (async () => {
+      try {
+        setLoading(true);
+
+        let query = supabase
+          .from('marketing_campaigns')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .eq('store_id', newStoreId);
+
+        const { data, error } = await query;
+
+        if (error && error.code !== 'PGRST116' && error.code !== '42P01' && error.code !== 'PGRST301') {
+          logger.error('Error loading campaigns', error);
+          setCampaigns([]);
+        } else {
+          setCampaigns(data || []);
+          
+          if (data && data.length > 0) {
+            try {
+              const { data: metricsData } = await supabase
+                .from('campaign_metrics')
+                .select('*')
+                .in('campaign_id', data.map(c => c.id))
+                .order('date', { ascending: false });
+
+              if (metricsData) {
+                const grouped: Record<string, CampaignMetrics[]> = {};
+                metricsData.forEach((metric: CampaignMetrics) => {
+                  if (!grouped[metric.campaign_id]) {
+                    grouped[metric.campaign_id] = [];
+                  }
+                  grouped[metric.campaign_id].push(metric);
+                });
+                setMetrics(grouped);
+              }
+            } catch (metricsErr) {
+              logger.warn('Error loading metrics', metricsErr);
+            }
+          }
+        }
+      } catch (err) {
+        logger.error('Error loading campaigns', err);
+        setCampaigns([]);
+      } finally {
+        setLoading(false);
+        loadingRef.current = false;
+      }
+    })();
+  }, [selectedStore, user?.id, authLoading]);
+
   // Verificar autenticación
   useEffect(() => {
     if (!authLoading && !user) {
-      // Si no hay usuario después de cargar, redirigir
-      window.location.href = '/auth/sign-in';
+      const timer = setTimeout(() => {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          if (!session) {
+            window.location.href = '/auth/sign-in';
+          }
+        });
+      }, 2000);
+      return () => clearTimeout(timer);
     }
   }, [authLoading, user]);
-
-  // Cargar tiendas del usuario
-  useEffect(() => {
-    if (user && !authLoading) {
-      loadStores();
-    }
-  }, [user, authLoading]);
-
-  // Cargar campañas
-  useEffect(() => {
-    if (user && !authLoading) {
-      loadCampaigns();
-    }
-  }, [user, authLoading, selectedStore]);
-
-  async function loadStores() {
-    try {
-      const { data: session, error: sessionError } = await supabase.auth.getSession();
-      
-      if (sessionError) {
-        logger.error('Error getting session in loadStores', sessionError);
-        return;
-      }
-      
-      if (!session?.session?.user?.id) {
-        logger.warn('No session in loadStores');
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from('stores')
-        .select('id, name, slug')
-        .eq('seller_id', session.session.user.id)
-        .eq('is_active', true);
-
-      if (error) {
-        logger.error('Error loading stores', error);
-        setStores([]);
-        return;
-      }
-      
-      setStores(data || []);
-      
-      // Seleccionar la primera tienda por defecto
-      if (data && data.length > 0 && !selectedStore) {
-        setSelectedStore(data[0].id);
-      }
-    } catch (err) {
-      logger.error('Error loading stores', err);
-      setStores([]);
-    }
-  }
-
-  async function loadCampaigns() {
-    try {
-      setLoading(true);
-      const { data: session, error: sessionError } = await supabase.auth.getSession();
-      
-      if (sessionError) {
-        logger.error('Error getting session', sessionError);
-        return;
-      }
-      
-      if (!session?.session?.user?.id) {
-        logger.warn('No session found, redirecting...');
-        window.location.href = '/auth/sign-in';
-        return;
-      }
-
-      let query = supabase
-        .from('marketing_campaigns')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      // Si hay una tienda seleccionada, filtrar por ella
-      if (selectedStore) {
-        query = query.eq('store_id', selectedStore);
-      }
-
-      const { data, error } = await query;
-
-      // Si la tabla no existe o hay error de permisos, simplemente mostrar lista vacía
-      if (error) {
-        // Si es error de tabla no existe o permisos, no lanzar error
-        if (error.code === '42P01' || error.code === 'PGRST301' || error.message?.includes('does not exist')) {
-          logger.warn('Marketing campaigns table does not exist or no access', error);
-          setCampaigns([]);
-          return;
-        }
-        // Para otros errores, solo loguear pero no fallar
-        logger.error('Error loading campaigns', error);
-        setCampaigns([]);
-        return;
-      }
-      
-      setCampaigns(data || []);
-
-      // Cargar métricas para cada campaña (solo si hay campañas y la tabla existe)
-      if (data && data.length > 0) {
-        try {
-          await loadMetrics(data.map(c => c.id));
-        } catch (metricsError) {
-          // Si la tabla de métricas no existe, continuar sin métricas
-          logger.warn('Error loading metrics (table may not exist)', metricsError);
-        }
-      }
-    } catch (err) {
-      logger.error('Error loading campaigns', err);
-      // No lanzar error, simplemente mostrar lista vacía
-      setCampaigns([]);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function loadMetrics(campaignIds: string[]) {
-    try {
-      const { data, error } = await supabase
-        .from('campaign_metrics')
-        .select('*')
-        .in('campaign_id', campaignIds)
-        .order('date', { ascending: false });
-
-      // Si la tabla no existe, simplemente retornar sin métricas
-      if (error) {
-        if (error.code === '42P01' || error.code === 'PGRST301' || error.message?.includes('does not exist')) {
-          logger.warn('Campaign metrics table does not exist', error);
-          setMetrics({});
-          return;
-        }
-        throw error;
-      }
-
-      // Agrupar métricas por campaign_id
-      const grouped: Record<string, CampaignMetrics[]> = {};
-      (data || []).forEach((metric: CampaignMetrics) => {
-        if (!grouped[metric.campaign_id]) {
-          grouped[metric.campaign_id] = [];
-        }
-        grouped[metric.campaign_id].push(metric);
-      });
-
-      setMetrics(grouped);
-    } catch (err) {
-      logger.error('Error loading metrics', err);
-      // No fallar, simplemente no mostrar métricas
-      setMetrics({});
-    }
-  }
 
   async function syncCatalog() {
     try {
       setSyncingCatalog(true);
-      const authHeaders = await getAuthHeaders();
-      const response = await fetch('/api/catalog/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeaders },
-        body: JSON.stringify({ platforms: ['meta', 'tiktok', 'google'] }),
-      });
-
-      // Si la ruta no existe (404), mostrar mensaje amigable
-      if (response.status === 404) {
-        alert('La funcionalidad de sincronización de catálogo aún no está disponible.');
-        return;
-      }
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Error sincronizando catálogo');
-      }
-
-      alert('Sincronización de catálogo iniciada. Esto puede tardar unos minutos.');
+      toast.error('La sincronización masiva de catálogo aún no está disponible. Por favor, sincroniza productos individualmente desde la página de productos.');
     } catch (err) {
       logger.error('Error syncing catalog', err);
-      // Si es un error de red o 404, mostrar mensaje más amigable
-      if (err instanceof TypeError || (err as any).message?.includes('fetch')) {
-        alert('No se pudo conectar con el servidor. Verifica tu conexión.');
-      } else {
-        alert('Error al sincronizar catálogo: ' + (err as Error).message);
-      }
+      toast.error('Error al sincronizar catálogo');
     } finally {
       setSyncingCatalog(false);
     }
@@ -312,24 +325,13 @@ export default function MarketingPage() {
     };
   }
 
-  // Mostrar loading mientras se carga la autenticación o los datos
-  if (authLoading || (loading && campaigns.length === 0 && !error)) {
+  // Loading inicial
+  if (authLoading && !user) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Cargando campañas...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Si no hay usuario después de cargar, mostrar mensaje
-  if (!authLoading && !user) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-gray-600 mb-4">Redirigiendo al inicio de sesión...</p>
+          <p className="text-gray-600">Cargando...</p>
         </div>
       </div>
     );
@@ -366,8 +368,100 @@ export default function MarketingPage() {
         </div>
       </div>
 
-      {/* Filtro de tienda */}
-      {stores.length > 0 && (
+      {/* Sección de Catálogos */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-8">
+        <div className="mb-4">
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Catálogos</h2>
+          <p className="text-gray-600 text-sm">Gestiona tus catálogos de productos para publicidad y feeds externos</p>
+        </div>
+        <div className="grid md:grid-cols-2 gap-6">
+          {/* Tarjeta: Mis Catálogos de Anuncios */}
+          <Link
+            href="/dashboard/marketing/catalogos-anuncios"
+            className="bg-white rounded-lg shadow hover:shadow-lg transition-shadow p-6 border border-gray-200 hover:border-blue-300"
+          >
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-blue-100 rounded-lg">
+                  <Package className="w-6 h-6 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Mis Catálogos de Anuncios</h3>
+                  <p className="text-sm text-gray-600 mt-1">Catálogos personalizados por tienda</p>
+                </div>
+              </div>
+              <ExternalLink className="w-5 h-5 text-gray-400 flex-shrink-0" />
+            </div>
+            <p className="text-sm text-gray-600 mb-4">
+              Crea y gestiona catálogos personalizados de productos para usar en campañas de publicidad (Meta, TikTok, Google). Cada catálogo puede tener filtros específicos o selección manual de productos.
+            </p>
+            <div className="flex items-center text-blue-600 font-medium text-sm">
+              Ver Catálogos
+              <ExternalLink className="w-4 h-4 ml-2" />
+            </div>
+          </Link>
+
+          {/* Tarjeta: Catálogo Mercadito */}
+          <Link
+            href="/dashboard/marketing/catalogo-mercadito"
+            className="bg-white rounded-lg shadow hover:shadow-lg transition-shadow p-6 border border-gray-200 hover:border-blue-300"
+          >
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-purple-100 rounded-lg">
+                  <Star className="w-6 h-6 text-purple-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Catálogo Mercadito</h3>
+                  <p className="text-sm text-gray-600 mt-1">Vitrina principal del marketplace</p>
+                </div>
+              </div>
+              <ExternalLink className="w-5 h-5 text-gray-400 flex-shrink-0" />
+            </div>
+            <p className="text-sm text-gray-600 mb-4">
+              Destaca hasta 2 productos en la vitrina principal de Mercadito. Estos productos aparecerán en la página de "Catálogo General" visible para todos los usuarios.
+            </p>
+            <div className="flex items-center text-blue-600 font-medium text-sm">
+              Gestionar Catálogo
+              <ExternalLink className="w-4 h-4 ml-2" />
+            </div>
+          </Link>
+        </div>
+      </div>
+
+      {/* Mensaje de error si existe */}
+      {error && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-6">
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-yellow-800">{error}</p>
+              {stores.length === 0 && (
+                <p className="text-sm text-yellow-700 mt-2">
+                  Necesitas tener una tienda activa para usar las funciones de marketing. 
+                  <Link href="/dashboard/become-seller" className="underline ml-1">
+                    Crear tienda
+                  </Link>
+                </p>
+              )}
+            </div>
+            <button
+              onClick={() => setError(null)}
+              className="text-yellow-600 hover:text-yellow-800"
+            >
+              <XCircle className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Separador */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-6">
+        <div className="border-t border-gray-200"></div>
+      </div>
+
+      {/* Filtro de tienda - Solo mostrar si hay más de una tienda */}
+      {stores.length > 1 && (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-6">
           <div className="bg-white rounded-lg shadow p-4">
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -375,7 +469,11 @@ export default function MarketingPage() {
             </label>
             <select
               value={selectedStore || ''}
-              onChange={(e) => setSelectedStore(e.target.value || null)}
+              onChange={(e) => {
+                const newStoreId = e.target.value || null;
+                currentStoreIdRef.current = newStoreId;
+                setSelectedStore(newStoreId);
+              }}
               className="w-full md:w-64 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Todas las tiendas</option>
@@ -391,7 +489,12 @@ export default function MarketingPage() {
 
       {/* Lista de campañas */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {campaigns.length === 0 ? (
+        {loading ? (
+          <div className="bg-white rounded-lg shadow p-12 text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Cargando campañas...</p>
+          </div>
+        ) : campaigns.length === 0 ? (
           <div className="bg-white rounded-lg shadow p-12 text-center">
             <Target className="w-12 h-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">No hay campañas</h3>
@@ -542,4 +645,3 @@ export default function MarketingPage() {
     </div>
   );
 }
-

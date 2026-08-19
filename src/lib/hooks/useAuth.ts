@@ -6,6 +6,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase, getCurrentUser, AuthUser } from '@/lib/supabase/client';
 import { syncAccessTokenCookie } from '@/lib/auth/clientAuthHeaders';
+import { multiTabSync } from '@/lib/utils/multiTabSync';
 
 // ============================================
 // HOOK PRINCIPAL DE AUTENTICACIÓN
@@ -68,33 +69,104 @@ export function useAuth() {
     loadUser();
   }, [loadUser]);
 
-  // Escuchar cambios en la autenticación + sync cookie para middleware/APIs
+  // Escuchar cambios en membresías (para recargar perfil cuando se aprueba)
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        syncAccessTokenCookie(
-          session?.access_token ?? null,
-          session?.expires_at ?? null
-        );
-
-        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-          await loadUser();
-        } else if (event === 'SIGNED_OUT') {
-          setUser(null);
-          setLoading(false);
-        }
+    const handleMembershipUpdate = async (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const { userId } = customEvent.detail || {};
+      if (userId && user?.id === userId) {
+        await loadUser();
       }
-    );
+    };
 
-    // Sync inicial si ya hay sesión en localStorage
-    supabase.auth.getSession().then(({ data }) => {
-      syncAccessTokenCookie(
-        data.session?.access_token ?? null,
-        data.session?.expires_at ?? null
+    window.addEventListener('membership-updated', handleMembershipUpdate);
+    return () => {
+      window.removeEventListener('membership-updated', handleMembershipUpdate);
+    };
+  }, [user, loadUser]);
+
+  // Escuchar cambios en la autenticación + cookie para middleware/APIs
+  useEffect(() => {
+    let mounted = true;
+    let subscription: any = null;
+
+    try {
+      const { data } = supabase.auth.onAuthStateChange(
+        async (event, session) => {
+          if (!mounted) return;
+
+          syncAccessTokenCookie(
+            session?.access_token ?? null,
+            session?.expires_at ?? null
+          );
+
+          try {
+            if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+              await loadUser();
+              multiTabSync.emit('auth_state_changed', { event: 'SIGNED_IN', userId: session?.user?.id });
+            } else if (event === 'SIGNED_OUT') {
+              setUser(null);
+              setLoading(false);
+              multiTabSync.emit('auth_state_changed', { event: 'SIGNED_OUT' });
+            } else if (event === 'USER_UPDATED') {
+              await loadUser();
+            }
+          } catch (err) {
+            console.error('Error en onAuthStateChange:', err);
+          }
+        }
       );
-    });
 
-    return () => subscription.unsubscribe();
+      subscription = data.subscription;
+
+      supabase.auth.getSession().then(({ data: sessionData }) => {
+        if (!mounted) return;
+        syncAccessTokenCookie(
+          sessionData.session?.access_token ?? null,
+          sessionData.session?.expires_at ?? null
+        );
+      });
+
+      const unsubscribeMultiTab = multiTabSync.on('auth_state_changed', async (data) => {
+        if (!mounted) return;
+        
+        try {
+          if (data.event === 'SIGNED_OUT') {
+            setUser(null);
+            setLoading(false);
+          } else if (data.event === 'SIGNED_IN') {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session?.user?.id === data.userId) {
+              await loadUser();
+            }
+          }
+        } catch (err) {
+          console.warn('Error handling multi-tab auth sync:', err);
+        }
+      });
+
+      return () => {
+        mounted = false;
+        try {
+          if (subscription) {
+            subscription.unsubscribe();
+          }
+          if (unsubscribeMultiTab) {
+            unsubscribeMultiTab();
+          }
+        } catch (err) {
+          console.warn('Error cleaning up auth listeners:', err);
+        }
+      };
+    } catch (err) {
+      console.error('Error setting up auth listener:', err);
+      return () => {
+        mounted = false;
+        if (subscription) {
+          subscription.unsubscribe();
+        }
+      };
+    }
   }, [loadUser]);
 
   // Función para cerrar sesión

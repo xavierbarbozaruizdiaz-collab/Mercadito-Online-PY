@@ -251,3 +251,10 @@ COMMENT ON FUNCTION reactivate_paused_products_on_renewal IS 'Reactiva productos
 
 
 
+
+
+
+
+
+
+

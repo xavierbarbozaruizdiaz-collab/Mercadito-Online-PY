@@ -35,6 +35,8 @@ type HeroSlide = {
   gradient_to?: string | null;
   storage_path?: string | null;
   public_url?: string | null;
+  link_url?: string | null;
+  show_title?: boolean | null;
   sort_order: number;
   created_at?: string | null;
 };
@@ -74,7 +76,7 @@ export default async function Home() {
       const { data, error } = await supabase
         .from('hero_slides')
         .select(
-          'id, title, subtitle, cta_primary_label, cta_primary_href, bg_type, image_url, bg_image_url, storage_path, gradient_from, gradient_to, bg_gradient_from, bg_gradient_to, is_active, sort_order, position, created_at'
+          'id, title, subtitle, cta_primary_label, cta_primary_href, cta_secondary_label, cta_secondary_href, bg_type, image_url, bg_image_url, storage_path, gradient_from, gradient_to, bg_gradient_from, bg_gradient_to, link_url, show_title, is_active, sort_order, position, created_at'
         )
         .eq('is_active', true)
         .order('position', { ascending: true });
@@ -93,7 +95,8 @@ export default async function Home() {
           return 0;
         });
         
-        const getPublicUrl = (path: string | null | undefined): string | null => {
+        // Función helper para construir URL pública desde storage_path (Server Component)
+        const getPublicUrlFromPath = (path: string | null | undefined): string | null => {
           if (!path) return null;
           try {
             const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -111,8 +114,21 @@ export default async function Home() {
           const resolvedImage =
             s.bg_image_url ||
             s.image_url ||
-            getPublicUrl(s.storage_path) ||
+            getPublicUrlFromPath(s.storage_path) ||
             null;
+          
+          // Construir URL de imagen: prioridad: bg_image_url > public_url desde storage_path > image_url
+          let imageUrl: string | null = null;
+          if (bgType === 'image') {
+            if (s.bg_image_url) {
+              imageUrl = s.bg_image_url;
+            } else if (s.storage_path) {
+              // Construir URL pública desde storage_path
+              imageUrl = getPublicUrlFromPath(s.storage_path);
+            } else if (s.image_url) {
+              imageUrl = s.image_url;
+            }
+          }
           
           return {
             id: s.id as string,
@@ -120,8 +136,8 @@ export default async function Home() {
             subtitle: (s.subtitle ?? null) as string | null,
             cta_primary_label: (s.cta_primary_label ?? null) as string | null,
             cta_primary_href: (s.cta_primary_href ?? null) as string | null,
-            cta_secondary_label: null,
-            cta_secondary_href: null,
+            cta_secondary_label: (s.cta_secondary_label ?? null) as string | null,
+            cta_secondary_href: (s.cta_secondary_href ?? null) as string | null,
             bg_type: bgType,
             bg_gradient_from:
               bgType === 'gradient'
@@ -131,12 +147,14 @@ export default async function Home() {
               bgType === 'gradient'
                 ? (s.bg_gradient_to ?? s.gradient_to ?? '#06B6D4')
                 : null,
-            bg_image_url: bgType === 'image' ? resolvedImage : null,
-            image_url: resolvedImage,
+            bg_image_url: bgType === 'image' ? (imageUrl || resolvedImage) : null,
+            image_url: imageUrl || resolvedImage,
             gradient_from: s.bg_gradient_from ?? s.gradient_from ?? null,
             gradient_to: s.bg_gradient_to ?? s.gradient_to ?? null,
-            storage_path: s.storage_path ?? null,
-            public_url: resolvedImage,
+            storage_path: (s.storage_path ?? null) as string | null,
+            public_url: imageUrl || resolvedImage,
+            link_url: (s.link_url ?? null) as string | null,
+            show_title: s.show_title !== undefined ? (s.show_title ?? true) : true,
             sort_order: (s.position as number) ?? (s.sort_order as number) ?? 0,
             created_at: s.created_at ?? null,
             position: (s.position as number) ?? (s.sort_order as number) ?? 0,

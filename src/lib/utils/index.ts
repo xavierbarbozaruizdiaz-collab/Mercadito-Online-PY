@@ -19,7 +19,10 @@ export function cn(...inputs: ClassValue[]) {
 // FORMATEO DE DATOS
 // ============================================
 
-export function formatCurrency(amount: number, currency: string = 'PYG'): string {
+export function formatCurrency(amount: number | null | undefined, currency: string = 'PYG'): string {
+  if (amount === null || amount === undefined || isNaN(amount)) {
+    return '₲0';
+  }
   return new Intl.NumberFormat('es-PY', {
     style: 'currency',
     currency,
@@ -28,16 +31,30 @@ export function formatCurrency(amount: number, currency: string = 'PYG'): string
   }).format(amount);
 }
 
-export function formatNumber(number: number): string {
+export function formatNumber(number: number | null | undefined): string {
+  if (number === null || number === undefined || isNaN(number)) {
+    return '0';
+  }
   return new Intl.NumberFormat('es-PY').format(number);
 }
 
-export function formatDate(date: string | Date): string {
-  return new Intl.DateTimeFormat('es-PY', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  }).format(new Date(date));
+export function formatDate(date: string | Date | null | undefined): string {
+  if (!date) {
+    return 'Fecha no disponible';
+  }
+  try {
+    const dateObj = typeof date === 'string' ? new Date(date) : date;
+    if (isNaN(dateObj.getTime())) {
+      return 'Fecha inválida';
+    }
+    return new Intl.DateTimeFormat('es-PY', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    }).format(dateObj);
+  } catch (error) {
+    return 'Fecha inválida';
+  }
 }
 
 export function formatDateTime(date: string | Date): string {

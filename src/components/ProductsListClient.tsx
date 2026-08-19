@@ -525,15 +525,29 @@ export default function ProductsListClient() {
               )
             : Promise.resolve({ data: [], error: null }),
           
-          // Obtener información de stores
+          // Obtener información de stores (solo activas) - protegido contra errores
           storeIds.length > 0
             ? createQueryWithTimeout(
                 supabase
                   .from('stores')
                   .select('id, name, slug')
-                  .in('id', storeIds),
+                  .in('id', storeIds)
+                  .eq('is_active', true),
                 15000
-              )
+              ).catch((err: any) => {
+                // Error silencioso - continuar sin datos de stores
+                const isExpectedError = 
+                  err?.code === 'PGRST116' || 
+                  err?.message?.includes('400') ||
+                  err?.message?.includes('401') ||
+                  err?.status === 400 ||
+                  err?.status === 401;
+                
+                if (!isExpectedError && process.env.NODE_ENV === 'development') {
+                  console.warn('⚠️ Error obteniendo stores (no crítico):', err?.message || err);
+                }
+                return { data: [], error: null };
+              })
             : Promise.resolve({ data: [], error: null }),
         ]);
 
@@ -1047,9 +1061,7 @@ export default function ProductsListClient() {
                 
                 <div className="p-1.5 sm:p-2">
                   <h3 className="font-semibold text-[10px] sm:text-xs mb-0.5 line-clamp-2 leading-tight">{product.title}</h3>
-                  {product.description && (
-                    <p className="text-gray-600 text-[9px] sm:text-[10px] mb-1 line-clamp-1 hidden sm:block">{product.description}</p>
-                  )}
+                  {/* Descripción removida de la página principal */}
                   
                   {/* Timer para subastas activas */}
                   {isActiveAuction && product.auction_end_at && auctionEndAt > serverNow && (

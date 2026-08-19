@@ -20,8 +20,10 @@ import {
   AlertCircle,
   ArrowLeft,
   Eye,
-  Filter
+  Filter,
+  Printer
 } from 'lucide-react';
+import OrderPrintView from '@/components/orders/OrderPrintView';
 
 type OrderItem = {
   id: string;
@@ -60,10 +62,38 @@ export default function SellerOrdersPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [updating, setUpdating] = useState<string | null>(null);
+  const [printOrder, setPrintOrder] = useState<Order | null>(null);
+  const [store, setStore] = useState<any>(null);
 
   useEffect(() => {
     loadOrders();
+    loadStore();
   }, [statusFilter]);
+
+  async function loadStore() {
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      if (!session?.session?.user?.id) {
+        return;
+      }
+
+      const sellerId = session.session.user.id;
+      const { data: storeData, error: storeError } = await supabase
+        .from('stores')
+        .select('*')
+        .eq('seller_id', sellerId)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (storeError && storeError.code !== 'PGRST116') {
+        console.error('Error cargando tienda:', storeError);
+      } else if (storeData) {
+        setStore(storeData);
+      }
+    } catch (err) {
+      console.error('Error cargando tienda:', err);
+    }
+  }
 
   async function loadOrders() {
     try {
@@ -428,6 +458,13 @@ export default function SellerOrdersPage() {
                     </div>
                     <div className="flex gap-2">
                       <button
+                        onClick={() => setPrintOrder(order)}
+                        className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm font-medium flex items-center gap-2"
+                      >
+                        <Printer className="w-4 h-4" />
+                        Imprimir
+                      </button>
+                      <button
                         onClick={() => setSelectedOrder(selectedOrder?.id === order.id ? null : order)}
                         className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium flex items-center gap-2"
                       >
@@ -605,6 +642,15 @@ export default function SellerOrdersPage() {
           </div>
         )}
       </div>
+
+      {/* Modal de impresión */}
+      {printOrder && (
+        <OrderPrintView
+          order={printOrder}
+          store={store}
+          onClose={() => setPrintOrder(null)}
+        />
+      )}
     </main>
   );
 }

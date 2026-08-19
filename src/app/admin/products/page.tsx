@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Check, X, Pencil, Trash2 } from 'lucide-react';
 import {
   getAllProducts,
   approveProduct,
@@ -122,14 +123,16 @@ export default function AdminProductsPage() {
   }
 
   async function handleDelete(product: ProductAdmin) {
-    if (!confirm(`¿Eliminar permanentemente el producto "${product.title}"?`)) return;
+    if (!confirm(`¿Eliminar permanentemente el producto "${product.title}"?\n\nEsta acción no se puede deshacer.`)) return;
 
     setProcessing(product.id);
     try {
       await deleteProduct(product.id);
       await loadData();
+      // Feedback visual: el producto desaparecerá de la lista
     } catch (error: any) {
-      alert(`Error: ${error.message}`);
+      console.error('Error eliminando producto:', error);
+      alert(`Error al eliminar el producto: ${error.message}\n\nVerifica que tengas permisos de administrador.`);
     } finally {
       setProcessing(null);
     }
@@ -230,7 +233,7 @@ export default function AdminProductsPage() {
               <div className="text-2xl font-bold text-gray-600">{stats.paused}</div>
             </div>
             <div className="bg-white p-4 rounded-lg shadow-sm border">
-              <div className="text-sm text-gray-600">Archivados</div>
+              <div className="text-sm text-gray-600">Eliminados</div>
               <div className="text-2xl font-bold text-gray-600">{stats.archived}</div>
             </div>
           </div>
@@ -318,7 +321,7 @@ export default function AdminProductsPage() {
                   {f === 'rejected' && 'Rechazados'}
                   {f === 'active' && 'Activos'}
                   {f === 'paused' && 'Pausados'}
-                  {f === 'archived' && 'Archivados'}
+                  {f === 'archived' && 'Eliminados'}
                 </button>
               ))}
             </div>
@@ -410,41 +413,46 @@ export default function AdminProductsPage() {
                       {new Date(product.created_at).toLocaleDateString('es-PY')}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 items-center">
                         {product.approval_status === 'pending' && (
                           <>
                             <button
                               onClick={() => handleApprove(product)}
                               disabled={processing === product.id}
-                              className="text-green-600 hover:text-green-900 disabled:opacity-50"
-                              title="Aprobar"
+                              className="flex items-center justify-center w-9 h-9 rounded-md bg-green-50 text-green-600 hover:bg-green-100 hover:text-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1"
+                              title="Aprobar producto"
+                              aria-label="Aprobar producto"
                             >
-                              ✓
+                              <Check className="w-5 h-5" />
                             </button>
                             <button
                               onClick={() => handleReject(product)}
                               disabled={processing === product.id}
-                              className="text-red-600 hover:text-red-900 disabled:opacity-50"
-                              title="Rechazar"
+                              className="flex items-center justify-center w-9 h-9 rounded-md bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1"
+                              title="Rechazar producto"
+                              aria-label="Rechazar producto"
                             >
-                              ✗
+                              <X className="w-5 h-5" />
                             </button>
                           </>
                         )}
                         <button
                           onClick={() => setEditingProduct(product)}
-                          className="text-blue-600 hover:text-blue-900"
-                          title="Editar"
+                          disabled={processing === product.id}
+                          className="flex items-center justify-center w-9 h-9 rounded-md bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
+                          title="Editar producto"
+                          aria-label="Editar producto"
                         >
-                          ✎
+                          <Pencil className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => handleDelete(product)}
                           disabled={processing === product.id}
-                          className="text-red-600 hover:text-red-900 disabled:opacity-50"
-                          title="Eliminar"
+                          className="flex items-center justify-center w-9 h-9 rounded-md bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1"
+                          title="Eliminar producto permanentemente"
+                          aria-label="Eliminar producto"
                         >
-                          🗑
+                          <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
                     </td>

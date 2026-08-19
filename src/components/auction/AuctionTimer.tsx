@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { AlarmClock, Circle } from 'lucide-react';
+import { getSyncedNow } from '@/lib/utils/timeSync';
 
 type AuctionTimerProps = {
   /** Fecha/hora de cierre (ms epoch) enviada por el servidor */
@@ -27,9 +28,27 @@ function pad2(n: number) {
 
 function formatHMS(totalMs: number) {
   const total = Math.max(0, Math.floor(totalMs / 1000));
-  const m = Math.floor(total / 60);
-  const s = total % 60;
-  return `${pad2(m)}:${pad2(s)}`;
+  
+  // Si es mayor a 24 horas, mostrar días
+  const hours24 = 24 * 60 * 60; // 86400 segundos
+  if (total >= hours24) {
+    const days = Math.floor(total / hours24);
+    const remainingSeconds = total % hours24;
+    const hours = Math.floor(remainingSeconds / 3600);
+    const minutes = Math.floor((remainingSeconds % 3600) / 60);
+    return `${days}d ${pad2(hours)}:${pad2(minutes)}`;
+  }
+  
+  // Formato normal para menos de 24 horas: HH:MM:SS o MM:SS
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const seconds = total % 60;
+  
+  // Si hay horas, mostrar HH:MM:SS, sino MM:SS
+  if (hours > 0) {
+    return `${pad2(hours)}:${pad2(minutes)}:${pad2(seconds)}`;
+  }
+  return `${pad2(minutes)}:${pad2(seconds)}`;
 }
 
 export default function AuctionTimer({
@@ -41,11 +60,9 @@ export default function AuctionTimer({
   size = 'md',
   tickMs = 200,
 }: AuctionTimerProps) {
-  // Offset estable: tiempoCliente - serverNow
-  // IMPORTANTE: Guardar el offset inicial cuando se monta el componente
-  const startClientMsRef = useRef<number>(Date.now());
-  const serverTimeOffsetRef = useRef<number>(serverNowMs - Date.now());
-  const [nowMs, setNowMs] = useState<number>(Date.now());
+  // Usar getSyncedNow() que calcula tiempo sincronizado con el servidor
+  // Este tiempo se actualiza automáticamente cuando timeSync recalcula el offset
+  const [nowMs, setNowMs] = useState<number>(getSyncedNow());
 
   // Para animación cuando entra nueva puja
   const [justReset, setJustReset] = useState<boolean>(false);
@@ -60,19 +77,20 @@ export default function AuctionTimer({
     }
   }, [lastBidAtMs]);
 
+  // Actualizar tiempo cada tick usando getSyncedNow()
+  // Esto garantiza que si el offset se recalcula, el timer se actualiza automáticamente
   useEffect(() => {
-    const timer = setInterval(() => setNowMs(Date.now()), tickMs);
+    const timer = setInterval(() => {
+      setNowMs(getSyncedNow());
+    }, tickMs);
     return () => clearInterval(timer);
   }, [tickMs]);
 
-  // Tiempo actual "oficial" = serverNow + (clienteAhora - clienteInicio)
-  // Usar offset guardado para mantener consistencia incluso si serverNowMs cambia
+  // Tiempo actual sincronizado con el servidor
+  // getSyncedNow() usa el offset que se recalcula periódicamente
   const officialNowMs = useMemo(() => {
-    const clientElapsed = nowMs - startClientMsRef.current;
-    // Usar el tiempo del servidor inicial + el tiempo transcurrido en el cliente
-    // Esto asegura que todos los usuarios vean el mismo tiempo
-    return serverNowMs + clientElapsed;
-  }, [nowMs, serverNowMs]);
+    return nowMs; // Ya viene sincronizado de getSyncedNow()
+  }, [nowMs]);
 
   const remainingMs = Math.max(0, endAtMs - officialNowMs);
 

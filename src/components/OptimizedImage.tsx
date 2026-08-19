@@ -35,29 +35,31 @@ export function OptimizedImage({
   const [imageError, setImageError] = useState(false);
   const imageOptimizer = ImageOptimizer.getInstance();
 
-  // Si la URL contiene Cloudinary pero no está configurado, usar la URL original o Supabase
+  // Si es una URL de Supabase, usar directamente sin optimización adicional
+  // El loader personalizado de Next.js manejará el acceso correctamente
   let optimizedSrc = src;
   
-  try {
-    optimizedSrc = imageOptimizer.generateOptimizedUrl(src, {
-      width,
-      height,
-      quality,
-      device
-    });
-    
-    // Si la URL generada contiene Cloudinary pero no está configurado en next.config, usar original
-    if (optimizedSrc.includes('res.cloudinary.com/your-cloud') || optimizedSrc.includes('res.cloudinary.com') && !process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME) {
-      // Usar directamente la URL original o transformarla con Supabase si es posible
-      if (src.includes('supabase.co/storage')) {
-        optimizedSrc = src; // Supabase maneja las transformaciones
-      } else {
+  // Para URLs de Supabase, no usar el ImageOptimizer ya que puede causar problemas
+  if (src.includes('supabase.co/storage')) {
+    optimizedSrc = src;
+  } else {
+    // Para otras URLs, intentar optimizar
+    try {
+      optimizedSrc = imageOptimizer.generateOptimizedUrl(src, {
+        width,
+        height,
+        quality,
+        device
+      });
+      
+      // Si la URL generada contiene Cloudinary pero no está configurado, usar original
+      if (optimizedSrc.includes('res.cloudinary.com/your-cloud') || (optimizedSrc.includes('res.cloudinary.com') && !process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME)) {
         optimizedSrc = src; // Usar URL original
       }
+    } catch (err) {
+      // Si falla la optimización, usar URL original
+      optimizedSrc = src;
     }
-  } catch (err) {
-    // Si falla la optimización, usar URL original
-    optimizedSrc = src;
   }
 
   // Generar srcset si no se proporciona sizes y no hay error
@@ -75,6 +77,10 @@ export function OptimizedImage({
     );
   }
 
+  // Para URLs de Supabase, deshabilitar optimización para evitar 404
+  // El loader personalizado devuelve la URL directamente, pero Next.js puede intentar optimizar de todas formas
+  const isSupabaseUrl = optimizedSrc.includes('supabase.co/storage');
+  
   return (
     <Image
       src={optimizedSrc}
@@ -84,9 +90,11 @@ export function OptimizedImage({
       className={className}
       priority={priority}
       sizes={sizesAttr}
-      onError={() => setImageError(true)}
-      // Usar srcSet si está disponible
-      {...(srcSet && { srcSet })}
+      unoptimized={isSupabaseUrl}
+      onError={() => {
+        console.error('Error cargando imagen:', optimizedSrc);
+        setImageError(true);
+      }}
     />
   );
 }

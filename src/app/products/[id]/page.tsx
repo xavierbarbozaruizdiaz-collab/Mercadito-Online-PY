@@ -13,6 +13,7 @@ import ProductPageClient from './ProductPageClient';
 import Breadcrumbs from '@/components/Breadcrumbs';
 import { Metadata } from 'next';
 import { generateProductStructuredData, generateBreadcrumbStructuredData } from '@/lib/structuredData';
+import { SITE_URL } from '@/lib/config/site';
 
 type Product = {
   id: string;
@@ -56,6 +57,8 @@ export async function generateMetadata(
         cover_url,
         condition,
         sale_type,
+        approval_status,
+        status,
         categories (name)
       `)
       .eq('id', id)
@@ -100,7 +103,7 @@ export async function generateMetadata(
         images: productData.cover_url ? [productData.cover_url] : [],
       },
       alternates: {
-        canonical: `https://mercadito-online-py.vercel.app/products/${id}`,
+        canonical: `${SITE_URL}/products/${id}`,
       },
     };
   } catch (error) {
@@ -141,6 +144,8 @@ export default async function ProductPage(
       category_id,
       seller_id,
       store_id,
+      approval_status,
+      status,
       wholesale_enabled,
       wholesale_min_quantity,
       wholesale_discount_percent,
@@ -184,6 +189,8 @@ export default async function ProductPage(
   // El tipo correcto es que categories viene como array desde Supabase
   const p = data as Product & { 
     categories: Category[];
+    approval_status?: string;
+    status?: string;
     stores?: Array<{
       id: string;
       name: string;
@@ -192,26 +199,30 @@ export default async function ProductPage(
       description: string | null;
     }> | null;
   };
+
   
   // Obtener la primera categoría (debería ser solo una)
   const category = p.categories && p.categories.length > 0 ? p.categories[0] : null;
   
   // Obtener información de la tienda si existe (cargar directamente si no viene en la query)
-  let store: { id: string; name: string; slug: string; logo_url: string | null; description: string | null } | null = null;
+  let store: { id: string; name: string; slug: string; logo_url: string | null; description: string | null; contact_phone?: string | null; phone?: string | null } | null = null;
+  let storePhone: string | null = null;
   
   if (p.stores && p.stores.length > 0) {
     store = p.stores[0];
+    storePhone = (p.stores[0] as any).contact_phone || (p.stores[0] as any).phone || null;
   } else if (p.store_id) {
     // Si no viene en la relación, cargar directamente
     try {
       const { data: storeData } = await supabase
         .from('stores')
-        .select('id, name, slug, logo_url, description')
+        .select('id, name, slug, logo_url, description, contact_phone, phone')
         .eq('id', p.store_id)
         .single();
       
       if (storeData) {
         store = storeData;
+        storePhone = storeData.contact_phone || storeData.phone || null;
       }
     } catch (err) {
       console.warn('No se pudo cargar información de la tienda:', err);
@@ -219,12 +230,13 @@ export default async function ProductPage(
   }
   
   // Obtener información del vendedor si no hay tienda
-  let sellerInfo: { name: string; email?: string } | null = null;
+  let sellerInfo: { name: string; email?: string; phone?: string | null } | null = null;
+  let sellerPhone: string | null = null;
   if (!store && p.seller_id) {
     try {
       const { data: sellerProfile } = await supabase
         .from('profiles')
-        .select('email, first_name, last_name')
+        .select('email, first_name, last_name, phone')
         .eq('id', p.seller_id)
         .single();
       
@@ -233,11 +245,28 @@ export default async function ProductPage(
           name: sellerProfile.first_name && sellerProfile.last_name 
             ? `${sellerProfile.first_name} ${sellerProfile.last_name}`
             : sellerProfile.email?.split('@')[0] || 'Vendedor',
-          email: sellerProfile.email
+          email: sellerProfile.email,
+          phone: sellerProfile.phone || null
         };
+        sellerPhone = sellerProfile.phone || null;
       }
     } catch (err) {
       console.warn('No se pudo cargar información del vendedor:', err);
+    }
+  } else if (p.seller_id && !storePhone) {
+    // Si hay tienda pero no tiene teléfono, intentar obtener el del vendedor
+    try {
+      const { data: sellerProfile } = await supabase
+        .from('profiles')
+        .select('phone')
+        .eq('id', p.seller_id)
+        .single();
+      
+      if (sellerProfile?.phone) {
+        sellerPhone = sellerProfile.phone;
+      }
+    } catch (err) {
+      // Ignorar error, no es crítico
     }
   }
 
@@ -267,15 +296,15 @@ export default async function ProductPage(
     availability: 'InStock',
     seller: {
       name: 'Vendedor Verificado',
-      url: `https://mercadito-online-py.vercel.app/store/seller-${p.seller_id}`,
+      url: `${SITE_URL}/store/seller-${p.seller_id}`,
     },
     category: category?.name || 'General',
   });
 
   const breadcrumbStructuredData = generateBreadcrumbStructuredData([
-    { name: 'Inicio', url: 'https://mercadito-online-py.vercel.app/' },
-    { name: category?.name || 'Productos', url: `https://mercadito-online-py.vercel.app/search?category=${category?.id || ''}` },
-    { name: p.title, url: `https://mercadito-online-py.vercel.app/products/${p.id}` },
+    { name: 'Inicio', url: `${SITE_URL}/` },
+    { name: category?.name || 'Productos', url: `${SITE_URL}/search?category=${category?.id || ''}` },
+    { name: p.title, url: `${SITE_URL}/products/${p.id}` },
   ]);
 
   return (
@@ -380,7 +409,9 @@ export default async function ProductPage(
                 ...p,
                 title: p.title,
                 price: Number(p.price),
-              }} 
+              }}
+              sellerPhone={sellerPhone}
+              storePhone={storePhone}
             />
 
             {/* Alerta de precio */}

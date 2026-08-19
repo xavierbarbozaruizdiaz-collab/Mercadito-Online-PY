@@ -117,3 +117,10 @@ vercel ls
 - Vercel hace deploy automático, así que el workflow de GitHub es principalmente para validación
 - Los workflows con `continue-on-error: true` no bloquean el deployment
 
+
+
+
+
+
+
+

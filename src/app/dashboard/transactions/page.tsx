@@ -16,8 +16,12 @@ type Transaction = {
   order?: { id: string; total_amount: number };
   platform_fee?: {
     commission_amount: number;
+    commission_percent?: number;
     base_amount: number;
     seller_earnings: number;
+    seller_commission_percent?: number;
+    auction_buyer_commission_percent?: number;
+    auction_seller_commission_percent?: number;
   };
   payout_request?: {
     amount: number;
@@ -46,6 +50,7 @@ export default function TransactionsPage() {
       const sellerId = session.session.user.id;
 
       // Obtener comisiones (platform_fees)
+      // LPMS-COMMISSION-START: Agregar campos de porcentajes de comisión
       const { data: fees, error: feesError } = await supabase
         .from('platform_fees')
         .select(`
@@ -53,8 +58,12 @@ export default function TransactionsPage() {
           order_id,
           transaction_type,
           commission_amount,
+          commission_percent,
           base_amount,
           seller_earnings,
+          seller_commission_percent,
+          auction_buyer_commission_percent,
+          auction_seller_commission_percent,
           status,
           payment_status,
           created_at,
@@ -63,6 +72,7 @@ export default function TransactionsPage() {
         .eq('seller_id', sellerId)
         .order('created_at', { ascending: false })
         .limit(100);
+      // LPMS-COMMISSION-END
 
       if (feesError) throw feesError;
 
@@ -288,7 +298,15 @@ export default function TransactionsPage() {
                       </div>
                       {transaction.platform_fee && (
                         <p className="text-xs text-gray-500 mt-1">
+                          {/* LPMS-COMMISSION-START: Mostrar porcentaje de comisión */}
                           Comisión: -{transaction.platform_fee.commission_amount.toLocaleString('es-PY')} Gs.
+                          {transaction.platform_fee.commission_percent && (
+                            <span className="ml-1">({transaction.platform_fee.commission_percent.toFixed(2)}%)</span>
+                          )}
+                          {transaction.platform_fee.seller_commission_percent && !transaction.platform_fee.commission_percent && (
+                            <span className="ml-1">({transaction.platform_fee.seller_commission_percent.toFixed(2)}%)</span>
+                          )}
+                          {/* LPMS-COMMISSION-END */}
                         </p>
                       )}
                     </div>

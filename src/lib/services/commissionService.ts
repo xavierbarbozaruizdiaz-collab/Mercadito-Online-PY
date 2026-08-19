@@ -76,6 +76,32 @@ export async function getCommissionForAuction(
   storeId?: string
 ): Promise<AuctionCommissions> {
   try {
+    // 1) Intentar leer configuración activa desde commission_settings (panel)
+    try {
+      const { data: settingsData, error: settingsError } = await supabase
+        .from('commission_settings')
+        .select('auction_buyer_commission_percent, auction_seller_commission_percent, scope_type, applies_to, is_active, effective_from, effective_until')
+        .eq('is_active', true)
+        .in('applies_to', ['auction_only', 'both'])
+        .order('effective_from', { ascending: false });
+
+      if (!settingsError && settingsData && settingsData.length > 0) {
+        const active = settingsData.find(() => true); // primera activa más reciente
+        const buyerPercent = active?.auction_buyer_commission_percent ?? null;
+        const sellerPercent = active?.auction_seller_commission_percent ?? null;
+
+        if (buyerPercent !== null && sellerPercent !== null) {
+          return {
+            buyer_commission_percent: buyerPercent,
+            seller_commission_percent: sellerPercent,
+          };
+        }
+      }
+    } catch (settingsEx) {
+      logger.warn('No se pudo leer commission_settings, se intentará RPC', settingsEx);
+    }
+
+    // 2) Fallback: RPC get_auction_commissions
     const { data, error } = await (supabase as any).rpc('get_auction_commissions', {
       p_seller_id: sellerId,
       p_store_id: storeId || null,
@@ -83,29 +109,30 @@ export async function getCommissionForAuction(
 
     if (error) {
       logger.error('Error getting auction commissions', error, { sellerId, storeId });
-      // Defaults: 3% comprador, 5% vendedor
+      // Defaults alineados al panel (12.5% comprador/vendedor) si no hay datos
       return {
-        buyer_commission_percent: 3.0,
-        seller_commission_percent: 5.0,
+        buyer_commission_percent: 12.5,
+        seller_commission_percent: 12.5,
       };
     }
 
     if (data && data.length > 0) {
       return {
-        buyer_commission_percent: data[0].buyer_commission_percent || 3.0,
-        seller_commission_percent: data[0].seller_commission_percent || 5.0,
+        buyer_commission_percent: data[0].buyer_commission_percent ?? 12.5,
+        seller_commission_percent: data[0].seller_commission_percent ?? 12.5,
       };
     }
 
+    // Defaults alineados al panel
     return {
-      buyer_commission_percent: 3.0,
-      seller_commission_percent: 5.0,
+      buyer_commission_percent: 12.5,
+      seller_commission_percent: 12.5,
     };
   } catch (err) {
     logger.error('Exception getting auction commissions', err, { sellerId, storeId });
     return {
-      buyer_commission_percent: 3.0,
-      seller_commission_percent: 5.0,
+      buyer_commission_percent: 12.5,
+      seller_commission_percent: 12.5,
     };
   }
 }

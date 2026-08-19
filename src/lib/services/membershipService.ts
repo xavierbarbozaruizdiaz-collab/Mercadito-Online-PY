@@ -119,7 +119,76 @@ export async function getUserBidLimit(userId: string): Promise<UserBidLimit> {
 }
 
 /**
+ * Crea una suscripción pendiente que requiere aprobación del admin
+ */
+export async function createPendingMembershipSubscription(
+  userId: string,
+  planId: string,
+  subscriptionType: 'monthly' | 'yearly' | 'one_time',
+  amountPaid: number,
+  paymentMethod: string,
+  paymentReference?: string
+): Promise<string> {
+  try {
+    // Obtener información del plan para calcular fechas
+    const plan = await getMembershipPlanById(planId);
+    if (!plan) {
+      throw new Error('Plan de membresía no encontrado');
+    }
+
+    // Calcular fechas según el tipo de suscripción
+    const now = new Date();
+    let expiresAt: Date;
+    
+    if (subscriptionType === 'one_time') {
+      expiresAt = new Date(now.getTime() + (plan.duration_days * 24 * 60 * 60 * 1000));
+    } else if (subscriptionType === 'monthly') {
+      expiresAt = new Date(now);
+      expiresAt.setMonth(expiresAt.getMonth() + 1);
+    } else { // yearly
+      expiresAt = new Date(now);
+      expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+    }
+
+    // Crear suscripción con status 'pending'
+    const { data, error } = await supabase
+      .from('membership_subscriptions')
+      .insert({
+        user_id: userId,
+        plan_id: planId,
+        status: 'pending', // Pendiente de aprobación
+        subscription_type: subscriptionType,
+        starts_at: now.toISOString(),
+        expires_at: expiresAt.toISOString(),
+        auto_renew: subscriptionType !== 'one_time',
+        amount_paid: amountPaid,
+        payment_method: paymentMethod,
+        payment_status: 'completed', // El pago está completo, pero la membresía está pendiente
+        payment_reference: paymentReference || null,
+      })
+      .select('id')
+      .single();
+
+    if (error) throw error;
+
+    logger.info('Suscripción pendiente creada', {
+      subscriptionId: data.id,
+      userId,
+      planId,
+      subscriptionType,
+      amountPaid,
+    });
+
+    return data.id;
+  } catch (err) {
+    logger.error('Error creating pending membership subscription', err);
+    throw err;
+  }
+}
+
+/**
  * Activa una suscripción tras pago exitoso
+ * NOTA: Esta función solo debe usarse para activaciones automáticas o desde el admin
  */
 export async function activateMembershipSubscription(
   userId: string,

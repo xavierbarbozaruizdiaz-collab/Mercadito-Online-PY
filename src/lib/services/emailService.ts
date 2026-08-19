@@ -57,14 +57,30 @@ export class EmailService {
 
       if (error) {
         // Errores se mantienen para debugging
-        console.error('Error enviando email:', error);
+        console.error('Error enviando email:', {
+          to: options.to,
+          subject: options.subject,
+          error,
+        });
         return null;
       }
+
+      // Log reducido para diagnosticar problemas de remitente/dominio
+      console.info('Email enviado vía Resend', {
+        to: options.to,
+        subject: options.subject,
+        from: options.from || this.defaultFrom,
+        id: data?.id,
+      });
 
       return { id: data?.id || '' };
     } catch (error) {
       // Errores se mantienen para debugging
-      console.error('Error en emailService:', error);
+      console.error('Error en emailService:', {
+        to: options.to,
+        subject: options.subject,
+        error,
+      });
       return null;
     }
   }

@@ -14,6 +14,7 @@ import {
   Button,
   Badge
 } from '@/components/ui';
+import SourcingOrderPrompt from '@/components/SourcingOrderPrompt';
 import { 
   Package, 
   Store, 
@@ -74,6 +75,7 @@ interface SearchResultsProps {
   onLoadMore?: () => void;
   hasMore?: boolean;
   className?: string;
+  searchQuery?: string; // Query de búsqueda actual para mostrar sourcing prompt
 }
 
 // ============================================
@@ -92,6 +94,7 @@ export default function SearchResults({
   onLoadMore,
   hasMore = false,
   className = '',
+  searchQuery = '',
 }: SearchResultsProps) {
   const [activeTab, setActiveTab] = useState<'products' | 'stores'>('products');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -155,6 +158,25 @@ export default function SearchResults({
   }
 
   if (stats.total === 0) {
+    // Si hay un query activo, mostrar opción de sourcing order
+    if (searchQuery && searchQuery.trim().length > 0) {
+      return (
+        <div className="space-y-4">
+          <EmptyState
+            title="No se encontraron resultados"
+            description={`No encontramos productos para "${searchQuery}". Intenta ajustar tus filtros de búsqueda o explorar diferentes categorías.`}
+            action={{
+              label: 'Limpiar filtros',
+              onClick: () => window.location.href = '/search',
+            }}
+            icon={<Package className="w-16 h-16" />}
+          />
+          <SourcingOrderPrompt query={searchQuery} variant="card" />
+        </div>
+      );
+    }
+
+    // Si no hay query, mostrar solo el EmptyState normal
     return (
       <EmptyState
         title="No se encontraron resultados"
@@ -260,11 +282,16 @@ export default function SearchResults({
               )}
             </>
           ) : (
-            <EmptyState
-              title="No se encontraron productos"
-              description="Intenta ajustar tus filtros de búsqueda."
-              icon={<Package className="w-16 h-16" />}
-            />
+            <div className="space-y-4">
+              <EmptyState
+                title="No se encontraron productos"
+                description="Intenta ajustar tus filtros de búsqueda."
+                icon={<Package className="w-16 h-16" />}
+              />
+              {searchQuery && searchQuery.trim().length > 0 && (
+                <SourcingOrderPrompt query={searchQuery} variant="inline" />
+              )}
+            </div>
           )}
         </div>
       )}

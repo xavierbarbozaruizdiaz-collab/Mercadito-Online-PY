@@ -98,3 +98,10 @@ export function containsSuspiciousPatterns(input: string): boolean {
   return suspiciousPatterns.some(pattern => pattern.test(input));
 }
 
+
+
+
+
+
+
+

@@ -440,3 +440,10 @@ CREATE TABLE loyalty_tier_benefits (
 **Versión:** 1.0  
 **Estado:** Pendiente de implementación
 
+
+
+
+
+
+
+

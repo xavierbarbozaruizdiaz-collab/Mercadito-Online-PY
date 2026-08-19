@@ -99,3 +99,10 @@ COMMENT ON FUNCTION create_auction_order IS 'Crea una orden directamente desde u
 
 
 
+
+
+
+
+
+
+

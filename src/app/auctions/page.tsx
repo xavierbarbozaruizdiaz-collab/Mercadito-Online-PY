@@ -6,9 +6,14 @@ import AuctionCard from '@/components/auction/AuctionCard';
 import { Input } from '@/components/ui';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui';
-import { Search, Filter, SlidersHorizontal, Clock, AlertCircle } from 'lucide-react';
+import { Search, Filter, SlidersHorizontal, Clock, AlertCircle, Crown, Lock } from 'lucide-react';
 import Select from '@/components/ui/Select';
 import Badge from '@/components/ui/Badge';
+import Link from 'next/link';
+import Pagination from '@/components/ui/Pagination';
+import { getActiveSubscription } from '@/lib/services/membershipService';
+import { getSessionWithTimeout } from '@/lib/supabase/client';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export default function AuctionsPage() {
   const [auctions, setAuctions] = useState<AuctionProduct[]>([]);
@@ -17,6 +22,32 @@ export default function AuctionsPage() {
   const [category, setCategory] = useState<string>('');
   const [sortBy, setSortBy] = useState<'all' | 'recent' | 'ending_soon' | 'price_asc' | 'price_desc'>('all');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [hasPaidCanon, setHasPaidCanon] = useState<boolean | null>(null);
+  const [checkingCanon, setCheckingCanon] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalAuctions, setTotalAuctions] = useState(0);
+
+  // Verificar si el usuario ha pagado el canon
+  useEffect(() => {
+    const checkCanon = async () => {
+      try {
+        const { data: session } = await getSessionWithTimeout();
+        if (session?.session?.user?.id) {
+          const subscription = await getActiveSubscription(session.session.user.id);
+          setHasPaidCanon(subscription !== null && subscription.amount_paid > 0);
+        } else {
+          setHasPaidCanon(null);
+        }
+      } catch (error) {
+        console.error('Error verificando canon:', error);
+        setHasPaidCanon(null);
+      } finally {
+        setCheckingCanon(false);
+      }
+    };
+    checkCanon();
+  }, []);
 
   useEffect(() => {
     loadAuctions();
@@ -46,12 +77,24 @@ export default function AuctionsPage() {
       setLoading(true);
       console.log('🔄 Cargando subastas...', { search, category });
       
-      const data = await getActiveAuctions({
+      const result = await getActiveAuctions({
         search: search || undefined,
         category: category || undefined,
       });
       
-      console.log('✅ Subastas cargadas:', data.length, data);
+      console.log('✅ Subastas cargadas:', result.length);
+      
+      // Paginación manual
+      const itemsPerPage = 20;
+      const startIndex = (currentPage - 1) * itemsPerPage;
+      const endIndex = startIndex + itemsPerPage;
+      const paginatedAuctions = result.slice(startIndex, endIndex);
+      const totalPages = Math.ceil(result.length / itemsPerPage);
+      
+      setTotalPages(totalPages);
+      setTotalAuctions(result.length);
+      
+      const data = paginatedAuctions;
       
       // Detectar si hay búsqueda activa
       const hasActiveSearch = search.trim() !== '' || category !== '';
@@ -165,6 +208,32 @@ export default function AuctionsPage() {
           Puja en tiempo real y gana los mejores productos
         </p>
       </div>
+
+      {/* CTA para pagar canon de participación */}
+      {!checkingCanon && hasPaidCanon === false && (
+        <Alert className="mb-6 border-2 border-amber-300 bg-gradient-to-r from-amber-50 to-orange-50">
+          <Lock className="h-5 w-5 text-amber-600" />
+          <AlertDescription className="flex items-center justify-between flex-wrap gap-4">
+            <div className="flex-1">
+              <p className="font-semibold text-amber-900 mb-1">
+                ¡Paga tu canon de participación para pujar en subastas!
+              </p>
+              <p className="text-sm text-amber-800">
+                Necesitas pagar el canon de participación para poder pujar en las subastas activas.
+              </p>
+            </div>
+            <Link href="/memberships">
+              <Button
+                className="bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white font-bold shadow-lg"
+                size="lg"
+              >
+                <Crown className="mr-2 h-5 w-5" />
+                Pagar Canon
+              </Button>
+            </Link>
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Filtros y búsqueda */}
       <div className="mb-6 space-y-4">
@@ -300,6 +369,27 @@ export default function AuctionsPage() {
                 </div>
               )}
             </>
+          )}
+
+          {/* Paginación */}
+          {totalPages > 1 && (
+            <div className="mt-8 flex justify-center">
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+                showFirstLast={true}
+                showPrevNext={true}
+                maxVisiblePages={5}
+              />
+            </div>
+          )}
+
+          {/* Información de paginación */}
+          {totalAuctions > 0 && (
+            <div className="mt-4 text-center text-sm text-gray-600">
+              Mostrando {((currentPage - 1) * 20) + 1} - {Math.min(currentPage * 20, totalAuctions)} de {totalAuctions} subastas
+            </div>
           )}
         </>
       )}

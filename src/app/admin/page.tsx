@@ -64,6 +64,11 @@ const SECTIONS: { title: string; subtitle: string; items: AdminLink[] }[] = [
         description: 'Organizar el catálogo',
       },
       {
+        href: '/admin/marketing/catalogo-vitrina',
+        title: 'Catálogo vitrina',
+        description: 'Productos destacados en la vitrina',
+      },
+      {
         href: '/admin/pages',
         title: 'Páginas legales',
         description: 'Términos, privacidad y contenido',

@@ -1,0 +1,107 @@
+MIGRACIONES PENDIENTES PARA APLICAR EN SUPABASE SQL EDITOR
+===========================================================
+
+Total: 74 migraciones
+
+Aplicar en este orden (de arriba hacia abajo):
+
+20250130000001_auction_system.sql
+20250130000002_fix_product_delete.sql
+20250130000003_get_server_time.sql
+20250130000004_auction_security_enhancements.sql
+20250130000005_setup_scheduler.sql
+20250130000006_auction_max_duration.sql
+20250130000007_scalability_security.sql
+20250130000008_final_optimizations.sql
+20250130000009_audit_and_maintenance.sql
+20250130000010_backup_system.sql
+20250130000011_fix_store_membership_expiration.sql
+20250130000012_store_membership_notifications_reactivation.sql
+20250131000001_approve_pending_membership.sql
+20250201000001_commission_system.sql
+20250201000002_inventory_system.sql
+20250201000003_update_order_creation.sql
+20250201000004_raffle_winner_photos.sql
+20250201000005_fix_seller_balance_update.sql
+20250201000006_payout_system.sql
+20250201000007_order_cancellation_refund.sql
+20250201000008_fix_stores_rls_for_admins.sql
+20250201000009_affiliate_system.sql
+20250201000010_update_auction_close_with_commissions.sql
+20250202000001_influencer_system.sql
+20250202000002_membership_bid_validation.sql
+20250202000003_penalty_system.sql
+20250202000004_membership_plans_system.sql
+20250202000005_seller_delivery_protection.sql
+20250202000006_create_auction_order_function.sql
+20250202000007_publication_limits_membership.sql
+20250202000008_product_expiration_handling.sql
+20250202000009_fix_close_expired_race_condition_final.sql
+20250202000010_add_anti_sniping_limits.sql
+20250202000011_centralize_bonus_time_config.sql
+20250202000012_place_bid_final_version.sql
+20250203000000_fix_products_structure_syntax.sql
+20250203000001_marketing_system.sql
+20250203000002_store_marketing_integrations.sql
+20251027185944_storage.sql
+20251027194329_profiles_table.sql
+20251027204301_categories_seed.sql
+20251027213611_product_images_limit.sql
+20251030_hero_carousel.sql
+202511021649_prod_align.sql
+20251103000000_fix_hero_slides_table.sql
+20251103000001_fix_hero_slides_table.sql
+20251103232213_showcase_system.sql
+20251103233120_store_favorites.sql
+20251104000000_wholesale_pricing.sql
+20251112170000_fix_product_audit_trigger.sql
+20251113000000_add_store_membership_plan.sql
+20251113010000_update_order_statuses.sql
+20251114093000_fix_is_user_store_owner.sql
+20251114094500_add_admin_profiles_policy.sql
+20251116010000_user_reputation_system.sql
+20251116011000_user_reputation_triggers.sql
+20251116012000_update_place_bid_with_reputation.sql
+20251117000000_add_catalog_fields_to_products.sql
+20251117001000_create_store_ad_catalogs_tables.sql
+20251124000000_add_fallback_store_and_sourcing_orders.sql
+20251124120000_oauth_system.sql
+20251124120001_oauth_gpt_client_seed.sql
+20251127000000_fix_site_settings_rls_and_show_title.sql
+20251127000002_fix_conversation_id_ambiguous.sql
+20251127000003_fix_footer_settings_rls.sql
+20251127000004_fix_double_encoded_settings.sql
+20251127000005_add_public_rls_site_settings.sql
+20251127000006_add_site_description.sql
+20251127000007_fix_contact_settings_verification.sql
+20251127000008_add_admin_delete_products_rls.sql
+20251130000003_fix_membership_levels.sql
+20251201174018_add_public_rls_bank_settings.sql
+20251201200001_add_profiles_updated_at_column.sql
+20251202000001_fix_approve_pending_membership.sql
+
+===========================================================
+INSTRUCCIONES:
+
+1. Ve a Supabase Dashboard → SQL Editor
+2. Para cada migración:
+   a. Copia el contenido del archivo desde: supabase/migrations/[nombre]
+   b. Pégalo en el SQL Editor
+   c. Ejecuta (Run)
+   d. Verifica que no haya errores
+3. Continúa con la siguiente migración en orden
+
+Script útil:
+   powershell -ExecutionPolicy Bypass -File scripts\copiar-migracion.ps1 "20250130000001_auction_system.sql"
+
+
+
+
+
+
+
+
+
+
+
+

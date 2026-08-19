@@ -131,3 +131,10 @@ Reemplazar todos los `.select('*')` por columnas específicas incluyendo `cover_
 
 
 
+
+
+
+
+
+
+

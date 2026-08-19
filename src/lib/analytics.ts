@@ -1,3 +1,15 @@
+/**
+ * @deprecated Este archivo está deprecado.
+ * Por favor usa @/lib/tracking/dataLayer en su lugar.
+ * 
+ * Migración:
+ * - dlPush() → track() de dataLayer.ts
+ * - trackViewItem() → trackViewItem() de dataLayer.ts
+ * - trackAddToCart() → trackAddToCart() de dataLayer.ts
+ * - trackBeginCheckout() → trackBeginCheckout() de dataLayer.ts
+ * - trackPurchase() → trackPurchase() de dataLayer.ts
+ */
+
 // ============================================
 // MERCADITO ONLINE PY - GTM ANALYTICS HELPER
 // Helper para eventos e-commerce vía Google Tag Manager

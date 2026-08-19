@@ -242,3 +242,10 @@ UPDATE products SET cover_url = image_url WHERE cover_url IS NULL;
 
 
 
+
+
+
+
+
+
+

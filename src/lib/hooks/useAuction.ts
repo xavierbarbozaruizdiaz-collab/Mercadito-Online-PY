@@ -48,12 +48,20 @@ export function useAuction(productId: string): UseAuctionReturn {
   const isActive = auction?.auction_status === 'active';
   const isEnded = auction?.auction_status === 'ended' || auction?.auction_status === 'cancelled';
   
-  // Calcular tiempo restante
+  // Calcular tiempo restante usando tiempo sincronizado
   const timeRemainingMs = (() => {
     if (!auction?.auction_end_at || isEnded) return 0;
-    const endAt = new Date(auction.auction_end_at).getTime();
-    const now = Date.now();
-    return Math.max(0, endAt - now);
+    try {
+      const { getSyncedNow } = require('@/lib/utils/timeSync');
+      const endAt = new Date(auction.auction_end_at).getTime();
+      const syncedNow = getSyncedNow();
+      return Math.max(0, endAt - syncedNow);
+    } catch {
+      // Fallback si timeSync no está disponible
+      const endAt = new Date(auction.auction_end_at).getTime();
+      const now = Date.now();
+      return Math.max(0, endAt - now);
+    }
   })();
 
   // Verificar si el usuario está ganando
@@ -137,10 +145,17 @@ export function useAuction(productId: string): UseAuctionReturn {
           filter: `product_id=eq.${productId}`,
         },
         (payload) => {
-          // Nueva puja - actualizar tiempo para anti-sniping
+          // Nueva puja detectada - actualizar tiempo para anti-sniping
           setLastBidTime(Date.now());
-          // Recargar pujas
-          getBidsForAuction(productId).then(setBids).catch(console.error);
+          // Recargar pujas y subasta para obtener estado actualizado
+          Promise.all([
+            getBidsForAuction(productId).then(setBids).catch(console.error),
+            getAuctionById(productId).then((auction) => {
+              if (auction) {
+                setAuction(auction);
+              }
+            }).catch(console.error),
+          ]).catch(console.error);
         }
       )
       .subscribe();
@@ -166,10 +181,30 @@ export function useAuction(productId: string): UseAuctionReturn {
       }
 
       try {
-        const result = await placeBid(productId, currentUserId, amount);
+        // Generar idempotency key para prevenir pujas duplicadas
+        const idempotencyKey = crypto.randomUUID();
+        const result = await placeBid(productId, currentUserId, amount, idempotencyKey);
         
         if (result.success) {
-          // Recargar datos
+          // Si se aplicó bonus time, actualizar el estado inmediatamente con el nuevo end_time
+          // Esto evita que el timer muestre tiempo incorrecto mientras se recarga
+          if (result.bonus_applied && result.bonus_new_end_time && auction) {
+            // Actualizar auction_end_at inmediatamente
+            setAuction({
+              ...auction,
+              auction_end_at: result.bonus_new_end_time,
+            });
+            
+            // Log para debugging
+            console.log('[useAuction] Bonus time aplicado, actualizando end_time', {
+              oldEndTime: auction.auction_end_at,
+              newEndTime: result.bonus_new_end_time,
+              extensionSeconds: result.bonus_extension_seconds,
+            });
+          }
+          
+          // Recargar datos para obtener estado actualizado completo
+          // El tiempo real también actualizará automáticamente, pero esto asegura consistencia
           await loadData();
           setLastBidTime(Date.now());
         }

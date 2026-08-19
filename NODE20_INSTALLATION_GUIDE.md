@@ -85,3 +85,10 @@ Si necesitas seguir usando Node 22 temporalmente, el proyecto debería funcionar
 
 
 
+
+
+
+
+
+
+

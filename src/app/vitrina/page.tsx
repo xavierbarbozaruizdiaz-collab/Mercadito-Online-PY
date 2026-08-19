@@ -53,15 +53,16 @@ export default function VitrinaPage() {
           cover_url,
           store_id,
           showcase_position,
-          stores!inner (
+          stores(
             id,
             name,
             slug,
-            logo_url
+            logo_url,
+            is_active
           )
         `)
         .eq('in_showcase', true)
-        .eq('status', 'active')
+        .or('status.is.null,status.eq.active')
         .order('showcase_position', { ascending: true })
         .order('created_at', { ascending: false });
 

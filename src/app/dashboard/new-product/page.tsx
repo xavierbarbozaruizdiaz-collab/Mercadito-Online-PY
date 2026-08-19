@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import imageCompression from 'browser-image-compression';
 import { supabase, getSessionWithTimeout } from '@/lib/supabaseClient';
 import Link from 'next/link';
+import CommissionPreview from '@/components/CommissionPreview';
 
 // Helper para formatear moneda
 function formatCurrency(amount: number): string {
@@ -61,6 +62,15 @@ export default function NewProduct() {
   
   // Campos específicos por categoría
   const [categoryFields, setCategoryFields] = useState<AllCategoryFields>({});
+
+  // LPMS-COMMISSION-START: Estado para información de comisiones
+  const [commissionInfo, setCommissionInfo] = useState<{
+    percent: number;
+    amount: number;
+    sellerEarnings: number;
+  } | null>(null);
+  const [commissionLoading, setCommissionLoading] = useState(false);
+  // LPMS-COMMISSION-END
 
   const [imagePreviews, setImagePreviews] = useState<ImagePreview[]>([]);
   const [loading, setLoading] = useState(false);
@@ -175,6 +185,54 @@ export default function NewProduct() {
   }, []);
 
   const priceNumber = useMemo(() => Number(price || 0), [price]);
+
+  // LPMS-COMMISSION-START: Cargar información de comisiones cuando cambia precio o tipo de venta
+  useEffect(() => {
+    if (saleType === 'direct' && priceNumber > 0) {
+      loadCommissionInfo();
+    } else {
+      setCommissionInfo(null);
+    }
+  }, [priceNumber, saleType, storeId]);
+
+  async function loadCommissionInfo() {
+    if (!priceNumber || priceNumber <= 0 || saleType !== 'direct') {
+      setCommissionInfo(null);
+      return;
+    }
+
+    setCommissionLoading(true);
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      if (!session?.session?.user?.id) {
+        setCommissionInfo(null);
+        return;
+      }
+
+      const sellerId = session.session.user.id;
+      const { getCommissionForDirectSale } = await import('@/lib/services/commissionService');
+      
+      const commissionPercent = await getCommissionForDirectSale(
+        sellerId,
+        storeId || undefined
+      );
+      
+      const commissionAmount = Math.round(priceNumber * commissionPercent / 100);
+      const sellerEarnings = priceNumber - commissionAmount;
+      
+      setCommissionInfo({
+        percent: commissionPercent,
+        amount: commissionAmount,
+        sellerEarnings: sellerEarnings
+      });
+    } catch (err) {
+      console.error('Error loading commission info:', err);
+      setCommissionInfo(null);
+    } finally {
+      setCommissionLoading(false);
+    }
+  }
+  // LPMS-COMMISSION-END
   const imagesCount = imagePreviews.length;
 
   // Validación en tiempo real
@@ -386,16 +444,44 @@ export default function NewProduct() {
     }
   }
 
+  // [IMAGES LEVEL2] Usar API route optimizado en lugar de subir directo
+  // El API route genera thumbnails y WebP automáticamente
   async function uploadToBucket(f: File, productId: string, idx: number) {
-    const ext = f.name.split('.').pop() || 'jpg';
-    const fileName = `products/${productId}/${idx}.${ext}`;
-    const { error } = await supabase.storage.from('product-images').upload(fileName, f, {
-      cacheControl: '3600',
-      upsert: false,
+    const formData = new FormData();
+    formData.append('file', f);
+    formData.append('productId', productId);
+
+    // [AUTH FIX] Leer token de localStorage y enviarlo en header Authorization
+    // [LPMS FIX] Obtener token desde sesión de Supabase (más confiable que localStorage)
+    let authToken: string | null = null;
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      authToken = session?.access_token || null;
+    } catch (err) {
+      console.warn('[uploadToBucket] Error obteniendo sesión', err);
+    }
+
+    const headers: HeadersInit = {};
+    if (authToken) {
+      headers['Authorization'] = `Bearer ${authToken}`;
+    }
+
+    // [SECURITY PATCH PRODUCTS INSERT RLS] Incluir credenciales para enviar cookies de sesión
+    const response = await fetch('/api/products/upload-images', {
+      method: 'POST',
+      body: formData,
+      credentials: 'include', // Importante: enviar cookies de sesión (si existen)
+      headers, // [AUTH FIX] Enviar token en header Authorization como fallback
     });
-    if (error) throw error;
-    const { data: pub } = supabase.storage.from('product-images').getPublicUrl(fileName);
-    return pub.publicUrl;
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Error al subir imagen');
+    }
+
+    const data = await response.json();
+    // Retornar URL full para compatibilidad con código existente
+    return data.urls?.full || data.urls?.original || data.image?.url;
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -516,9 +602,9 @@ export default function NewProduct() {
         
         auctionStartAt = startDate.toISOString();
         
-        // Duración para pruebas: 5 minutos (300 segundos)
+        // Duración para pruebas: 2 minutos (120 segundos)
         // Cambiar a 1440 para producción (24 horas)
-        const durationMinutes = 5; // 5 minutos para pruebas - cambiar a 1440 para producción
+        const durationMinutes = 2; // 2 minutos para pruebas - cambiar a 1440 para producción
         auctionEndAt = new Date(startDate.getTime() + durationMinutes * 60 * 1000).toISOString();
         
         console.log('📅 Fechas de subasta configuradas:', {
@@ -620,44 +706,40 @@ export default function NewProduct() {
       console.log('✅ Producto creado:', newProduct.id);
       showMsg('success', '📦 Producto creado. Comprimiendo imágenes...');
 
-      // 2. Comprimir imágenes
-      showMsg('success', '🖼️ Comprimiendo imágenes (1/3)...');
-      const compressed = await Promise.all(
-        imagePreviews.map(({ file }) => compress(file))
+      // [IMAGES LEVEL2] Pipeline optimizado: el API route ya comprime, genera thumbnails y WebP
+      // 2. Subir imágenes usando API route optimizado
+      showMsg('success', '🖼️ Procesando y subiendo imágenes...');
+      const uploadResults = await Promise.all(
+        imagePreviews.map(({ file }, idx) => 
+          uploadToBucket(file, newProduct.id.toString(), idx)
+            .then(url => ({ url, idx, isCover: idx === 0 }))
+            .catch(err => {
+              console.error(`Error subiendo imagen ${idx}:`, err);
+              throw err;
+            })
+        )
       );
 
-      // 3. Subir imágenes a Storage
-      showMsg('success', '☁️ Subiendo imágenes (2/3)...');
-      const imageUrls = await Promise.all(
-        compressed.map((f, idx) => uploadToBucket(f, newProduct.id.toString(), idx))
-      );
+      // El API route ya guarda en product_images y actualiza cover_url/thumbnail_url
+      // Solo necesitamos verificar que todo se subió correctamente
+      const imageUrls = uploadResults.map(r => r.url);
+      
+      // [IMAGES LEVEL2] Actualizar thumbnail_url en products si no se hizo automáticamente
+      if (imageUrls[0]) {
+        // Obtener thumbnail_url de la primera imagen (cover)
+        const { data: coverImage } = await supabase
+          .from('product_images')
+          .select('thumbnail_url')
+          .eq('product_id', newProduct.id)
+          .eq('is_cover', true)
+          .single();
 
-      // 4. Guardar referencias en product_images
-      showMsg('success', '💾 Guardando referencias de imágenes (3/3)...');
-      const { error: imagesError } = await (supabase as any)
-        .from('product_images')
-        .insert(imageUrls.map((url, idx) => ({
-          product_id: newProduct.id,
-          image_url: url,
-          url: url, // Para compatibilidad
-          is_cover: idx === 0, // La primera imagen es la portada
-        })));
-
-      if (imagesError) {
-        console.error('❌ Error guardando imágenes:', imagesError);
-        throw new Error(`Error al guardar imágenes: ${imagesError.message}`);
-      }
-
-      // 5. Actualizar cover_url
-      showMsg('success', '🔄 Actualizando imagen de portada...');
-      const { error: updateError } = await (supabase as any)
-        .from('products')
-        .update({ cover_url: imageUrls[0] })
-        .eq('id', newProduct.id);
-
-      if (updateError) {
-        console.error('❌ Error actualizando cover_url:', updateError);
-        throw new Error(`Error al actualizar portada: ${updateError.message}`);
+        if (coverImage?.thumbnail_url) {
+          await supabase
+            .from('products')
+            .update({ thumbnail_url: coverImage.thumbnail_url })
+            .eq('id', newProduct.id);
+        }
       }
 
       console.log('✅ Producto y imágenes creadas exitosamente');
@@ -893,6 +975,19 @@ export default function NewProduct() {
               {validationErrors.price && (
                 <p className="text-red-500 text-sm mt-1">{validationErrors.price}</p>
               )}
+              {/* LPMS-COMMISSION-START: Vista previa de comisiones */}
+              {saleType === 'direct' && priceNumber > 0 && (
+                commissionLoading || commissionInfo ? (
+                  <CommissionPreview
+                    price={priceNumber}
+                    commissionPercent={commissionInfo?.percent || 0}
+                    commissionAmount={commissionInfo?.amount || 0}
+                    sellerEarnings={commissionInfo?.sellerEarnings || 0}
+                    loading={commissionLoading}
+                  />
+                ) : null
+              )}
+              {/* LPMS-COMMISSION-END */}
             </div>
           )}
 
@@ -965,7 +1060,7 @@ export default function NewProduct() {
                   />
                   <p className="text-xs text-gray-600 mt-1 font-medium">📅 Inicio de la subasta</p>
                   <p className="text-xs text-gray-500">
-                    La subasta comenzará automáticamente en esta fecha y hora. <strong>Duración para pruebas: 5 minutos</strong> desde el inicio. Puedes seleccionar una fecha pasada para iniciar inmediatamente.
+                    La subasta comenzará automáticamente en esta fecha y hora. <strong>Duración para pruebas: 2 minutos</strong> desde el inicio. Puedes seleccionar una fecha pasada para iniciar inmediatamente.
                   </p>
                 </div>
               </div>
@@ -973,7 +1068,7 @@ export default function NewProduct() {
                 <p className="text-xs text-yellow-900">
                   <strong>💡 ¿Cómo funcionan las subastas?</strong><br/>
                   • Los compradores pujan incrementando el precio<br/>
-                  • <strong>Duración: 5 minutos</strong> desde la fecha de inicio (modo prueba)<br/>
+                  • <strong>Duración: 2 minutos</strong> desde la fecha de inicio (modo prueba)<br/>
                   • Quien ofrezca el precio más alto al finalizar gana<br/>
                   • Si configuraste "Compra ahora", alguien puede comprarlo inmediatamente<br/>
                   • Puedes usar una fecha pasada para iniciar la subasta inmediatamente

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useToast } from '@/lib/hooks/useToast';
-import { trackAddToCart } from '@/lib/analytics';
+import { trackAddToCart } from '@/lib/tracking/dataLayer';
 
 interface AddToCartButtonProps {
   productId: string;

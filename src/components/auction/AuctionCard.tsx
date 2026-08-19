@@ -29,13 +29,22 @@ export default function AuctionCard({ auction, variant = 'default' }: AuctionCar
   
   const currentBid = auction.current_bid || auction.price;
   
-  // Calcular tiempo restante - usar estado para evitar impureza durante render
+  // Calcular tiempo restante - usar tiempo sincronizado del servidor
   const [serverNowMs, setServerNowMs] = useState<number | null>(null);
   
-  // Efecto intencional: inicializar tiempo del servidor para evitar problemas de hidratación
+  // Efecto intencional: inicializar tiempo sincronizado del servidor
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
-    setServerNowMs(Date.now());
+    // Usar getSyncedNow() en lugar de Date.now() para consistencia
+    const { getSyncedNow } = require('@/lib/utils/timeSync');
+    setServerNowMs(getSyncedNow());
+    
+    // Actualizar periódicamente para mantener sincronización
+    const interval = setInterval(() => {
+      setServerNowMs(getSyncedNow());
+    }, 1000); // Actualizar cada segundo
+    
+    return () => clearInterval(interval);
   }, []);
   
   let endAtMs = 0;
