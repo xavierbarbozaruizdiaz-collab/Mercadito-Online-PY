@@ -26,6 +26,7 @@ import {
   Settings
 } from 'lucide-react';
 import Link from 'next/link';
+import { getAuthHeaders } from '@/lib/auth/clientAuthHeaders';
 
 // ============================================
 // TIPOS
@@ -244,9 +245,10 @@ export default function MarketingPage() {
   async function syncCatalog() {
     try {
       setSyncingCatalog(true);
+      const authHeaders = await getAuthHeaders();
       const response = await fetch('/api/catalog/sync', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
         body: JSON.stringify({ platforms: ['meta', 'tiktok', 'google'] }),
       });
 

@@ -61,7 +61,7 @@ const affiliateSidebarItems: SidebarItem[] = [
 
 // Items para administradores
 const adminSidebarItems: SidebarItem[] = [
-  { icon: Shield, label: 'Dashboard Admin', href: '/dashboard/admin', roles: ['admin'] },
+  { icon: Shield, label: 'Dashboard Admin', href: '/admin', roles: ['admin'] },
 ];
 
 interface DashboardSidebarProps {

@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/database';
 import { metaBusiness } from '@/lib/services/metaBusinessService';
+import { requireSellerOrAdmin } from '@/lib/auth/apiAuth';
 
 function getSupabaseServer(): SupabaseClient<Database> | null {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -25,13 +26,28 @@ function getSupabaseServer(): SupabaseClient<Database> | null {
   });
 }
 
+async function userOwnsStore(
+  supabase: SupabaseClient<Database>,
+  userId: string,
+  storeId: string
+): Promise<boolean> {
+  const { data } = await supabase
+    .from('stores')
+    .select('id, seller_id')
+    .eq('id', storeId)
+    .maybeSingle();
+  return Boolean(data && (data as any).seller_id === userId);
+}
+
 // GET - Listar campañas
 export async function GET(request: NextRequest) {
   try {
+    const auth = await requireSellerOrAdmin(request);
+    if (!auth.ok) return auth.response;
+
     const supabase = getSupabaseServer();
 
     if (!supabase) {
-      // Entorno sin Supabase configurado (por ejemplo, CI): devolver respuesta segura
       return NextResponse.json(
         {
           campaigns: [],
@@ -44,6 +60,19 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const storeId = searchParams.get('storeId');
     const campaignType = searchParams.get('type');
+
+    if (auth.role !== 'admin') {
+      if (!storeId) {
+        return NextResponse.json(
+          { error: 'storeId es requerido para vendedores' },
+          { status: 400 }
+        );
+      }
+      const owns = await userOwnsStore(supabase, auth.user.id, storeId);
+      if (!owns) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+    }
 
     let query = supabase.from('marketing_campaigns').select('*');
 
@@ -70,6 +99,9 @@ export async function GET(request: NextRequest) {
 // POST - Crear campaña
 export async function POST(request: NextRequest) {
   try {
+    const auth = await requireSellerOrAdmin(request);
+    if (!auth.ok) return auth.response;
+
     const supabase = getSupabaseServer();
 
     if (!supabase) {
@@ -77,7 +109,7 @@ export async function POST(request: NextRequest) {
         {
           error: 'Supabase no está configurado (NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY ausentes)',
         },
-        { status: 200 }
+        { status: 503 }
       );
     }
 
@@ -93,7 +125,6 @@ export async function POST(request: NextRequest) {
       targeting,
     } = body;
 
-    // Validaciones
     if (!name || !objective || !targetUrl || !campaignType) {
       return NextResponse.json(
         { error: 'Faltan campos requeridos' },
@@ -108,7 +139,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Crear campaña en Meta (si está configurado)
+    if (auth.role !== 'admin' && storeId) {
+      const owns = await userOwnsStore(supabase, auth.user.id, storeId);
+      if (!owns) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+    }
+
+    if (auth.role !== 'admin' && campaignType === 'platform') {
+      return NextResponse.json(
+        { error: 'Solo admin puede crear campañas de plataforma' },
+        { status: 403 }
+      );
+    }
+
     let metaCampaignId: string | undefined;
     if (metaBusiness.isConfigured()) {
       const metaResult = await metaBusiness.createCampaign({
@@ -127,7 +171,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Crear en base de datos
     const { data, error } = await (supabase
       .from('marketing_campaigns') as any)
       .insert({
@@ -148,7 +191,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    // Crear targeting si se proporciona
     if (targeting && data) {
       await supabase.from('campaign_targeting').insert({
         campaign_id: data.id,
@@ -161,4 +203,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
-

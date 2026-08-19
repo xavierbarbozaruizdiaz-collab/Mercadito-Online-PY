@@ -5,10 +5,11 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { Database } from '@/types/database';
+import { getSupabaseAnonKey, getSupabaseUrl } from '@/lib/supabase/config';
 
-// Configuración de Supabase
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://hqdatzhliaordlsqtjea.supabase.co';
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhxZGF0emhsaWFvcmRsc3F0amVhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE1MTk1NzQsImV4cCI6MjA3NzA5NTU3NH0.u1VFWCN4yHZ_v_bR4MNw5wt7jTPdfpIwjhDRYfQ5qRw';
+// Configuración de Supabase (solo desde env — sin keys hardcodeadas)
+const supabaseUrl = getSupabaseUrl();
+const supabaseKey = getSupabaseAnonKey();
 
 // Singleton global para evitar múltiples instancias de GoTrueClient
 // Usar window para almacenar la instancia globalmente en el navegador

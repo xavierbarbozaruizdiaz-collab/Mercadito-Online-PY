@@ -4,6 +4,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import {
   MarketplaceFeaturesService,
@@ -24,18 +26,18 @@ interface ProductQandAProps {
 export default function ProductQandA({
   productId,
   sellerId,
-  currentUserId,
 }: ProductQandAProps) {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+  const pathname = usePathname();
   const [questions, setQuestions] = useState<ProductQuestion[]>([]);
   const [loading, setLoading] = useState(true);
   const [showQuestionForm, setShowQuestionForm] = useState(false);
   const [questionText, setQuestionText] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [answeringQuestionId, setAnsweringQuestionId] = useState<string | null>(null);
   const [answerText, setAnswerText] = useState('');
 
-  const isSeller = user?.id === sellerId;
+  const isSeller = Boolean(user?.id && user.id === sellerId);
+  const signInHref = `/auth/sign-in?redirect=${encodeURIComponent(pathname || '/')}`;
 
   useEffect(() => {
     loadQuestions();
@@ -83,7 +85,6 @@ export default function ProductQandA({
     try {
       await MarketplaceFeaturesService.answerQuestion(questionId, user.id, answerText.trim());
       setAnswerText('');
-      setAnsweringQuestionId(null);
       await loadQuestions();
     } catch (error: any) {
       alert(error.message || 'Error al responder la pregunta');
@@ -92,7 +93,7 @@ export default function ProductQandA({
     }
   };
 
-  if (loading) {
+  if (loading || authLoading) {
     return (
       <Card>
         <CardContent className="flex justify-center p-8">
@@ -103,73 +104,79 @@ export default function ProductQandA({
   }
 
   return (
-    <div className="space-y-4">
-      {/* Formulario para hacer pregunta */}
-      {user && !isSeller && !showQuestionForm && (
-        <Card>
-          <CardContent className="p-4">
-            <Button onClick={() => setShowQuestionForm(true)} className="w-full" variant="outline">
-              <HelpCircle className="w-4 h-4 mr-2" />
-              Hacer una Pregunta
-            </Button>
-          </CardContent>
-        </Card>
-      )}
+    <Card>
+      <CardHeader>
+        <CardTitle>Preguntas y respuestas</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {!user && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+            <p className="mb-2">Iniciá sesión para hacer una pregunta sobre este producto.</p>
+            <Link
+              href={signInHref}
+              className="inline-flex font-medium text-blue-700 underline hover:text-blue-900"
+            >
+              Iniciar sesión
+            </Link>
+          </div>
+        )}
 
-      {showQuestionForm && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Hacer una Pregunta</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmitQuestion} className="space-y-4">
-              <textarea
-                value={questionText}
-                onChange={(e) => setQuestionText(e.target.value)}
-                placeholder="Escribe tu pregunta sobre este producto..."
-                rows={4}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
-                maxLength={500}
-                required
-              />
-              <div className="flex gap-2">
-                <Button type="submit" disabled={submitting || !questionText.trim()}>
-                  {submitting ? <LoadingSpinner size="sm" className="mr-2" /> : <Send className="w-4 h-4 mr-2" />}
-                  Enviar Pregunta
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setShowQuestionForm(false);
-                    setQuestionText('');
-                  }}
-                >
-                  Cancelar
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-      )}
+        {user && isSeller && (
+          <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700">
+            Sos el vendedor de este producto. Acá podés responder las preguntas de los compradores.
+          </div>
+        )}
 
-      {/* Lista de preguntas */}
-      <div className="space-y-4">
+        {user && !isSeller && !showQuestionForm && (
+          <Button onClick={() => setShowQuestionForm(true)} className="w-full" variant="outline">
+            <HelpCircle className="w-4 h-4 mr-2" />
+            Hacer una Pregunta
+          </Button>
+        )}
+
+        {showQuestionForm && (
+          <form onSubmit={handleSubmitQuestion} className="space-y-3">
+            <textarea
+              value={questionText}
+              onChange={(e) => setQuestionText(e.target.value)}
+              placeholder="Escribe tu pregunta sobre este producto..."
+              rows={4}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+              maxLength={500}
+              required
+            />
+            <div className="flex flex-wrap gap-2">
+              <Button type="submit" disabled={submitting || !questionText.trim()}>
+                {submitting ? <LoadingSpinner size="sm" className="mr-2" /> : <Send className="w-4 h-4 mr-2" />}
+                Enviar Pregunta
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setShowQuestionForm(false);
+                  setQuestionText('');
+                }}
+              >
+                Cancelar
+              </Button>
+            </div>
+          </form>
+        )}
+
         {questions.length === 0 ? (
-          <Card>
-            <CardContent className="p-8 text-center text-gray-500">
-              <MessageSquare className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-              <p>No hay preguntas aún. ¡Sé el primero en preguntar!</p>
-            </CardContent>
-          </Card>
+          <div className="py-6 text-center text-gray-500">
+            <MessageSquare className="w-10 h-10 mx-auto mb-3 text-gray-300" />
+            <p>No hay preguntas aún. ¡Sé el primero en preguntar!</p>
+          </div>
         ) : (
-          questions.map((question) => (
-            <Card key={question.id}>
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <HelpCircle className="w-5 h-5 text-blue-600" />
+          <div className="space-y-4">
+            {questions.map((question) => (
+              <div key={question.id} className="border rounded-lg p-4">
+                <div className="flex items-start justify-between gap-3 mb-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2 mb-2">
+                      <HelpCircle className="w-4 h-4 text-blue-600 shrink-0" />
                       <span className="font-medium text-gray-900">
                         {question.asker?.full_name || 'Usuario'}
                       </span>
@@ -177,11 +184,11 @@ export default function ProductQandA({
                         • {formatDate(question.created_at)}
                       </span>
                     </div>
-                    <p className="text-gray-700 mb-4">{question.question_text}</p>
+                    <p className="text-gray-700 mb-3">{question.question_text}</p>
 
                     {question.answer_text ? (
-                      <div className="bg-green-50 border-l-4 border-green-500 p-4 rounded-r-lg">
-                        <div className="flex items-center gap-2 mb-2">
+                      <div className="bg-green-50 border-l-4 border-green-500 p-3 rounded-r-lg">
+                        <div className="flex flex-wrap items-center gap-2 mb-1">
                           <span className="font-medium text-green-900">Respuesta del vendedor</span>
                           {question.answered_at && (
                             <span className="text-xs text-green-700">
@@ -201,25 +208,13 @@ export default function ProductQandA({
                             rows={3}
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
                           />
-                          <div className="flex gap-2">
-                            <Button
-                              onClick={() => handleSubmitAnswer(question.id)}
-                              disabled={submitting || !answerText.trim()}
-                              size="sm"
-                            >
-                              Enviar Respuesta
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                setAnsweringQuestionId(null);
-                                setAnswerText('');
-                              }}
-                            >
-                              Cancelar
-                            </Button>
-                          </div>
+                          <Button
+                            onClick={() => handleSubmitAnswer(question.id)}
+                            disabled={submitting || !answerText.trim()}
+                            size="sm"
+                          >
+                            Enviar Respuesta
+                          </Button>
                         </div>
                       )
                     )}
@@ -229,18 +224,18 @@ export default function ProductQandA({
                       onClick={() => MarketplaceFeaturesService.upvoteQuestion(question.id)}
                       className="flex flex-col items-center gap-1 p-2 text-gray-500 hover:text-blue-600"
                       title="Útil"
+                      type="button"
                     >
                       <ThumbsUp className="w-4 h-4" />
                       <span className="text-xs">{question.upvotes}</span>
                     </button>
                   )}
                 </div>
-              </CardContent>
-            </Card>
-          ))
+              </div>
+            ))}
+          </div>
         )}
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }
-

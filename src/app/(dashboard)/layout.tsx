@@ -11,7 +11,6 @@ import Link from 'next/link';
 import { supabase } from '@/lib/supabaseClient';
 import DashboardSidebar from '@/components/DashboardSidebar';
 import ProfileEnsurer from '@/components/ProfileEnsurer';
-import AdminRoleAssigner from '@/components/AdminRoleAssigner';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -293,7 +292,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {userRole !== 'admin' && (
           <>
             <ProfileEnsurer />
-            <AdminRoleAssigner />
           </>
         )}
         

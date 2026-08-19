@@ -2031,7 +2031,6 @@ export default function Dashboard() {
 
       {/* Admin Role Assigner - Temporalmente comentado para debug */}
       {/* <div className="mt-8">
-        <AdminRoleAssigner />
       </div> */}
       </div>
     </div>

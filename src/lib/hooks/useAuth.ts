@@ -5,6 +5,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase, getCurrentUser, AuthUser } from '@/lib/supabase/client';
+import { syncAccessTokenCookie } from '@/lib/auth/clientAuthHeaders';
 
 // ============================================
 // HOOK PRINCIPAL DE AUTENTICACIÓN
@@ -67,10 +68,15 @@ export function useAuth() {
     loadUser();
   }, [loadUser]);
 
-  // Escuchar cambios en la autenticación
+  // Escuchar cambios en la autenticación + sync cookie para middleware/APIs
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        syncAccessTokenCookie(
+          session?.access_token ?? null,
+          session?.expires_at ?? null
+        );
+
         if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
           await loadUser();
         } else if (event === 'SIGNED_OUT') {
@@ -79,6 +85,14 @@ export function useAuth() {
         }
       }
     );
+
+    // Sync inicial si ya hay sesión en localStorage
+    supabase.auth.getSession().then(({ data }) => {
+      syncAccessTokenCookie(
+        data.session?.access_token ?? null,
+        data.session?.expires_at ?? null
+      );
+    });
 
     return () => subscription.unsubscribe();
   }, [loadUser]);
@@ -89,6 +103,7 @@ export function useAuth() {
       setLoading(true);
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
+      syncAccessTokenCookie(null);
       setUser(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al cerrar sesión');

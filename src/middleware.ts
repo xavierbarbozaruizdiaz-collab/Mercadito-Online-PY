@@ -1,15 +1,14 @@
 // ============================================
-// RATE LIMITING MIDDLEWARE
-// Middleware para limitar requests por IP/usuario (solo /api)
+// Middleware: rate limit APIs + gate /admin pages
 // ============================================
 
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+import { ACCESS_COOKIE } from '@/lib/auth/constants';
 
-// Cache en memoria para rate limiting (simple; en prod real usar Redis)
 type Bucket = { count: number; resetTime: number };
 
-// Reutiliza un Map global para evitar reinicios entre hot reloads
 const rateLimitMap: Map<string, Bucket> =
   (globalThis as any).__rateLimitMap ?? new Map<string, Bucket>();
 (globalThis as any).__rateLimitMap = rateLimitMap;
@@ -20,21 +19,18 @@ interface RateLimitConfig {
   message?: string;
 }
 
-// Config por prefijos de ruta
 const rateLimitConfigs: Record<string, RateLimitConfig> = {
-  '/api/auth': { maxRequests: 5, windowMs: 15 * 60 * 1000, message: 'Demasiados intentos de login' }, // 5/15m
-  '/api/checkout': { maxRequests: 10, windowMs: 60 * 1000, message: 'Demasiadas solicitudes de checkout' }, // 10/min
-  '/api/search': { maxRequests: 30, windowMs: 60 * 1000, message: 'Demasiadas búsquedas' }, // 30/min
-  '/api/chat': { maxRequests: 50, windowMs: 60 * 1000, message: 'Demasiados mensajes' }, // 50/min
-  default: { maxRequests: 100, windowMs: 60 * 1000, message: 'Demasiadas solicitudes' }, // 100/min
+  '/api/auth': { maxRequests: 5, windowMs: 15 * 60 * 1000, message: 'Demasiados intentos de login' },
+  '/api/checkout': { maxRequests: 10, windowMs: 60 * 1000, message: 'Demasiadas solicitudes de checkout' },
+  '/api/search': { maxRequests: 30, windowMs: 60 * 1000, message: 'Demasiadas búsquedas' },
+  '/api/chat': { maxRequests: 50, windowMs: 60 * 1000, message: 'Demasiados mensajes' },
+  default: { maxRequests: 100, windowMs: 60 * 1000, message: 'Demasiadas solicitudes' },
 };
 
 function getClientIdentifier(request: NextRequest): string {
-  // Intentar IP de proxy (x-forwarded-for) o real-ip; fallback 'unknown'
   const forwarded = request.headers.get('x-forwarded-for');
   const realIp = request.headers.get('x-real-ip');
   const ip = forwarded?.split(',')[0]?.trim() || realIp || 'unknown';
-  // Añadir un recorte del user-agent para distinguir mejor clientes
   const ua = (request.headers.get('user-agent') || '').slice(0, 60);
   return `${ip}|${ua}`;
 }
@@ -68,15 +64,80 @@ function checkAndUpdateBucket(key: string, cfg: RateLimitConfig) {
   return { allowed: false, remaining: 0, resetTime: existing.resetTime };
 }
 
-export function middleware(request: NextRequest) {
+async function requireAdminSession(request: NextRequest): Promise<NextResponse | null> {
+  let token =
+    request.cookies.get(ACCESS_COOKIE)?.value ||
+    request.headers.get('authorization')?.replace(/^Bearer\s+/i, '') ||
+    null;
+
+  if (token) {
+    try {
+      token = decodeURIComponent(token);
+    } catch {
+      // keep raw
+    }
+  }
+
+  if (!token) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/auth/sign-in';
+    url.searchParams.set('redirect', request.nextUrl.pathname);
+    return NextResponse.redirect(url);
+  }
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!supabaseUrl || !anon) {
+    return null; // no bloquear si env incompleto en build
+  }
+
+  const supabase = createClient(supabaseUrl, anon, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { headers: { Authorization: `Bearer ${token}` } },
+  });
+
+  const { data: userData, error } = await supabase.auth.getUser(token);
+  if (error || !userData.user) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/auth/sign-in';
+    url.searchParams.set('redirect', request.nextUrl.pathname);
+    return NextResponse.redirect(url);
+  }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', userData.user.id)
+    .maybeSingle();
+
+  // Si no podemos leer perfil (RLS), dejamos pasar al layout client como fallback
+  if (profile && (profile as { role?: string }).role !== 'admin') {
+    const url = request.nextUrl.clone();
+    url.pathname = '/dashboard';
+    url.searchParams.set('error', 'admin_required');
+    return NextResponse.redirect(url);
+  }
+
+  return null;
+}
+
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Preflight CORS pasa directo
   if (request.method === 'OPTIONS') {
     return NextResponse.next();
   }
 
-  // Sólo /api/* (el matcher también lo limita, esto es defensivo)
+  // Gate páginas admin (y editor hero del dashboard)
+  if (
+    pathname.startsWith('/admin') ||
+    pathname.startsWith('/dashboard/admin')
+  ) {
+    const denied = await requireAdminSession(request);
+    if (denied) return denied;
+    return NextResponse.next();
+  }
+
   if (!pathname.startsWith('/api/')) {
     return NextResponse.next();
   }
@@ -92,17 +153,12 @@ export function middleware(request: NextRequest) {
   headers.set('X-RateLimit-Reset', String(Math.floor(res.resetTime / 1000)));
 
   if (res.allowed) {
-    return NextResponse.next({
-      headers,
-    });
+    return NextResponse.next({ headers });
   }
 
   const retryAfterSec = Math.max(1, Math.floor((res.resetTime - Date.now()) / 1000));
-
   headers.set('Retry-After', String(retryAfterSec));
   headers.set('Content-Type', 'application/json; charset=utf-8');
-
-  // CORS básicos para respuestas de error
   const origin = request.headers.get('origin') || '*';
   headers.set('Access-Control-Allow-Origin', origin);
   headers.set('Vary', 'Origin');
@@ -117,7 +173,6 @@ export function middleware(request: NextRequest) {
   );
 }
 
-// Limita el middleware explícitamente a /api/*
 export const config = {
-  matcher: ['/api/:path*'],
+  matcher: ['/api/:path*', '/admin/:path*', '/dashboard/admin/:path*'],
 };

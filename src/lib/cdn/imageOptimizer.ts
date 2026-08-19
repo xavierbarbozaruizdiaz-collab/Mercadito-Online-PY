@@ -9,11 +9,17 @@ import { NextRequest, NextResponse } from 'next/server';
 // CONFIGURACIÓN DE CDN
 // ============================================
 
+const supabaseBase = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+
 export const CDN_CONFIG = {
   // URLs de CDN para diferentes tipos de recursos
-  IMAGES: process.env.NEXT_PUBLIC_CDN_IMAGES_URL || 'https://hqdatzhliaordlsqtjea.supabase.co/storage/v1/object/public/product-images',
+  IMAGES:
+    process.env.NEXT_PUBLIC_CDN_IMAGES_URL ||
+    (supabaseBase
+      ? `${supabaseBase}/storage/v1/object/public/product-images`
+      : '/storage/v1/object/public/product-images'),
   STATIC_ASSETS: process.env.NEXT_PUBLIC_CDN_STATIC_URL || '/static',
-  API_BASE: process.env.NEXT_PUBLIC_API_BASE_URL || 'https://hqdatzhliaordlsqtjea.supabase.co',
+  API_BASE: process.env.NEXT_PUBLIC_API_BASE_URL || supabaseBase || '',
   
   // Configuración de caché
   CACHE_TTL: {

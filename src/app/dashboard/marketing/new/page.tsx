@@ -15,6 +15,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import Link from 'next/link';
+import { getAuthHeaders } from '@/lib/auth/clientAuthHeaders';
 
 interface Store {
   id: string;
@@ -75,9 +76,10 @@ export default function NewCampaignPage() {
         return;
       }
 
+      const authHeaders = await getAuthHeaders();
       const response = await fetch('/api/marketing/campaigns', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
         body: JSON.stringify({
           ...formData,
           budget_amount: formData.budget_amount ? parseFloat(formData.budget_amount) : null,

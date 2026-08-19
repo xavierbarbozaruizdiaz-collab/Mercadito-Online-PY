@@ -7,6 +7,7 @@ import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import { useToast } from '@/lib/hooks/useToast';
+import { resolvePostLoginPath } from '@/lib/auth/postLoginRedirect';
 
 function CallbackContent() {
   const router = useRouter();
@@ -114,7 +115,9 @@ function CallbackContent() {
             }
 
             toast.success('Sesión iniciada exitosamente');
-            router.push('/');
+            window.location.href = await resolvePostLoginPath(
+              urlParams.get('redirect') || searchParams.get('redirect')
+            );
             return;
           }
         }
@@ -124,8 +127,9 @@ function CallbackContent() {
           // Verificar si ya hay una sesión activa
           const { data: { session } } = await supabase.auth.getSession();
           if (session) {
-            // Ya hay sesión, redirigir al home
-            router.push('/');
+            window.location.href = await resolvePostLoginPath(
+              urlParams.get('redirect') || searchParams.get('redirect')
+            );
             return;
           }
           
@@ -216,9 +220,9 @@ function CallbackContent() {
           }
 
           toast.success('Sesión iniciada exitosamente');
-          
-          // Redirigir al home
-          router.push('/');
+          window.location.href = await resolvePostLoginPath(
+            urlParams.get('redirect') || searchParams.get('redirect')
+          );
         } else {
           setError('No se pudo crear la sesión');
           toast.error('Error al autenticar. Por favor intenta nuevamente.');

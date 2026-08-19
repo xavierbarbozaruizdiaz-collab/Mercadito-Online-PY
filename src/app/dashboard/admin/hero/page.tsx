@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import HeroImageUploader from '@/components/admin/HeroImageUploader';
 import { heroPublicUrlFromPath } from '@/lib/storage/hero';
+import { getAuthHeaders } from '@/lib/auth/clientAuthHeaders';
 
 type Slide = {
   id?: string;
@@ -29,7 +30,7 @@ type Slide = {
 
 export default function AdminHeroPage() {
   const [slides, setSlides] = useState<Slide[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState<Slide | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -40,7 +41,26 @@ export default function AdminHeroPage() {
       setLoading(true);
       setError(null);
       console.log('📥 Cargando slides...');
-      
+
+      // Preferir API admin (evita RLS/cliente) y caer a Supabase directo
+      const headers = await getAuthHeaders();
+      const res = await fetch('/api/admin/hero/slides', {
+        cache: 'no-store',
+        headers,
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json?.ok && Array.isArray(json.slides)) {
+          console.log('✅ Slides cargados (API):', json.slides.length);
+          setSlides(json.slides);
+          return;
+        }
+      } else if (res.status === 401 || res.status === 403) {
+        setError('Debes iniciar sesión como administrador para gestionar slides.');
+        setSlides([]);
+        return;
+      }
+
       const { data, error } = await (supabase as any)
         .from('hero_slides')
         .select('*')
@@ -115,6 +135,14 @@ export default function AdminHeroPage() {
         bg_gradient_from: editing.bg_gradient_from || null,
         bg_gradient_to: editing.bg_gradient_to || null,
         storage_path: editing.storage_path || null,
+        // Mantener image_url en sync para el home
+        image_url: editing.storage_path
+          ? heroPublicUrlFromPath(editing.storage_path)
+          : null,
+        bg_image_url: editing.storage_path
+          ? heroPublicUrlFromPath(editing.storage_path)
+          : null,
+        sort_order: editing.position,
         position: editing.position,
         is_active: editing.is_active,
         banner_position: 'hero', // Siempre Hero - otras posiciones no están implementadas
@@ -254,10 +282,10 @@ export default function AdminHeroPage() {
   return (
     <main className="p-6">
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-bold">Hero Editor</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-[hsl(var(--foreground))]">Portada del inicio</h1>
         <div className="flex gap-2">
-          <button onClick={refreshStats} className="px-4 py-2 rounded bg-emerald-600 text-white">Refrescar estadísticas</button>
-          <button onClick={createNew} className="px-4 py-2 rounded bg-black text-white">Nuevo slide</button>
+          <button onClick={refreshStats} className="px-4 py-2 rounded-xl bg-white border border-[hsl(var(--border))] text-sm font-medium hover:border-[hsl(var(--primary))]">Actualizar números</button>
+          <button onClick={createNew} className="px-4 py-2 rounded-xl bg-[hsl(var(--primary))] text-white text-sm font-medium hover:bg-[hsl(var(--accent))]">Nueva imagen de portada</button>
         </div>
       </div>
 
@@ -305,7 +333,10 @@ export default function AdminHeroPage() {
               </div>
             </div>
           ))}
-          {slides.length === 0 && (
+          {loading && (
+            <div className="text-gray-500">Cargando slides base...</div>
+          )}
+          {!loading && slides.length === 0 && (
             <div className="text-gray-500">No hay slides todavía.</div>
           )}
         </div>

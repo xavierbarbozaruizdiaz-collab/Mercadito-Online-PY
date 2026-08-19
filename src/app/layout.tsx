@@ -14,6 +14,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Gavel, Ticket } from "lucide-react";
 import Logo from "@/components/Logo";
 import Footer from "@/components/Footer";
+import AuthCookieSync from "@/components/AuthCookieSync";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -189,7 +190,7 @@ export default function RootLayout({
         <ErrorBoundary>
           <ThemeProvider>
             {/* Header mejorado */}
-            <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-sm border-b border-gray-200 shadow-md">
+            <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-[hsl(var(--border))]">
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between h-16 gap-2 sm:gap-4">
                   {/* Menú móvil y Logo */}
@@ -202,9 +203,9 @@ export default function RootLayout({
                       {/* Logo PWA - con fallback si no existe la imagen */}
                       <div className="relative">
                         <Logo />
-                        <div className="absolute inset-0 bg-blue-500/0 group-hover:bg-blue-500/10 rounded-full transition-colors"></div>
+                        <div className="absolute inset-0 bg-[hsl(var(--primary))]/0 group-hover:bg-[hsl(var(--primary))]/10 rounded-full transition-colors"></div>
                       </div>
-                      <span className="text-base sm:text-xl md:text-2xl font-bold text-blue-600 group-hover:text-blue-700 transition-colors truncate">
+                      <span className="text-base sm:text-xl md:text-2xl font-bold text-[hsl(var(--primary))] group-hover:text-[hsl(var(--accent))] transition-colors truncate tracking-tight">
                         <span className="hidden sm:inline">Mercadito Online PY</span>
                         <span className="sm:hidden">Mercadito PY</span>
                       </span>
@@ -223,14 +224,14 @@ export default function RootLayout({
                     <div className="md:hidden flex items-center gap-1">
                       <Link
                         href="/auctions"
-                        className="flex items-center justify-center p-2 min-h-[44px] min-w-[44px] text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-all"
+                        className="flex items-center justify-center p-2 min-h-[44px] min-w-[44px] text-gray-600 hover:text-[hsl(var(--primary))] hover:bg-emerald-50 rounded-lg transition-all"
                         aria-label="Subastas"
                       >
                         <Gavel className="w-5 h-5 sm:w-6 sm:h-6" />
                       </Link>
                       <Link
                         href="/raffles"
-                        className="flex items-center justify-center p-2 min-h-[44px] min-w-[44px] text-gray-600 hover:text-yellow-600 hover:bg-yellow-50 rounded-lg transition-all"
+                        className="flex items-center justify-center p-2 min-h-[44px] min-w-[44px] text-gray-600 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
                         aria-label="Sorteos"
                       >
                         <Ticket className="w-5 h-5 sm:w-6 sm:h-6" />
@@ -249,6 +250,7 @@ export default function RootLayout({
 
             {/* Toast Provider */}
             <ToastProvider />
+            <AuthCookieSync />
 
             {/* Contenido de cada página */}
             <div className="flex flex-col min-h-screen">

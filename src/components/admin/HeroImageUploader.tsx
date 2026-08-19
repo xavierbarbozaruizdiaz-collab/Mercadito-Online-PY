@@ -2,6 +2,7 @@
 
 import imageCompression from 'browser-image-compression';
 import { useState } from 'react';
+import { getAuthHeaders } from '@/lib/auth/clientAuthHeaders';
 
 type Props = {
   value?: string | null;
@@ -27,7 +28,12 @@ export default function HeroImageUploader({ value, onChange }: Props) {
       setPreview(URL.createObjectURL(compressed));
       const form = new FormData();
       form.append('file', compressed, compressed.name);
-      const res = await fetch('/api/admin/hero/upload', { method: 'POST', body: form });
+      const headers = await getAuthHeaders();
+      const res = await fetch('/api/admin/hero/upload', {
+        method: 'POST',
+        body: form,
+        headers,
+      });
       const json = await res.json();
       if (!res.ok || !json.ok) throw new Error(json.error || 'upload failed');
       onChange(json.storagePath as string);

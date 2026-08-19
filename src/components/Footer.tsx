@@ -19,16 +19,16 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           {/* Sección 1: Acerca de */}
           <div>
-            <h3 className="text-white text-lg font-bold mb-4">Mercadito Online PY</h3>
-            <p className="text-sm mb-4">
-              El mejor marketplace de Paraguay. Compra y vende productos nuevos y usados de forma segura.
+            <h3 className="text-white text-lg font-bold mb-4 tracking-tight">Mercadito Online PY</h3>
+            <p className="text-sm mb-4 text-gray-400 leading-relaxed">
+              Marketplace paraguayo para comprar, vender y subastar con confianza.
             </p>
             <div className="flex space-x-4">
               <a
                 href="https://facebook.com"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="hover:text-blue-400 transition-colors"
+                className="hover:text-emerald-400 transition-colors"
                 aria-label="Facebook"
               >
                 <Facebook className="w-5 h-5" />
@@ -37,7 +37,7 @@ export default function Footer() {
                 href="https://instagram.com"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="hover:text-pink-400 transition-colors"
+                className="hover:text-emerald-400 transition-colors"
                 aria-label="Instagram"
               >
                 <Instagram className="w-5 h-5" />
@@ -46,7 +46,7 @@ export default function Footer() {
                 href="https://twitter.com"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="hover:text-blue-400 transition-colors"
+                className="hover:text-emerald-400 transition-colors"
                 aria-label="Twitter"
               >
                 <Twitter className="w-5 h-5" />
@@ -59,7 +59,7 @@ export default function Footer() {
             <h3 className="text-white text-lg font-bold mb-4">Enlaces Rápidos</h3>
             <ul className="space-y-2 text-sm">
               <li>
-                <Link href="/" className="hover:text-white transition-colors">
+                <Link href="/" className="hover:text-emerald-400 transition-colors">
                   Inicio
                 </Link>
               </li>
@@ -68,23 +68,23 @@ export default function Footer() {
                   href={productsHref}
                   prefetch={enableProductsApi}
                   aria-disabled={!enableProductsApi}
-                  className="hover:text-white transition-colors"
+                  className="hover:text-emerald-400 transition-colors"
                 >
                   Productos
                 </Link>
               </li>
               <li>
-                <Link href="/auctions" className="hover:text-white transition-colors">
+                <Link href="/auctions" className="hover:text-emerald-400 transition-colors">
                   Subastas
                 </Link>
               </li>
               <li>
-                <Link href="/raffles" className="hover:text-white transition-colors">
+                <Link href="/raffles" className="hover:text-emerald-400 transition-colors">
                   Sorteos
                 </Link>
               </li>
               <li>
-                <Link href="/stores" className="hover:text-white transition-colors">
+                <Link href="/stores" className="hover:text-emerald-400 transition-colors">
                   Tiendas
                 </Link>
               </li>
@@ -96,17 +96,17 @@ export default function Footer() {
             <h3 className="text-white text-lg font-bold mb-4">Para Vendedores</h3>
             <ul className="space-y-2 text-sm">
               <li>
-                <Link href="/dashboard" className="hover:text-white transition-colors">
+                <Link href="/dashboard" className="hover:text-emerald-400 transition-colors">
                   Panel de Vendedor
                 </Link>
               </li>
               <li>
-                <Link href="/dashboard/new-product" className="hover:text-white transition-colors">
+                <Link href="/dashboard/new-product" className="hover:text-emerald-400 transition-colors">
                   Vender Producto
                 </Link>
               </li>
               <li>
-                <Link href="/orders" className="hover:text-white transition-colors">
+                <Link href="/orders" className="hover:text-emerald-400 transition-colors">
                   Mis Pedidos
                 </Link>
               </li>
@@ -119,13 +119,13 @@ export default function Footer() {
             <ul className="space-y-3 text-sm">
               <li className="flex items-center gap-2">
                 <Mail className="w-4 h-4" />
-                <a href="mailto:contacto@mercadito-online-py.com" className="hover:text-white transition-colors">
+                <a href="mailto:contacto@mercadito-online-py.com" className="hover:text-emerald-400 transition-colors">
                   contacto@mercadito-online-py.com
                 </a>
               </li>
               <li className="flex items-center gap-2">
                 <Phone className="w-4 h-4" />
-                <a href="tel:+595981234567" className="hover:text-white transition-colors">
+                <a href="tel:+595981234567" className="hover:text-emerald-400 transition-colors">
                   +595 981 234 567
                 </a>
               </li>
@@ -144,10 +144,10 @@ export default function Footer() {
               © {currentYear} Mercadito Online PY. Todos los derechos reservados.
             </p>
             <div className="flex gap-6">
-              <Link href="/terms" className="hover:text-white transition-colors">
+              <Link href="/terms" className="hover:text-emerald-400 transition-colors">
                 Términos y Condiciones
               </Link>
-              <Link href="/privacy" className="hover:text-white transition-colors">
+              <Link href="/privacy" className="hover:text-emerald-400 transition-colors">
                 Política de Privacidad
               </Link>
             </div>

@@ -453,23 +453,35 @@ export default async function ProductPage(
         </div>
       </div>
 
-      {/* Marketplace Features Avanzadas */}
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-        {/* Historial de precios */}
-        <PriceHistoryChart 
-          productId={p.id} 
-          currentPrice={Number(p.price)}
-        />
+      {/* Historial, preguntas y reseñas */}
+      <div className="w-full max-w-7xl mx-auto pt-10 pb-16 sm:pb-20">
+        <div className="mb-6">
+          <h2 className="text-xl font-semibold tracking-tight text-[hsl(var(--foreground))]">
+            Más sobre este producto
+          </h2>
+          <p className="text-sm text-[hsl(var(--muted-foreground))] mt-1">
+            Precios, preguntas al vendedor y opiniones de compradores
+          </p>
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
+          <div className="min-w-0">
+            <PriceHistoryChart
+              productId={p.id}
+              currentPrice={Number(p.price)}
+            />
+          </div>
 
-        {/* Preguntas y respuestas */}
-        <ProductQandA
-          productId={p.id}
-          sellerId={p.seller_id}
-          currentUserId={undefined}
-        />
+          <div className="min-w-0">
+            <ProductQandA
+              productId={p.id}
+              sellerId={p.seller_id}
+            />
+          </div>
 
-        {/* Reseñas del producto */}
-        <ProductReviews productId={p.id} storeId={p.store_id || undefined} />
+          <div className="min-w-0">
+            <ProductReviews productId={p.id} storeId={p.store_id || undefined} />
+          </div>
+        </div>
       </div>
       </main>
     </>

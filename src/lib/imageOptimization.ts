@@ -20,12 +20,22 @@ export const supabaseImageLoader: ImageLoader = ({ src, width, quality }) => {
 };
 
 // Configuración de dominios permitidos para imágenes
+function supabaseHostFromEnv(): string | null {
+  const raw = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!raw) return null;
+  try {
+    return new URL(raw).hostname;
+  } catch {
+    return null;
+  }
+}
+
 export const imageDomains = [
-  'hqdatzhliaordlsqtjea.supabase.co',
+  supabaseHostFromEnv(),
   'placehold.co',
   'images.unsplash.com',
   'via.placeholder.com',
-];
+].filter(Boolean) as string[];
 
 // Configuración de tamaños de imagen
 export const imageSizes = {

@@ -303,14 +303,14 @@ export const ROUTES = {
     FORGOT_PASSWORD: '/auth/forgot-password',
   },
   DASHBOARD: {
-    SELLER: '/dashboard/seller',
-    BUYER: '/dashboard/buyer',
-    ADMIN: '/dashboard/admin',
+    SELLER: '/seller',
+    BUYER: '/dashboard',
+    ADMIN: '/admin',
   },
   MARKETPLACE: {
     STORE: '/store',
-    PRODUCT: '/product',
-    AUCTION: '/auction',
+    PRODUCT: '/products',
+    AUCTION: '/auctions',
     SEARCH: '/search',
   },
   API: {

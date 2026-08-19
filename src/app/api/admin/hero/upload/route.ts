@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseClient';
+import { requireAdmin } from '@/lib/auth/apiAuth';
 import { randomUUID } from 'crypto';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
+  const auth = await requireAdmin(req);
+  if (!auth.ok) return auth.response;
+
   try {
     const formData = await req.formData();
     const file = formData.get('file');
@@ -18,7 +22,10 @@ export async function POST(req: NextRequest) {
     const arrayBuffer = await file.arrayBuffer();
     const { error } = await supabaseAdmin.storage
       .from('hero-banners')
-      .upload(key, new Uint8Array(arrayBuffer), { contentType: file.type || 'image/webp', upsert: true });
+      .upload(key, new Uint8Array(arrayBuffer), {
+        contentType: file.type || 'image/webp',
+        upsert: true,
+      });
 
     if (error) {
       return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
@@ -30,11 +37,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }
 }
-
-
-
-
-
-
-
-

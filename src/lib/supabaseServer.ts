@@ -6,16 +6,10 @@
 
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/database';
+import { getSupabaseAnonKey, getSupabaseUrl } from '@/lib/supabase/config';
 
-const url =
-  process.env.SUPABASE_URL ??
-  process.env.NEXT_PUBLIC_SUPABASE_URL ??
-  'http://localhost';
-
-const anon =
-  process.env.SUPABASE_ANON_KEY ??
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
-  'public-anon-key';
+const url = getSupabaseUrl();
+const anon = getSupabaseAnonKey();
 
 export const supabase = createClient<Database>(url, anon, {
   auth: {

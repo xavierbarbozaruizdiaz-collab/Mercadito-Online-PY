@@ -699,23 +699,20 @@ export default function ProductsListClient() {
           <div className="flex flex-wrap gap-2 items-center">
             <a
               href="/stores"
-              className="flex-1 min-w-[140px] sm:flex-none sm:min-w-0 px-3 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors text-xs sm:text-sm font-medium flex items-center justify-center gap-1.5 sm:gap-2"
+              className="flex-1 min-w-[140px] sm:flex-none sm:min-w-0 px-4 py-2.5 bg-[hsl(var(--primary))] text-white rounded-xl hover:bg-[hsl(var(--accent))] transition-colors text-xs sm:text-sm font-medium flex items-center justify-center gap-1.5 sm:gap-2 shadow-sm"
             >
-              <span>🏪</span>
-              <span className="truncate">Ver Tiendas</span>
+              <span className="truncate">Ver tiendas</span>
             </a>
             <a
               href="/vitrina"
-              className="flex-1 min-w-[140px] sm:flex-none sm:min-w-0 px-3 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition-colors text-xs sm:text-sm font-medium flex items-center justify-center gap-1.5 sm:gap-2"
+              className="flex-1 min-w-[140px] sm:flex-none sm:min-w-0 px-4 py-2.5 bg-white text-[hsl(var(--foreground))] border border-[hsl(var(--border))] rounded-xl hover:border-[hsl(var(--primary))] hover:text-[hsl(var(--primary))] transition-colors text-xs sm:text-sm font-medium flex items-center justify-center gap-1.5 sm:gap-2"
             >
-              <span>⭐</span>
               <span className="truncate">Vitrina</span>
             </a>
             <a
               href="/favorites/stores"
-              className="flex-1 min-w-[140px] sm:flex-none sm:min-w-0 px-3 py-2 bg-gradient-to-r from-red-600 to-pink-600 text-white rounded-lg hover:from-red-700 hover:to-pink-700 transition-colors text-xs sm:text-sm font-medium flex items-center justify-center gap-1.5 sm:gap-2"
+              className="flex-1 min-w-[140px] sm:flex-none sm:min-w-0 px-4 py-2.5 bg-white text-[hsl(var(--foreground))] border border-[hsl(var(--border))] rounded-xl hover:border-rose-300 hover:text-rose-600 transition-colors text-xs sm:text-sm font-medium flex items-center justify-center gap-1.5 sm:gap-2"
             >
-              <span>❤️</span>
               <span className="truncate">Favoritas</span>
             </a>
           </div>
@@ -725,7 +722,7 @@ export default function ProductsListClient() {
             <select
               value={filters.sortBy}
               onChange={(e) => updateFilter('sortBy', e.target.value)}
-              className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
+              className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-[hsl(var(--border))] rounded-xl focus:ring-2 focus:ring-[hsl(var(--primary))] text-sm sm:text-base bg-white"
             >
               <option value="date_desc">Más recientes</option>
               <option value="date_asc">Más antiguos</option>
