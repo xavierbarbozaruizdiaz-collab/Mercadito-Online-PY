@@ -27,6 +27,8 @@ import {
   Gavel,
   ExternalLink,
 } from 'lucide-react';
+import Logo from '@/components/Logo';
+import { BrandWordmark } from '@/components/BrandWordmark';
 
 interface SidebarItem {
   icon: React.ComponentType<{ className?: string }>;
@@ -190,22 +192,13 @@ export default function DashboardSidebar({
         >
           <Link
             href="/dashboard"
-            className={`flex items-center gap-2 ${isDesktopCollapsed ? 'justify-center' : ''}`}
+            className={`flex items-center gap-2.5 ${isDesktopCollapsed ? 'justify-center' : ''}`}
             onClick={() => setIsOpen(false)}
             title="Mercadito Online PY"
           >
-            <div className="w-9 h-9 bg-[hsl(var(--primary))] rounded-xl flex items-center justify-center shrink-0">
-              <span className="text-white font-bold text-sm">M</span>
-            </div>
+            <Logo className="w-9 h-9" />
             {!isDesktopCollapsed && (
-              <div className="min-w-0">
-                <p className="text-sm font-bold text-[hsl(var(--foreground))] truncate">
-                  Mercadito Online
-                </p>
-                <p className="text-[10px] text-[hsl(var(--muted-foreground))]">
-                  {showSellerNav ? 'Panel vendedor' : 'Mi cuenta'}
-                </p>
-              </div>
+              <BrandWordmark siteName="Mercadito Online PY" compact />
             )}
           </Link>
           <button
