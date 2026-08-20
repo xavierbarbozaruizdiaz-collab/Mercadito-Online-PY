@@ -62,6 +62,7 @@ export default function SourcedCatalogPage() {
 
   const [imported, setImported] = useState<ImportedProduct[]>([]);
   const [importedTotal, setImportedTotal] = useState(0);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const authFetch = useCallback(async (url: string, init?: RequestInit) => {
     const headers = await getAuthHeaders();
@@ -78,6 +79,7 @@ export default function SourcedCatalogPage() {
 
   const loadSettingsAndProducts = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const [settingsRes, productsRes] = await Promise.all([
         authFetch('/api/sourced-catalog/settings'),
@@ -105,7 +107,9 @@ export default function SourcedCatalogPage() {
         setImportedTotal(productsJson.pagination?.total || 0);
       }
     } catch (err: any) {
-      toast.error(err.message || 'Error cargando el catálogo');
+      const message = err.message || 'Error cargando el catálogo';
+      setLoadError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -188,6 +192,34 @@ export default function SourcedCatalogPage() {
     return (
       <main className="min-h-screen bg-gray-50 p-8 flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-gray-700" />
+      </main>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <main className="min-h-screen bg-gray-50 p-4 sm:p-8">
+        <div className="max-w-3xl mx-auto">
+          <Link href="/admin" className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6">
+            <ArrowLeft className="w-4 h-4" />
+            Volver al panel admin
+          </Link>
+          <div className="bg-red-50 border border-red-200 rounded-lg p-8 text-center">
+            <h1 className="text-xl font-bold text-gray-900 mb-2">No se pudo cargar el catálogo</h1>
+            <p className="text-gray-700">{loadError}</p>
+            <p className="text-sm text-gray-500 mt-3">
+              Si acabamos de publicar Ubuy, hay que correr la migración SQL en Supabase de producción
+              y tener ALIEXPRESS_APP_KEY / ALIEXPRESS_APP_SECRET en Vercel.
+            </p>
+            <button
+              type="button"
+              onClick={() => loadSettingsAndProducts()}
+              className="mt-4 px-4 py-2 bg-black text-white rounded-lg"
+            >
+              Reintentar
+            </button>
+          </div>
+        </div>
       </main>
     );
   }
