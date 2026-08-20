@@ -22,6 +22,7 @@ export default function EditProduct() {
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState<string>('');
   const [saleType, setSaleType] = useState<'direct' | 'auction' | 'negotiable'>('direct');
+  const [existingAuctionStatus, setExistingAuctionStatus] = useState<string | null>(null);
   const [condition, setCondition] = useState<'nuevo' | 'usado' | 'usado_como_nuevo'>('nuevo');
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [inShowcase, setInShowcase] = useState(false);
@@ -89,6 +90,7 @@ export default function EditProduct() {
         setDescription(product.description || '');
         setPrice(product.price?.toString() || '');
         setSaleType(product.sale_type || 'direct');
+        setExistingAuctionStatus(product.auction_status || null);
         setCondition(product.condition || 'nuevo');
         setCategoryId(product.category_id);
         setInShowcase(product.in_showcase || false);
@@ -412,35 +414,39 @@ export default function EditProduct() {
         wholesale_discount_percent: saleType === 'direct' && wholesaleEnabled && wholesaleDiscountPercent ? parseFloat(wholesaleDiscountPercent) || null : null,
       };
       
-      // Si es subasta, agregar campos directos de subasta (igual que new-product)
+      // Si es subasta, actualizar campos con cuidado según el estado actual
       if (saleType === 'auction') {
         const startDate = new Date(auctionStartDate);
-        
-        // Logs para debugging de zona horaria
-        const timezoneOffset = startDate.getTimezoneOffset();
-        const paraguayOffset = -240; // UTC-4
-        
-        console.log('🕐 Información de zona horaria (edición):', {
-          horaIngresada: auctionStartDate,
-          horaInterpretadaLocal: startDate.toString(),
-          horaUTC: startDate.toISOString(),
-          offsetZonaHoraria: timezoneOffset,
-          offsetParaguay: paraguayOffset,
-          diferenciaConParaguay: timezoneOffset - paraguayOffset
-        });
-        
-        const durationMinutes = 1440;
-        const endDate = new Date(startDate.getTime() + durationMinutes * 60 * 1000);
-        
-        updateData.auction_status = 'scheduled';
-        updateData.auction_start_at = startDate.toISOString();
-        updateData.auction_end_at = endDate.toISOString();
-        updateData.current_bid = finalPrice; // Precio inicial
-        updateData.min_bid_increment = 1000; // Por defecto
-        
-        // También guardar buy_now_price en attributes si existe
-        if (attributes && attributes.auction?.buy_now_price) {
-          updateData.attributes = attributes;
+        const isLiveOrEnded =
+          existingAuctionStatus === 'active' || existingAuctionStatus === 'ended';
+
+        if (isLiveOrEnded) {
+          // No reiniciar subasta en curso o finalizada — solo metadata en attributes
+          if (attributes?.auction) {
+            updateData.attributes = {
+              ...(attributes as object),
+              auction: {
+                ...attributes.auction,
+                buy_now_price:
+                  auctionBuyNowPrice && Number(auctionBuyNowPrice) > 0
+                    ? Number(auctionBuyNowPrice)
+                    : null,
+              },
+            };
+          }
+        } else {
+          const durationMinutes = 1440;
+          const endDate = new Date(startDate.getTime() + durationMinutes * 60 * 1000);
+
+          updateData.auction_status = 'scheduled';
+          updateData.auction_start_at = startDate.toISOString();
+          updateData.auction_end_at = endDate.toISOString();
+          updateData.current_bid = finalPrice;
+          updateData.min_bid_increment = 1000;
+
+          if (attributes?.auction) {
+            updateData.attributes = attributes;
+          }
         }
       } else {
         // Si cambió de subasta a directa, limpiar campos de subasta

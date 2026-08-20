@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { Gavel } from 'lucide-react';
-import { supabase } from '@/lib/supabaseClient';
 import { HeaderNavPill } from '@/components/HeaderNavPill';
+import { getActiveAuctions } from '@/lib/services/auctionService';
 
 export default function AuctionsNavLink() {
   const pathname = usePathname();
@@ -20,36 +20,19 @@ export default function AuctionsNavLink() {
 
   async function loadAuctionsCount() {
     try {
-      const now = new Date();
-      const oneHourFromNow = new Date(now.getTime() + 60 * 60 * 1000);
+      const auctions = await getActiveAuctions();
+      const now = Date.now();
+      const oneHourFromNow = now + 60 * 60 * 1000;
 
-      const { count: active, error: activeError } = await supabase
-        .from('products')
-        .select('*', { count: 'exact', head: true })
-        .eq('sale_type', 'auction')
-        .eq('auction_status', 'active')
-        .gte('auction_end_at', now.toISOString());
+      const live = auctions.filter((a) => a.auction_status === 'active');
+      const endingSoon = live.filter((a) => {
+        if (!a.auction_end_at) return false;
+        const end = new Date(a.auction_end_at).getTime();
+        return end <= oneHourFromNow && end > now;
+      });
 
-      if (activeError) {
-        console.error('Error loading active auctions count:', activeError);
-        return;
-      }
-
-      const { count: endingSoon, error: endingSoonError } = await supabase
-        .from('products')
-        .select('*', { count: 'exact', head: true })
-        .eq('sale_type', 'auction')
-        .eq('auction_status', 'active')
-        .gte('auction_end_at', now.toISOString())
-        .lte('auction_end_at', oneHourFromNow.toISOString());
-
-      if (endingSoonError) {
-        console.error('Error loading ending soon auctions count:', endingSoonError);
-        return;
-      }
-
-      setActiveCount(active || 0);
-      setEndingSoonCount(endingSoon || 0);
+      setActiveCount(live.length);
+      setEndingSoonCount(endingSoon.length);
     } catch (error) {
       console.error('Error loading auctions count:', error);
     } finally {

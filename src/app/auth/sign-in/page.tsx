@@ -8,6 +8,7 @@ import { Eye, EyeOff } from 'lucide-react';
 import { useToast } from '@/lib/hooks/useToast';
 import { getAuthHeaders, syncAccessTokenCookie } from '@/lib/auth/clientAuthHeaders';
 import { resolvePostLoginPath } from '@/lib/auth/postLoginRedirect';
+import { getPublicAppUrl } from '@/lib/config/site';
 import { Suspense } from 'react';
 
 function SignInPageContent() {
@@ -213,7 +214,7 @@ function SignInPageContent() {
       // Obtener la URL de callback basada en el entorno
       const redirectTo = typeof window !== 'undefined' 
         ? `${window.location.origin}/auth/callback`
-        : `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/auth/callback`;
+        : `${getPublicAppUrl()}/auth/callback`;
       
       // Configurar opciones según el proveedor
       const options: any = {

@@ -50,13 +50,18 @@ export async function acquireLock(
     retryDelayMs = 100,
   } = options;
 
-  // Si Redis no está disponible, fallar de forma segura
+  // Si Redis no está disponible, ejecutar sin lock (PostgreSQL place_bid usa FOR UPDATE)
   if (!isRedisAvailable()) {
-    logger.warn('[Redis Lock] Redis no disponible, no se puede adquirir lock', { key });
-    return {
-      acquired: false,
-      error: 'Redis no disponible',
-    };
+    logger.warn('[Redis Lock] Redis no disponible, ejecutando sin lock distribuido', { key });
+    try {
+      const result = await fn();
+      return { success: true, result };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error : new Error(String(error)),
+      };
+    }
   }
 
   const redis = getRedis();

@@ -499,45 +499,43 @@ export default function BidForm({
           </Button>
         </div>
 
-        {/* Botón Compra Ahora - Solo mostrar cuando la subasta haya terminado */}
-        {buyNowPrice && isAuctionEnded && (
-          <>
-            {/* Si el monto ganador es menor al buy_now_price, mostrar mensaje de aprobación */}
-            {currentBid < buyNowPrice ? (
-              <div className="w-full p-4 bg-amber-50 border-2 border-amber-300 rounded-lg">
-                <div className="flex items-center gap-2 mb-2">
-                  <ShoppingCart className="h-5 w-5 text-amber-600" />
-                  <h3 className="font-bold text-amber-900">Monto menor a la oferta esperada</h3>
-                </div>
-                <p className="text-sm text-amber-800 mb-2">
-                  El monto ganador ({formatCurrency(currentBid)}) es menor al precio de compra inmediata ({formatCurrency(buyNowPrice)}).
-                </p>
-                <p className="text-sm font-semibold text-amber-900">
-                  Se espera aprobación del vendedor para confirmar la compra.
-                </p>
-              </div>
+        {/* Compra Ahora — disponible mientras la subasta está activa */}
+        {buyNowPrice && !isAuctionEnded && !isDisabled && (
+          <Button
+            onClick={handleBuyNow}
+            disabled={buyNowLoading}
+            variant="primary"
+            className="w-full bg-emerald-600 hover:bg-emerald-700"
+            size="lg"
+          >
+            {buyNowLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Procesando...
+              </>
             ) : (
-              <Button
-                onClick={handleBuyNow}
-                disabled={buyNowLoading}
-                variant="primary"
-                className="w-full bg-emerald-600 hover:bg-emerald-700"
-                size="lg"
-              >
-                {buyNowLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Procesando...
-                  </>
-                ) : (
-                  <>
-                    <ShoppingCart className="mr-2 h-4 w-4" />
-                    Compra Ahora - {formatCurrency(buyNowPrice)}
-                  </>
-                )}
-              </Button>
+              <>
+                <ShoppingCart className="mr-2 h-4 w-4" />
+                Compra Ahora — {formatCurrency(buyNowPrice)}
+              </>
             )}
-          </>
+          </Button>
+        )}
+
+        {/* Post-cierre: aprobación del vendedor si la puja quedó por debajo del precio esperado */}
+        {buyNowPrice && isAuctionEnded && currentBid < buyNowPrice && (
+          <div className="w-full p-4 bg-amber-50 border-2 border-amber-300 rounded-lg">
+            <div className="flex items-center gap-2 mb-2">
+              <ShoppingCart className="h-5 w-5 text-amber-600" />
+              <h3 className="font-bold text-amber-900">Monto menor a la oferta esperada</h3>
+            </div>
+            <p className="text-sm text-amber-800 mb-2">
+              El monto ganador ({formatCurrency(currentBid)}) es menor al precio de compra inmediata ({formatCurrency(buyNowPrice)}).
+            </p>
+            <p className="text-sm font-semibold text-amber-900">
+              Se espera aprobación del vendedor para confirmar la compra.
+            </p>
+          </div>
         )}
       </div>
 

@@ -1248,7 +1248,7 @@ export default function AuctionDetailPage() {
                           💳 Pagar Ahora
                         </Button>
                         <Button
-                          onClick={() => window.location.href = `/messages?user=${auction.seller_id}`}
+                          onClick={() => window.location.href = `/seller/${auction.seller_id}`}
                           variant="outline"
                           className="border-white text-white hover:bg-white hover:text-emerald-600"
                         >
@@ -1364,7 +1364,7 @@ export default function AuctionDetailPage() {
                   )}
                   
                   {/* Formulario de puja */}
-                  <div className={isConnected ? '' : 'opacity-50 pointer-events-none'}>
+                  <div className={isConnected ? '' : 'opacity-90'}>
                     <BidForm
                       productId={productId}
                       currentBid={currentBid}

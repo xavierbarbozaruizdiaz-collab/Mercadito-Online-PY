@@ -211,21 +211,16 @@ export async function POST(
     // ========================================
     // [SECURITY PATCH] Validación de membresía en servidor para pujas
     // ========================================
-    // Verificar que el usuario tiene membresía activa antes de permitir pujar
-    type MembershipData = { membership_level: string | null; membership_expires_at: string | null };
-    
-    const { data: profileData, error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .select('membership_level, membership_expires_at')
-      .eq('id', userId)
-      .single();
-    
-    const profile = profileData as MembershipData | null;
+    // Verificar membresía con la misma RPC que usa el frontend
+    const { data: bidLimitData, error: bidLimitError } = await supabaseAdmin.rpc(
+      'get_user_bid_limit',
+      { p_user_id: userId }
+    );
 
-    if (profileError || !profile) {
-      logger.warn('[Bid API] Error obteniendo perfil para validar membresía', {
+    if (bidLimitError || !bidLimitData) {
+      logger.warn('[Bid API] Error obteniendo límite de puja/membresía', {
         userId,
-        error: profileError,
+        error: bidLimitError,
       });
       return NextResponse.json<BidResponse>(
         { success: false, error: 'Error al verificar membresía. Intenta de nuevo.' },
@@ -233,22 +228,15 @@ export async function POST(
       );
     }
 
-    // Verificar que la membresía esté activa
-    const hasActiveMembership = profileData.membership_expires_at 
-      && new Date(profileData.membership_expires_at) > new Date()
-      && profileData.membership_level !== 'free';
+    const bidLimit = bidLimitData as { can_bid?: boolean; message?: string; bid_limit?: number | null };
 
-    if (!hasActiveMembership) {
-      logger.warn('[Bid API] Intento de puja sin membresía activa', {
-        userId,
-        membership_level: profile.membership_level,
-        expires_at: profile.membership_expires_at,
-      });
+    if (!bidLimit.can_bid) {
+      logger.warn('[Bid API] Intento de puja sin membresía activa', { userId, bidLimit });
       return NextResponse.json<BidResponse>(
-        { 
-          success: false, 
-          error: 'Se requiere membresía activa para participar en subastas.',
-          error_code: 'NO_ACTIVE_MEMBERSHIP'
+        {
+          success: false,
+          error: bidLimit.message || 'Se requiere membresía activa para participar en subastas.',
+          error_code: 'NO_ACTIVE_MEMBERSHIP',
         },
         { status: 403 }
       );
@@ -312,6 +300,17 @@ export async function POST(
       return NextResponse.json<BidResponse>(
         { success: false, error: 'bidAmount es requerido y debe ser un número' },
         { status: 400 }
+      );
+    }
+
+    if (bidLimit.bid_limit != null && bidAmount > bidLimit.bid_limit) {
+      return NextResponse.json<BidResponse>(
+        {
+          success: false,
+          error: `Tu plan permite pujar hasta Gs. ${bidLimit.bid_limit.toLocaleString('es-PY')}.`,
+          error_code: 'BID_LIMIT_EXCEEDED',
+        },
+        { status: 403 }
       );
     }
 

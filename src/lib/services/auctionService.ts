@@ -125,48 +125,8 @@ export async function getActiveAuctions(filters?: {
 
     logger.debug('Subastas encontradas (sin filtrar)', { count: data?.length || 0 });
     
-    let refreshedData: any[] | null = null;
-    
-    // ACTUALIZAR ESTADOS de todas las subastas antes de filtrar
-    if (data && data.length > 0) {
-      logger.debug('Actualizando estados de subastas', { count: data.length });
-      await Promise.all(
-        (data || []).map((auction: any) => checkAndUpdateAuctionStatus(auction.id))
-      );
-      
-      // RECARGAR los datos después de actualizar estados
-      logger.debug('Estados actualizados, recargando datos');
-      const refreshedQuery = supabase
-        .from('products')
-        .select('id, title, description, price, cover_url, condition, sale_type, auction_status, auction_start_at, auction_end_at, current_bid, min_bid_increment, buy_now_price, reserve_price, winner_id, total_bids, seller_id, status, category_id, created_at')
-        .eq('sale_type', 'auction')
-        .not('seller_id', 'is', null)
-        .or('status.is.null,status.eq.active,status.eq.paused');
-      
-      if (filters?.category) {
-        refreshedQuery.eq('category_id', filters.category);
-      }
-      if (filters?.minPrice) {
-        refreshedQuery.gte('price', filters.minPrice);
-      }
-      if (filters?.maxPrice) {
-        refreshedQuery.lte('price', filters.maxPrice);
-      }
-      if (filters?.search) {
-        refreshedQuery.or(`title.ilike.%${filters.search}%,description.ilike.%${filters.search}%`);
-      }
-      
-      const { data: refreshed, error: refreshError } = await refreshedQuery;
-      if (!refreshError && refreshed) {
-        refreshedData = refreshed;
-        if (refreshedData) {
-          logger.debug('Datos recargados después de actualizar estados', { count: refreshedData.length });
-        }
-      }
-    }
-
-    // Usar datos refrescados si están disponibles, sino usar los originales
-    const dataToFilter = refreshedData || data || [];
+    // Usar datos originales — el cierre de subastas lo maneja pg_cron / API cron en servidor
+    const dataToFilter = data || [];
     
     // Filtrar en memoria para ser más flexible con los estados
     const filteredData = dataToFilter.filter((auction: any) => {
@@ -500,7 +460,8 @@ export async function getAuctionById(
         created_at, 
         attributes,
         auction_version,
-        store_id
+        store_id,
+        approval_status
         ${includeImages ? ', product_images(url, idx)' : ''}
       `)
       .eq('id', productId)

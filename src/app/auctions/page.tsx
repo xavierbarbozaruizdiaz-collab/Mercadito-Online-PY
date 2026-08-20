@@ -11,7 +11,7 @@ import Select from '@/components/ui/Select';
 import Badge from '@/components/ui/Badge';
 import Link from 'next/link';
 import Pagination from '@/components/ui/Pagination';
-import { getActiveSubscription } from '@/lib/services/membershipService';
+import { getUserBidLimit } from '@/lib/services/membershipService';
 import { getSessionWithTimeout } from '@/lib/supabase/client';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
@@ -36,8 +36,8 @@ export default function AuctionsPage() {
         const { data: session } = await getSessionWithTimeout();
         if (session?.session?.user?.id) {
           setIsLoggedIn(true);
-          const subscription = await getActiveSubscription(session.session.user.id);
-          setHasPaidCanon(subscription !== null && subscription.amount_paid > 0);
+          const limit = await getUserBidLimit(session.session.user.id);
+          setHasPaidCanon(limit.can_bid);
         } else {
           setIsLoggedIn(false);
           setHasPaidCanon(null);
@@ -62,7 +62,7 @@ export default function AuctionsPage() {
     }, 15000); // Cada 15 segundos
     
     return () => clearInterval(refreshInterval);
-  }, [search, category]);
+  }, [search, category, sortBy, currentPage]);
   
   // También recargar cuando la ventana recupera el foco (usuario vuelve a la pestaña)
   useEffect(() => {

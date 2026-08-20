@@ -154,6 +154,16 @@ function CheckoutContent() {
         return;
       }
 
+      // Si la puja ganadora está por debajo del precio "compra ahora", requiere aprobación del vendedor
+      const buyNowPrice = auction.buy_now_price;
+      const winningBid = auction.current_bid || auction.price;
+      const approvalStatus = (auction as any).approval_status as string | null | undefined;
+      if (buyNowPrice && winningBid < buyNowPrice && approvalStatus !== 'approved') {
+        toast.error('El vendedor debe aprobar esta venta antes de que puedas pagar');
+        router.push(`/auctions/${auctionProductId}`);
+        return;
+      }
+
       // Verificar si ya existe un pedido para esta subasta
       const { data: existingOrder, error: orderCheckError } = await (supabase as any)
         .from('orders')

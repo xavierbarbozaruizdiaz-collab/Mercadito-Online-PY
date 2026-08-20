@@ -4,6 +4,7 @@
 import { Resend } from 'resend';
 import { getBaseEmailTemplate } from '@/lib/templates/email/baseTemplate';
 import { getOrderConfirmationTemplate, type OrderConfirmationData } from '@/lib/templates/email/orderConfirmation';
+import { getPublicAppUrl } from '@/lib/config/site';
 
 // Cliente Resend lazy para evitar errores en build cuando falta la API key
 let resendClient: Resend | null = null;
@@ -160,7 +161,7 @@ export class EmailService {
       title: `¡Bienvenido${userName ? `, ${userName}` : ''}!`,
       content,
       buttonText: 'Explorar Productos',
-      buttonUrl: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+      buttonUrl: getPublicAppUrl(),
       footerText: 'Mercadito Online PY - El mejor marketplace de Paraguay',
     });
 
@@ -318,7 +319,7 @@ export class EmailService {
       raffleId: string;
     }
   ): Promise<boolean> {
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const appUrl = getPublicAppUrl();
     const raffleUrl = `${appUrl}/raffles/${raffleDetails.raffleId}`;
 
     const html = `
@@ -474,7 +475,7 @@ export class EmailService {
               <p><strong>Mercadito Online PY</strong></p>
               <p>El mejor marketplace de Paraguay</p>
               <div class="unsubscribe">
-                <p>Puedes desactivar estas notificaciones en tu <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/settings/notifications">configuración de cuenta</a></p>
+                <p>Puedes desactivar estas notificaciones en tu <a href="${getPublicAppUrl()}/settings/notifications">configuración de cuenta</a></p>
               </div>
             </div>
           </div>
