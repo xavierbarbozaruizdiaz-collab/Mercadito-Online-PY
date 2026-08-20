@@ -41,7 +41,7 @@ export function Header({ siteName }: HeaderProps) {
             </Link>
           </div>
 
-          <div className="hidden md:flex flex-1 justify-center items-center gap-4">
+          <div className="hidden md:flex flex-1 justify-center items-center gap-2">
             <AuctionsNavLink />
             <RafflesNavLink />
           </div>

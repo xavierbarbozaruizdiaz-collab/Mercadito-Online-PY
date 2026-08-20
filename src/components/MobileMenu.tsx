@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Menu, X, Home, Gavel, ShoppingBag, User } from 'lucide-react';
+import { Menu, X, Home, Gavel, ShoppingBag, Ticket } from 'lucide-react';
+import Logo from '@/components/Logo';
 
 export default function MobileMenu() {
   const [isOpen, setIsOpen] = useState(false);
@@ -12,6 +13,7 @@ export default function MobileMenu() {
   const navigationItems = [
     { href: '/', label: 'Inicio', icon: Home },
     { href: '/auctions', label: 'Subastas', icon: Gavel },
+    { href: '/raffles', label: 'Sorteos', icon: Ticket },
     { href: '/stores', label: 'Tiendas', icon: ShoppingBag },
   ];
 
@@ -20,7 +22,7 @@ export default function MobileMenu() {
       {/* Botón hamburguesa */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="md:hidden p-3 min-h-[44px] min-w-[44px] text-gray-600 hover:text-gray-900 flex items-center justify-center"
+        className="md:hidden p-3 min-h-[44px] min-w-[44px] text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--primary))] flex items-center justify-center rounded-xl hover:bg-[hsl(var(--muted))]"
         aria-label="Toggle menu"
       >
         {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -44,11 +46,14 @@ export default function MobileMenu() {
           ${isOpen ? 'translate-x-0' : '-translate-x-full'}
         `}
       >
-        <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-          <span className="text-lg font-bold text-blue-600">Menú</span>
+        <div className="p-4 border-b border-[hsl(var(--border))] flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <Logo className="w-8 h-8" />
+            <span className="text-sm font-bold text-[hsl(var(--foreground))]">Menú</span>
+          </div>
           <button
             onClick={() => setIsOpen(false)}
-            className="p-3 min-h-[44px] min-w-[44px] text-gray-600 hover:text-gray-900 flex items-center justify-center"
+            className="p-3 min-h-[44px] min-w-[44px] text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] flex items-center justify-center rounded-xl"
             aria-label="Close menu"
           >
             <X className="w-6 h-6" />
@@ -65,10 +70,10 @@ export default function MobileMenu() {
                 href={item.href}
                 onClick={() => setIsOpen(false)}
                 className={`
-                  flex items-center gap-3 px-4 py-3 mx-2 min-h-[44px] rounded-lg transition-colors
+                  flex items-center gap-3 px-4 py-3 mx-2 min-h-[44px] rounded-xl transition-colors
                   ${isActive
-                    ? 'bg-blue-50 text-blue-600'
-                    : 'text-gray-700 hover:bg-gray-50'
+                    ? 'bg-[hsl(var(--primary))] text-white'
+                    : 'text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))]'
                   }
                 `}
               >
