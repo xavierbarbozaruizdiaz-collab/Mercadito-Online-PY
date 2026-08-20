@@ -71,7 +71,7 @@ export default function SourcedFulfillmentsPage() {
     } finally {
       setLoading(false);
     }
-  }, [authFetch, status, toast]);
+  }, [authFetch, status]);
 
   useEffect(() => {
     load();
