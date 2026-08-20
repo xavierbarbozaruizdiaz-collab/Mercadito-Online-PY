@@ -13,6 +13,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { getSyncedNow } from '@/lib/utils/timeSync';
 import { getUserBidLimit, type UserBidLimit } from '@/lib/services/membershipService';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 
 interface BidFormProps {
   productId: string;
@@ -37,6 +38,8 @@ export default function BidForm({
   auctionEndAt,
   isAuctionEnded = false,
 }: BidFormProps) {
+  const pathname = usePathname();
+  const signInHref = `/auth/sign-in?redirect=${encodeURIComponent(pathname || '/auctions')}`;
   const [bidAmount, setBidAmount] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [buyNowLoading, setBuyNowLoading] = useState(false);
@@ -122,6 +125,7 @@ export default function BidForm({
   const canBid = bidLimit?.can_bid ?? false;
   const membershipMessage = bidLimit?.message;
   const membershipLevel = bidLimit?.membership_level;
+  const requiresLogin = !checkingMembership && !userId;
   const requiresMembership = userId && !canBid && !isSeller;
 
   const handleQuickBid = (amount: number) => {
@@ -285,6 +289,41 @@ export default function BidForm({
         <div className="flex items-center justify-center gap-2">
           <Loader2 className="h-4 w-4 animate-spin" />
           <p className="text-sm text-muted-foreground">Verificando permisos...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (requiresLogin) {
+    return (
+      <div className="rounded-lg border-2 border-primary/30 p-6 bg-gradient-to-br from-emerald-50 to-green-50">
+        <div className="text-center space-y-4">
+          <div className="flex items-center justify-center gap-2 mb-2">
+            <Lock className="h-6 w-6 text-primary" />
+            <h3 className="text-lg font-bold text-foreground">
+              Inicia sesión para pujar
+            </h3>
+          </div>
+
+          <Alert className="bg-white border-primary/20 text-left">
+            <AlertDescription>
+              Para participar en subastas necesitás una cuenta activa y pagar el canon de participación (membresía).
+            </AlertDescription>
+          </Alert>
+
+          <div className="flex flex-col gap-2 pt-1">
+            <Link href={signInHref}>
+              <Button className="w-full" size="lg">
+                Iniciar sesión
+              </Button>
+            </Link>
+            <Link href="/memberships">
+              <Button variant="outline" className="w-full" size="lg">
+                <Crown className="mr-2 h-5 w-5" />
+                Ver planes y pagar canon
+              </Button>
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -522,17 +561,6 @@ export default function BidForm({
         <Alert className="border-emerald-500 bg-emerald-50">
           <AlertDescription className="text-emerald-800">
             ¡Puja colocada exitosamente!
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {!userId && (
-        <Alert>
-          <AlertDescription>
-            <a href="/auth/login" className="underline">
-              Inicia sesión
-            </a>{' '}
-            para pujar en esta subasta.
           </AlertDescription>
         </Alert>
       )}

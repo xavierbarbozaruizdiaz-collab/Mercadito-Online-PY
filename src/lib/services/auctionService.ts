@@ -33,6 +33,7 @@ export interface AuctionProduct {
   title: string;
   description?: string;
   price: number;
+  cover_url?: string;
   image_url?: string;
   condition: string;
   sale_type: 'auction';
@@ -86,7 +87,7 @@ export async function getActiveAuctions(filters?: {
         // Optimizado: solo seleccionar columnas necesarias
         let query = supabase
           .from('products')
-          .select('id, title, description, price, image_url:cover_url, condition, sale_type, auction_status, auction_start_at, auction_end_at, current_bid, min_bid_increment, buy_now_price, reserve_price, winner_id, total_bids, seller_id, status, category_id, created_at')
+          .select('id, title, description, price, cover_url, condition, sale_type, auction_status, auction_start_at, auction_end_at, current_bid, min_bid_increment, buy_now_price, reserve_price, winner_id, total_bids, seller_id, status, category_id, created_at')
           .eq('sale_type', 'auction')
           // Excluir productos sin seller_id (productos huérfanos/eliminados)
           .not('seller_id', 'is', null);
@@ -137,7 +138,7 @@ export async function getActiveAuctions(filters?: {
       logger.debug('Estados actualizados, recargando datos');
       const refreshedQuery = supabase
         .from('products')
-        .select('id, title, description, price, image_url:cover_url, condition, sale_type, auction_status, auction_start_at, auction_end_at, current_bid, min_bid_increment, buy_now_price, reserve_price, winner_id, total_bids, seller_id, status, category_id, created_at')
+        .select('id, title, description, price, cover_url, condition, sale_type, auction_status, auction_start_at, auction_end_at, current_bid, min_bid_increment, buy_now_price, reserve_price, winner_id, total_bids, seller_id, status, category_id, created_at')
         .eq('sale_type', 'auction')
         .not('seller_id', 'is', null)
         .or('status.is.null,status.eq.active,status.eq.paused');
@@ -275,12 +276,59 @@ export async function getActiveAuctions(filters?: {
       return aEnd - bEnd;
     });
 
-    return filteredData as AuctionProduct[];
+    // Fallback: cargar primera imagen de product_images si cover_url está vacío
+    const idsWithoutCover = filteredData
+      .filter((a: any) => !a.cover_url)
+      .map((a: any) => a.id);
+
+    let imageByProductId = new Map<string, string>();
+    if (idsWithoutCover.length > 0) {
+      const { data: imageRows } = await supabase
+        .from('product_images')
+        .select('product_id, url, idx')
+        .in('product_id', idsWithoutCover)
+        .order('idx', { ascending: true });
+
+      if (imageRows) {
+        for (const row of imageRows) {
+          if (!imageByProductId.has(row.product_id) && row.url) {
+            imageByProductId.set(row.product_id, row.url);
+          }
+        }
+      }
+    }
+
+    return filteredData.map((auction: any) => {
+      const coverUrl = auction.cover_url || imageByProductId.get(auction.id);
+      return {
+        ...auction,
+        cover_url: coverUrl,
+        image_url: coverUrl,
+      };
+    }) as AuctionProduct[];
   } catch (error) {
     logger.error('Error fetching active auctions', error);
     // Retornar array vacío en lugar de lanzar error para mejor UX
     return [];
   }
+}
+
+/**
+ * Obtiene subastas activas relacionadas (misma lógica de filtrado que el listado principal)
+ */
+export async function getRelatedActiveAuctions(
+  excludeProductId: string,
+  limit = 10
+): Promise<Array<{ id: string; title: string; image_url: string | null }>> {
+  const auctions = await getActiveAuctions();
+  return auctions
+    .filter((a) => a.id !== excludeProductId)
+    .slice(0, limit)
+    .map((a) => ({
+      id: a.id,
+      title: a.title,
+      image_url: a.cover_url || a.image_url || null,
+    }));
 }
 
 /**
