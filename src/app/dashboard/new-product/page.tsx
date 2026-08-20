@@ -555,7 +555,7 @@ export default function NewProduct() {
             ? Number(auctionBuyNowPrice) 
             : null,
           start_date: startDate.toISOString(),
-          duration_minutes: 1440, // 24 horas
+          duration_minutes: 2, // 2 minutos
         };
       }
 
@@ -1059,7 +1059,7 @@ export default function NewProduct() {
                   />
                   <p className="text-xs text-gray-600 mt-1 font-medium">📅 Inicio de la subasta</p>
                   <p className="text-xs text-gray-500">
-                    La subasta comenzará automáticamente en esta fecha y hora. <strong>Duración: 24 horas</strong> desde el inicio. Podés seleccionar una fecha pasada para iniciar inmediatamente.
+                    La subasta comenzará automáticamente en esta fecha y hora. <strong>Duración: 2 minutos</strong> desde el inicio. Podés seleccionar una fecha pasada para iniciar inmediatamente.
                   </p>
                 </div>
               </div>
@@ -1067,7 +1067,7 @@ export default function NewProduct() {
                 <p className="text-xs text-yellow-900">
                   <strong>💡 ¿Cómo funcionan las subastas?</strong><br/>
                   • Los compradores pujan incrementando el precio<br/>
-                  • <strong>Duración: 24 horas</strong> desde la fecha de inicio<br/>
+                  • <strong>Duración: 2 minutos</strong> desde la fecha de inicio<br/>
                   • Quien ofrezca el precio más alto al finalizar gana<br/>
                   • Si configuraste "Compra ahora", alguien puede comprarlo inmediatamente<br/>
                   • Puedes usar una fecha pasada para iniciar la subasta inmediatamente
