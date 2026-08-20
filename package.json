@@ -7,7 +7,7 @@
   },
   "packageManager": "npm@10",
   "scripts": {
-    "postinstall": "npm rebuild lightningcss --no-save 2>$null 2>&1 || true; npm rebuild @tailwindcss/oxide --no-save 2>$null 2>&1 || true; npm rebuild sharp --no-save 2>$null 2>&1 || true",
+    "postinstall": "npm rebuild lightningcss @tailwindcss/oxide sharp --no-save || true",
     "dev": "next dev --webpack",
     "build": "next build --webpack",
     "start": "next start",
@@ -124,7 +124,9 @@
     "vitest": "^4.0.4"
   },
   "optionalDependencies": {
-    "lightningcss-linux-x64-gnu": "^1.30.2",
-    "@tailwindcss/oxide-linux-x64-gnu": "latest"
+    "@img/sharp-libvips-linux-x64": "^1.2.4",
+    "@img/sharp-linux-x64": "^0.34.5",
+    "@tailwindcss/oxide-linux-x64-gnu": "latest",
+    "lightningcss-linux-x64-gnu": "^1.30.2"
   }
 }

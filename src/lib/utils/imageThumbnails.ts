@@ -3,7 +3,9 @@
 // Generación de thumbnails para optimizar carga
 // ============================================
 
-import sharp from 'sharp';
+async function getSharp() {
+  return (await import('sharp')).default;
+}
 
 /**
  * Tamaños de thumbnails predefinidos
@@ -30,7 +32,8 @@ export async function generateThumbnail(
   quality: number = 80
 ): Promise<Buffer> {
   const dimensions = THUMBNAIL_SIZES[size];
-  
+  const sharp = await getSharp();
+
   return await sharp(imageBuffer)
     .resize(dimensions.width, dimensions.height, {
       fit: 'inside',
@@ -73,6 +76,7 @@ export async function generateWebPThumbnail(
   quality: number = 80
 ): Promise<Buffer> {
   const dimensions = THUMBNAIL_SIZES[size];
+  const sharp = await getSharp();
   
   return await sharp(imageBuffer)
     .resize(dimensions.width, dimensions.height, {
