@@ -31,6 +31,10 @@ type Product = {
   wholesale_discount_percent?: number | null;
   stock_quantity?: number | null;
   stock_management_enabled?: boolean;
+  fulfillment_type?: string | null;
+  estimated_delivery_min_days?: number | null;
+  estimated_delivery_max_days?: number | null;
+  source_available?: boolean | null;
   created_at: string;
 };
 
@@ -151,6 +155,10 @@ export default async function ProductPage(
       wholesale_discount_percent,
       stock_quantity,
       stock_management_enabled,
+      fulfillment_type,
+      estimated_delivery_min_days,
+      estimated_delivery_max_days,
+      source_available,
       created_at,
       categories (
         id,
@@ -359,10 +367,26 @@ export default async function ProductPage(
           <div className="space-y-6">
             <div>
               <h1 className="text-xl sm:text-2xl md:text-3xl font-bold mb-2 text-gray-900">{p.title}</h1>
-              {category && (
-                <span className="inline-block bg-blue-100 text-blue-800 text-sm sm:text-base px-3 py-1 rounded-full font-medium">
-                  {category.name}
-                </span>
+              <div className="flex flex-wrap gap-2">
+                {category && (
+                  <span className="inline-block bg-blue-100 text-blue-800 text-sm sm:text-base px-3 py-1 rounded-full font-medium">
+                    {category.name}
+                  </span>
+                )}
+                {p.fulfillment_type === 'sourced' && (
+                  <span className="inline-block bg-indigo-100 text-indigo-800 text-sm sm:text-base px-3 py-1 rounded-full font-medium">
+                    Envío internacional
+                    {p.estimated_delivery_min_days && p.estimated_delivery_max_days
+                      ? `: ${p.estimated_delivery_min_days}–${p.estimated_delivery_max_days} días`
+                      : ''}
+                  </span>
+                )}
+              </div>
+              {p.fulfillment_type === 'sourced' && (
+                <p className="mt-3 text-sm text-indigo-900 bg-indigo-50 border border-indigo-100 rounded-lg p-3">
+                  Este producto se consigue en origen y se envía a Paraguay. El plazo es estimado; no hay stock local.
+                  {p.source_available === false ? ' El origen no está disponible en este momento.' : ''}
+                </p>
               )}
             </div>
 

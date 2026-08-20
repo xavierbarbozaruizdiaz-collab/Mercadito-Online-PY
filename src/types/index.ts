@@ -171,6 +171,13 @@ export interface Product {
   seo_description?: string;
   is_featured: boolean;
   cover_url?: string;
+  fulfillment_type?: 'local' | 'sourced';
+  source_platform?: string | null;
+  source_product_id?: string | null;
+  source_url?: string | null;
+  source_available?: boolean | null;
+  estimated_delivery_min_days?: number | null;
+  estimated_delivery_max_days?: number | null;
   created_at: string;
   updated_at: string;
 }

@@ -26,6 +26,8 @@ import {
   Target,
   Gavel,
   ExternalLink,
+  Globe,
+  Truck,
 } from 'lucide-react';
 import Logo from '@/components/Logo';
 import { BrandWordmark } from '@/components/BrandWordmark';
@@ -62,6 +64,11 @@ const sellerMoreItems: SidebarItem[] = [
   { icon: UserPlus, label: 'Afiliados', href: '/dashboard/store/affiliates' },
   { icon: Gavel, label: 'Mis pujas', href: '/dashboard/my-bids' },
   { icon: Gift, label: 'Sorteos ganados', href: '/dashboard/raffles-won' },
+];
+
+const adminSourcedItems: SidebarItem[] = [
+  { icon: Globe, label: 'Catálogo internacional', href: '/dashboard/sourced-catalog' },
+  { icon: Truck, label: 'Fulfillment sourced', href: '/dashboard/sourced-fulfillments' },
 ];
 
 interface DashboardSidebarProps {
@@ -128,7 +135,11 @@ export default function DashboardSidebar({
   );
 
   useEffect(() => {
-    if (showSellerNav && sellerMoreItems.some((item) => isActive(item.href))) {
+    if (
+      showSellerNav &&
+      (sellerMoreItems.some((item) => isActive(item.href)) ||
+        (isAdmin && adminSourcedItems.some((item) => isActive(item.href))))
+    ) {
       setMoreOpen(true);
     }
   }, [pathname, showSellerNav, isActive]);
@@ -235,6 +246,7 @@ export default function DashboardSidebar({
                   </button>
                   {moreOpen && (
                     <div className="mt-1 ml-1 space-y-0.5 border-l-2 border-[hsl(var(--muted))] pl-2">
+                      {isAdmin && adminSourcedItems.map(renderLink)}
                       {sellerMoreItems.map(renderLink)}
                       {onStatsClick && (
                         <button

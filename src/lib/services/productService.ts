@@ -70,20 +70,34 @@ class ProductServiceImpl implements ProductService {
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       if (authError || !user) throw new Error('Usuario no autenticado');
 
-      // Rate limiting para crear productos
-      try {
-        const { rateLimiter } = await import('@/lib/utils/rateLimit');
-        const limitCheck = await rateLimiter.checkLimit(user.id, 'PRODUCT_CREATE');
-        
-        if (!limitCheck.allowed) {
-          throw new Error(
-            `Has alcanzado el límite de creación de productos. Intenta de nuevo en ${limitCheck.retryAfter || 60} segundos.`
-          );
+      // Rate limiting para crear productos (la tienda fallback/Ubuy no aplica)
+      const { data: fallbackCheck } = await supabase
+        .from('stores')
+        .select('id')
+        .eq('seller_id', user.id)
+        .eq('is_fallback_store', true)
+        .eq('is_active', true)
+        .limit(1);
+
+      const isFallbackStoreOwner = !!(fallbackCheck && fallbackCheck.length > 0);
+
+      if (!isFallbackStoreOwner) {
+        try {
+          const { rateLimiter } = await import('@/lib/utils/rateLimit');
+          const limitCheck = await rateLimiter.checkLimit(user.id, 'PRODUCT_CREATE');
+          
+          if (!limitCheck.allowed) {
+            throw new Error(
+              `Has alcanzado el límite de creación de productos. Intenta de nuevo en ${limitCheck.retryAfter || 60} segundos.`
+            );
+          }
+        } catch (rateLimitError: any) {
+          if (rateLimitError?.message?.includes('límite de creación')) {
+            throw rateLimitError;
+          }
+          const { logger } = await import('@/lib/utils/logger');
+          logger.warn('Rate limiter no disponible, continuando sin limitación', rateLimitError);
         }
-      } catch (rateLimitError: any) {
-        // Si el rate limiter falla, loguear pero continuar (degradación elegante)
-        const { logger } = await import('@/lib/utils/logger');
-        logger.warn('Rate limiter no disponible, continuando sin limitación', rateLimitError);
       }
 
       // Verificar límites de publicación (membresía o tienda)

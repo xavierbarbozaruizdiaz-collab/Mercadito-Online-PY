@@ -12,6 +12,7 @@ const NAV = [
   { href: '/admin/products', label: 'Productos' },
   { href: '/admin/orders', label: 'Pedidos' },
   { href: '/admin/stores', label: 'Tiendas' },
+  { href: '/dashboard/sourced-catalog', label: 'Catálogo Ubuy' },
   { href: '/admin/users', label: 'Usuarios' },
   { href: '/admin/raffles', label: 'Sorteos' },
   { href: '/admin/marketing/catalogo-vitrina', label: 'Vitrina' },

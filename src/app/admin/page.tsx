@@ -1,4 +1,5 @@
 import AnalyticsDashboard from '@/components/AnalyticsDashboard';
+import AdminUbuyStoreCard from '@/components/admin/AdminUbuyStoreCard';
 import Link from 'next/link';
 
 type AdminLink = {
@@ -25,7 +26,17 @@ const SECTIONS: { title: string; subtitle: string; items: AdminLink[] }[] = [
       {
         href: '/admin/stores',
         title: 'Tiendas',
-        description: 'Aprobar o rechazar vendedores',
+        description: 'Aprobar o rechazar vendedores. La fallback es la tienda Ubuy del admin',
+      },
+      {
+        href: '/dashboard/sourced-catalog',
+        title: 'Catálogo Ubuy',
+        description: 'Tienda oficial del admin: importar AliExpress',
+      },
+      {
+        href: '/dashboard/sourced-fulfillments',
+        title: 'Fulfillment Ubuy',
+        description: 'Comprar en origen y cargar tracking',
       },
       {
         href: '/admin/users',
@@ -172,6 +183,8 @@ export default function AdminDashboardPage() {
           Desde acá manejás pedidos, tiendas, la portada del inicio y el día a día del marketplace.
         </p>
       </section>
+
+      <AdminUbuyStoreCard />
 
       {SECTIONS.map((section) => (
         <section key={section.title} className="space-y-4">

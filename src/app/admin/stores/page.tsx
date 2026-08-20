@@ -371,7 +371,7 @@ export default function AdminStoresPage() {
                     <div className="flex items-center gap-2">
                       {store.is_fallback_store && (
                         <div className="px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800 font-medium">
-                          🏪 Tienda Fallback
+                          Tienda Ubuy (oficial admin)
                         </div>
                       )}
                       {isStorePaused(store) && (
@@ -470,7 +470,7 @@ export default function AdminStoresPage() {
                               : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                           }`}
                         >
-                          {processing === store.id ? 'Procesando...' : store.is_fallback_store ? '🏪 Es Fallback' : '🏪 Marcar como Fallback'}
+                          {processing === store.id ? 'Procesando...' : store.is_fallback_store ? 'Es tienda Ubuy' : 'Marcar como tienda Ubuy'}
                         </button>
                       </>
                     )}
@@ -494,8 +494,24 @@ export default function AdminStoresPage() {
                       className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
                       target="_blank"
                     >
-                      👁️ Ver tienda
+                      Ver tienda
                     </Link>
+                    {store.is_fallback_store && (
+                      <>
+                        <Link
+                          href="/dashboard"
+                          className="px-4 py-2 bg-indigo-700 text-white rounded hover:bg-indigo-800"
+                        >
+                          Panel de esta tienda
+                        </Link>
+                        <Link
+                          href="/dashboard/sourced-catalog"
+                          className="px-4 py-2 bg-indigo-100 text-indigo-900 rounded hover:bg-indigo-200"
+                        >
+                          Importar AliExpress
+                        </Link>
+                      </>
+                    )}
                   </div>
                 </div>
               );

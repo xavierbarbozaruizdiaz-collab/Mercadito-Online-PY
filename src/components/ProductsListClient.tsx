@@ -17,6 +17,9 @@ type Product = {
   image_url: string | null;
   condition: string;
   sale_type: string;
+  fulfillment_type?: string | null;
+  estimated_delivery_min_days?: number | null;
+  estimated_delivery_max_days?: number | null;
   category_id: string;
   seller_id: string;
   store_id: string | null;
@@ -184,6 +187,9 @@ export default function ProductsListClient() {
           image_url:cover_url,
           condition,
           sale_type,
+          fulfillment_type,
+          estimated_delivery_min_days,
+          estimated_delivery_max_days,
           category_id,
           seller_id,
           store_id,
@@ -1041,6 +1047,11 @@ export default function ProductsListClient() {
                     )}
                   </div> */}
                   <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
+                    {product.fulfillment_type === 'sourced' && (
+                      <span className="px-2 py-0.5 text-[10px] rounded-full bg-indigo-600 text-white">
+                        Internacional
+                      </span>
+                    )}
                     {/* Badge de tipo de venta - OCULTO */}
                     {/* <span className={`px-2 py-1 text-xs rounded-full flex items-center gap-1 ${
                       isAuction 

@@ -45,6 +45,9 @@ interface Product {
   compare_price?: number;
   condition: string;
   sale_type: string;
+  fulfillment_type?: string;
+  estimated_delivery_min_days?: number | null;
+  estimated_delivery_max_days?: number | null;
   image_url?: string;
   thumbnail_url?: string; // [IMAGES LEVEL2] Thumbnail optimizado para listados
   created_at: string;
@@ -472,6 +475,15 @@ export default function ProductCard({
               className="absolute top-2 right-2"
             >
               -{discount}%
+            </Badge>
+          )}
+
+          {product.fulfillment_type === 'sourced' && (
+            <Badge variant="info" size="sm" className="absolute bottom-2 left-2 bg-indigo-600/90 text-white">
+              Envío internacional
+              {product.estimated_delivery_min_days && product.estimated_delivery_max_days
+                ? ` ${product.estimated_delivery_min_days}-${product.estimated_delivery_max_days}d`
+                : ''}
             </Badge>
           )}
 

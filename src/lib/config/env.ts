@@ -28,6 +28,13 @@ const envSchema = z.object({
   WHATSAPP_API_KEY: z.string().optional(),
   WHATSAPP_API_URL: z.string().url().optional(),
 
+  // AliExpress Open Platform (catálogo sourced / tienda fallback)
+  ALIEXPRESS_APP_KEY: z.string().optional(),
+  ALIEXPRESS_APP_SECRET: z.string().optional(),
+  ALIEXPRESS_ACCESS_TOKEN: z.string().optional(),
+  ALIEXPRESS_TRACKING_ID: z.string().optional(),
+  ALIEXPRESS_API_GATEWAY: z.string().url().optional(),
+
   // Node Environment
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
 });
@@ -50,6 +57,11 @@ function getEnv(): Env {
       WHATSAPP_API_ENABLED: process.env.WHATSAPP_API_ENABLED,
       WHATSAPP_API_KEY: process.env.WHATSAPP_API_KEY,
       WHATSAPP_API_URL: process.env.WHATSAPP_API_URL,
+      ALIEXPRESS_APP_KEY: process.env.ALIEXPRESS_APP_KEY,
+      ALIEXPRESS_APP_SECRET: process.env.ALIEXPRESS_APP_SECRET,
+      ALIEXPRESS_ACCESS_TOKEN: process.env.ALIEXPRESS_ACCESS_TOKEN,
+      ALIEXPRESS_TRACKING_ID: process.env.ALIEXPRESS_TRACKING_ID,
+      ALIEXPRESS_API_GATEWAY: process.env.ALIEXPRESS_API_GATEWAY || undefined,
       NODE_ENV: process.env.NODE_ENV,
     });
   } catch (error) {
@@ -80,6 +92,9 @@ export const features = {
   },
   cron: {
     enabled: !!env.CRON_SECRET,
+  },
+  aliexpress: {
+    enabled: !!env.ALIEXPRESS_APP_KEY && !!env.ALIEXPRESS_APP_SECRET,
   },
 } as const;
 

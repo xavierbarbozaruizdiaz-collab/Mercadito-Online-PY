@@ -35,6 +35,13 @@ const nextConfig: NextConfig = {
       // Otros dominios comunes
       { protocol: 'https', hostname: 'placehold.co' },
       { protocol: 'https', hostname: 'via.placeholder.com' },
+      { protocol: 'https', hostname: 'ae01.alicdn.com' },
+      { protocol: 'https', hostname: 'ae02.alicdn.com' },
+      { protocol: 'https', hostname: 'ae03.alicdn.com' },
+      { protocol: 'https', hostname: 'ae04.alicdn.com' },
+      { protocol: 'https', hostname: '**.alicdn.com' },
+      { protocol: 'https', hostname: 'ae-pic-a1.aliexpress-media.com' },
+      { protocol: 'https', hostname: '**.aliexpress-media.com' },
     ],
     formats: ['image/webp', 'image/avif'],
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
