@@ -76,20 +76,19 @@ export default async function Home() {
       const { data, error } = await supabase
         .from('hero_slides')
         .select(
-          'id, title, subtitle, cta_primary_label, cta_primary_href, cta_secondary_label, cta_secondary_href, bg_type, image_url, bg_image_url, gradient_from, gradient_to, storage_path, link_url, show_title, is_active, sort_order, created_at'
+          'id, title, subtitle, cta_primary_label, cta_primary_href, cta_secondary_label, cta_secondary_href, bg_type, image_url, bg_image_url, storage_path, gradient_from, gradient_to, bg_gradient_from, bg_gradient_to, link_url, show_title, is_active, sort_order, position, created_at'
         )
         .eq('is_active', true)
-        .order('sort_order', { ascending: true });
+        .order('position', { ascending: true });
       
              if (error) {
                console.error('[Hero] Error loading hero slides:', error);
              } else if (data) {
-        // Ordenar por sort_order ASC y luego por created_at DESC (si existe)
+        // Ordenar por position (editor) y luego sort_order / created_at
         const sortedData = [...data].sort((a: any, b: any) => {
-          if (a.sort_order !== b.sort_order) {
-            return (a.sort_order || 0) - (b.sort_order || 0);
-          }
-          // Si sort_order es igual, ordenar por created_at DESC
+          const posA = a.position ?? a.sort_order ?? 0;
+          const posB = b.position ?? b.sort_order ?? 0;
+          if (posA !== posB) return posA - posB;
           if (a.created_at && b.created_at) {
             return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
           }
@@ -100,7 +99,8 @@ export default async function Home() {
         const getPublicUrlFromPath = (path: string | null | undefined): string | null => {
           if (!path) return null;
           try {
-            const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://hqdatzhliaordlsqtjea.supabase.co';
+            const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+            if (!supabaseUrl) return null;
             const bucketName = 'hero-banners';
             return `${supabaseUrl}/storage/v1/object/public/${bucketName}/${path}`;
           } catch {
@@ -108,9 +108,14 @@ export default async function Home() {
           }
         };
         
-        // Mapear según bg_type
+        // Mapear según bg_type — image_url o storage_path (admin guarda path)
         slides = sortedData.map((s: any) => {
           const bgType = (s.bg_type || 'gradient') as 'gradient' | 'image';
+          const resolvedImage =
+            s.bg_image_url ||
+            s.image_url ||
+            getPublicUrlFromPath(s.storage_path) ||
+            null;
           
           // Construir URL de imagen: prioridad: bg_image_url > public_url desde storage_path > image_url
           let imageUrl: string | null = null;
@@ -134,22 +139,25 @@ export default async function Home() {
             cta_secondary_label: (s.cta_secondary_label ?? null) as string | null,
             cta_secondary_href: (s.cta_secondary_href ?? null) as string | null,
             bg_type: bgType,
-            // Para gradient: usar gradient_from/gradient_to
-            bg_gradient_from: bgType === 'gradient' ? (s.gradient_from ?? '#6d28d9') : null,
-            bg_gradient_to: bgType === 'gradient' ? (s.gradient_to ?? '#2563eb') : null,
-            // Para image: usar la URL construida
-            bg_image_url: imageUrl,
-            image_url: s.image_url ?? null,
-            gradient_from: s.gradient_from ?? null,
-            gradient_to: s.gradient_to ?? null,
+            bg_gradient_from:
+              bgType === 'gradient'
+                ? (s.bg_gradient_from ?? s.gradient_from ?? '#14B8A6')
+                : null,
+            bg_gradient_to:
+              bgType === 'gradient'
+                ? (s.bg_gradient_to ?? s.gradient_to ?? '#06B6D4')
+                : null,
+            bg_image_url: bgType === 'image' ? (imageUrl || resolvedImage) : null,
+            image_url: imageUrl || resolvedImage,
+            gradient_from: s.bg_gradient_from ?? s.gradient_from ?? null,
+            gradient_to: s.bg_gradient_to ?? s.gradient_to ?? null,
             storage_path: (s.storage_path ?? null) as string | null,
-            public_url: s.storage_path ? getPublicUrlFromPath(s.storage_path) : null,
+            public_url: imageUrl || resolvedImage,
             link_url: (s.link_url ?? null) as string | null,
-            show_title: s.show_title !== undefined ? (s.show_title ?? true) : true, // Por defecto true
-            sort_order: (s.sort_order as number) ?? 0,
+            show_title: s.show_title !== undefined ? (s.show_title ?? true) : true,
+            sort_order: (s.position as number) ?? (s.sort_order as number) ?? 0,
             created_at: s.created_at ?? null,
-            // Añadir position para compatibilidad con HeroSlider
-            position: (s.sort_order as number) ?? 0,
+            position: (s.position as number) ?? (s.sort_order as number) ?? 0,
           };
         });
         

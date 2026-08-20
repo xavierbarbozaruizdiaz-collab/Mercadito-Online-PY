@@ -32,6 +32,8 @@ const IMPORTANT_VARS = [
   'SUPABASE_SERVICE_ROLE_KEY',
   'NEXT_PUBLIC_APP_URL',
   'CRON_SECRET',
+  'UPSTASH_REDIS_REST_URL',
+  'UPSTASH_REDIS_REST_TOKEN',
 ];
 
 // Variables opcionales pero que pueden causar diferencias
@@ -66,6 +68,13 @@ const WHATSAPP_VARS = [
   'WHATSAPP_API_URL',
 ];
 
+const ALIEXPRESS_VARS = [
+  'ALIEXPRESS_APP_KEY',
+  'ALIEXPRESS_APP_SECRET',
+  'ALIEXPRESS_ACCESS_TOKEN',
+  'ALIEXPRESS_TRACKING_ID',
+];
+
 // Todas las variables que deberían existir
 const ALL_VARS = [
   ...CRITICAL_VARS,
@@ -73,13 +82,14 @@ const ALL_VARS = [
   ...OPTIONAL_VARS,
   ...PAYMENT_VARS,
   ...WHATSAPP_VARS,
+  ...ALIEXPRESS_VARS,
 ];
 
 // Variables que DEBEN ser diferentes entre local y prod
 const EXPECTED_DIFFERENCES = {
   'NEXT_PUBLIC_APP_URL': {
     local: 'http://localhost:3000',
-    prod: 'https://mercadito-online-py.vercel.app',
+    prod: 'https://mercadito-online-py-swart.vercel.app',
     note: 'Esta diferencia es esperada y correcta',
   },
   'NEXT_PUBLIC_APP_ENV': {

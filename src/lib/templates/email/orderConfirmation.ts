@@ -4,6 +4,7 @@
 // ============================================
 
 import { getBaseEmailTemplate } from './baseTemplate';
+import { getPublicAppUrl } from '@/lib/config/site';
 
 export interface OrderConfirmationData {
   orderNumber: string;
@@ -130,7 +131,7 @@ export function getOrderConfirmationTemplate(data: OrderConfirmationData): strin
     title: `Confirmación de Pedido #${data.orderNumber}`,
     content,
     buttonText: 'Ver Detalles del Pedido',
-    buttonUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'https://mercadito-online-py.vercel.app'}/dashboard/orders`,
+    buttonUrl: `${getPublicAppUrl()}/dashboard/orders`,
     footerText: 'Mercadito Online PY - El mejor marketplace de Paraguay',
   });
 }

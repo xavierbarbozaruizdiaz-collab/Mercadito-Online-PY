@@ -10,6 +10,7 @@ import FooterWrapper from "@/components/FooterWrapper";
 import HeaderWrapper from "@/components/HeaderWrapper";
 import { SITE_URL } from "@/lib/config/site";
 import MercaditoAssistantWidget from "@/components/MercaditoAssistantWidget";
+import AuthCookieSync from "@/components/AuthCookieSync";
 import { getSiteSettings } from "@/lib/services/siteSettingsServer";
 
 const geistSans = Geist({
@@ -116,7 +117,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 5,
   userScalable: true,
-  themeColor: '#000000',
+  themeColor: '#22C55E',
 };
 
 export default function RootLayout({
@@ -175,6 +176,7 @@ export default function RootLayout({
         <ErrorBoundary>
           <ThemeProvider>
             <AnalyticsProvider>
+            <AuthCookieSync />
             {/* Header dinámico */}
             <HeaderWrapper />
 

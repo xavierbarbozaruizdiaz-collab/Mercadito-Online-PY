@@ -22,15 +22,5 @@
     "src/app/api/**/*.ts": {
       "maxDuration": 30
     }
-  },
-  "crons": [
-    {
-      "path": "/api/cron/backup-database",
-      "schedule": "0 2 * * *"
-    },
-    {
-      "path": "/api/cron/close-auctions",
-      "schedule": "*/5 * * * *"
-    }
-  ]
+  }
 }

@@ -3,6 +3,8 @@
 // Template base para todos los emails
 // ============================================
 
+import { getPublicAppUrl } from '@/lib/config/site';
+
 export interface EmailTemplateData {
   title: string;
   content: string;
@@ -13,7 +15,8 @@ export interface EmailTemplateData {
 }
 
 export function getBaseEmailTemplate(data: EmailTemplateData): string {
-  const logo = data.logoUrl || 'https://mercadito-online-py.vercel.app/logo.png';
+  const appUrl = getPublicAppUrl();
+  const logo = data.logoUrl || `${appUrl}/logo.png`;
   const buttonHtml = data.buttonText && data.buttonUrl ? `
     <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin: 32px auto;">
       <tr>
@@ -124,7 +127,7 @@ export function getBaseEmailTemplate(data: EmailTemplateData): string {
           Este es un email automático, por favor no responder.
         </p>
         <p style="margin: 10px 0 0 0; font-size: 12px; color: #9ca3af;">
-          <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://mercadito-online-py.vercel.app'}" style="color: #3b82f6; text-decoration: underline;">Visitar sitio web</a>
+          <a href="${appUrl}" style="color: #3b82f6; text-decoration: underline;">Visitar sitio web</a>
         </p>
       </td>
     </tr>

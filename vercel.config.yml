@@ -5,14 +5,14 @@
 BUILD_COMMAND: npm run build
 OUTPUT_DIRECTORY: .next
 INSTALL_COMMAND: npm ci
-NODE_VERSION: 20.x
+NODE_VERSION: 22.x
 
 # Environment Variables
 NEXT_PUBLIC_SUPABASE_URL: https://hqdatzhliaordlsqtjea.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY: $NEXT_PUBLIC_SUPABASE_ANON_KEY
 SUPABASE_SERVICE_ROLE_KEY: $SUPABASE_SERVICE_ROLE_KEY
 NEXT_PUBLIC_APP_ENV: production
-NEXT_PUBLIC_APP_URL: https://mercadito-online-py.vercel.app
+NEXT_PUBLIC_APP_URL: https://mercadito-online-py-swart.vercel.app
 
 # Functions Configuration
 FUNCTIONS_REGIONS: ["iad1", "sfo1", "lhr1"]

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabaseClient';
 import type { Database } from '@/types/database';
 import { formatPhoneForWhatsApp } from '@/lib/utils';
+import { requireUser } from '@/lib/auth/apiAuth';
 
 /**
  * API Route para enviar notificaciones de WhatsApp a vendedores cuando reciben un pedido
@@ -9,6 +10,9 @@ import { formatPhoneForWhatsApp } from '@/lib/utils';
  */
 export async function POST(request: NextRequest) {
   try {
+    const auth = await requireUser(request);
+    if (!auth.ok) return auth.response;
+
     const body = await request.json();
     const { sellerId, orderId, orderData, buyerPhone, buyerName } = body;
 

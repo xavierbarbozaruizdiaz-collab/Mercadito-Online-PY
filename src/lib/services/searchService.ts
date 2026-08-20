@@ -42,6 +42,9 @@ export interface ProductSearchResult {
   compare_price?: number;
   condition: string;
   sale_type: string;
+  fulfillment_type?: string;
+  estimated_delivery_min_days?: number;
+  estimated_delivery_max_days?: number;
   cover_url?: string;
   created_at: string;
   store: {
@@ -97,6 +100,9 @@ export class SearchService {
           compare_price,
           condition,
           sale_type,
+          fulfillment_type,
+          estimated_delivery_min_days,
+          estimated_delivery_max_days,
           image_url:cover_url,
           created_at,
           store:stores(

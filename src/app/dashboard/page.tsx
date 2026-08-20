@@ -24,11 +24,14 @@ import {
   Edit,
   Target,
   Percent,
-  TrendingDown
+  TrendingDown,
+  User,
+  Store,
 } from 'lucide-react';
 import Image from 'next/image';
 import DashboardSidebar from '@/components/DashboardSidebar';
 import StatsPanel from '@/components/StatsPanel';
+import SellerHomeHeader from '@/components/dashboard/SellerHomeHeader';
 import { useToast } from '@/lib/hooks/useToast';
 // import AdminRoleAssigner from '@/components/AdminRoleAssigner'; // Temporalmente comentado
 
@@ -1298,14 +1301,12 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-[#1A1A1A] flex">
-      {/* Barra lateral */}
+    <div className="min-h-screen bg-[hsl(var(--background))] flex">
       <DashboardSidebar 
         onCollapseChange={setSidebarCollapsed}
         onStatsClick={() => setStatsPanelOpen(true)}
       />
       
-      {/* Panel de Estadísticas */}
       <StatsPanel
         isOpen={statsPanelOpen}
         onClose={() => setStatsPanelOpen(false)}
@@ -1314,307 +1315,54 @@ export default function Dashboard() {
         storeId={storeId}
       />
       
-      {/* Contenido principal */}
-      <div className={`flex-1 p-6 transition-all duration-300 ${sidebarCollapsed ? 'md:ml-16' : 'md:ml-64'}`}>
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-0 mb-6">
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-200">Panel del vendedor</h1>
-        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-          <Link
-            href="/orders"
-            className="px-3 sm:px-4 py-2 rounded bg-gray-700 text-white hover:bg-gray-600 transition-colors text-sm sm:text-base text-center"
-          >
-            📦 Mis pedidos
-          </Link>
-          <button
-            onClick={() => {
-              setFilterType('all');
-              logger.debug('Mostrando todos los productos', { count: allProducts.length });
-              setProducts(allProducts);
-            }}
-            className={`px-3 sm:px-4 py-2 rounded transition-colors text-sm sm:text-base text-center ${
-              filterType === 'all'
-                ? 'bg-gray-700 text-white hover:bg-gray-600' 
-                : 'bg-gray-800 text-gray-300 hover:bg-gray-700 border border-gray-600'
-            }`}
-          >
-            📦 Todos
-          </button>
-          <button
-            onClick={() => {
-              setFilterType('direct');
-              const directProducts = allProducts.filter(p => p.sale_type === 'direct');
-              logger.debug('Filtrando precios fijos', {
-                total: allProducts.length,
-                direct: directProducts.length
-              });
-              setProducts(directProducts);
-            }}
-            className={`px-3 sm:px-4 py-2 rounded transition-colors text-sm sm:text-base text-center ${
-              filterType === 'direct'
-                ? 'bg-blue-600 text-white hover:bg-blue-700' 
-                : 'bg-gray-800 text-gray-300 hover:bg-gray-700 border border-gray-600'
-            }`}
-          >
-            💰 Precios fijos
-          </button>
-          <button
-            onClick={() => {
-              setFilterType('auction');
-              const auctions = allProducts.filter(p => p.sale_type === 'auction');
-              logger.debug('Filtrando subastas', {
-                total: allProducts.length,
-                auctions: auctions.length
-              });
-              setProducts(auctions);
-            }}
-            className={`px-3 sm:px-4 py-2 rounded transition-colors text-sm sm:text-base text-center ${
-              filterType === 'auction'
-                ? 'bg-yellow-600 text-white hover:bg-yellow-700' 
-                : 'bg-gray-800 text-gray-300 hover:bg-gray-700 border border-gray-600'
-            }`}
-          >
-            🔨 Mis subastas
-          </button>
-          {finishedAuctions.length > 0 && (
-            <button
-              onClick={() => {
-                setFilterType('finished_auctions');
-                setProducts(finishedAuctions);
-              }}
-              className={`px-3 sm:px-4 py-2 rounded transition-colors text-sm sm:text-base text-center ${
-                filterType === 'finished_auctions'
-                  ? 'bg-gray-700 text-white hover:bg-gray-600' 
-                  : 'bg-gray-800 text-gray-300 hover:bg-gray-700 border border-gray-600'
-              }`}
-              title="Las subastas finalizadas se eliminan automáticamente después de 30 días"
-            >
-              ✓ Finalizadas ({finishedAuctions.length})
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Notificaciones Importantes */}
-      {(role === 'seller' || (role === null && loading)) && stats && stats.notifications.length > 0 && (
-        <div className="mb-6 space-y-2">
-          {stats.notifications.map((notif, idx) => (
-            <Link
-              key={idx}
-              href={notif.link || '#'}
-              className={`block p-4 rounded-lg border-l-4 transition-all hover:shadow-md ${
-                notif.priority === 'high' 
-                  ? 'bg-red-900/30 border-red-500' 
-                  : notif.priority === 'medium'
-                  ? 'bg-yellow-900/30 border-yellow-500'
-                  : 'bg-blue-900/30 border-blue-500'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <Bell className={`w-5 h-5 ${
-                  notif.priority === 'high' ? 'text-red-400' :
-                  notif.priority === 'medium' ? 'text-yellow-400' :
-                  'text-blue-400'
-                }`} />
-                <p className={`flex-1 font-medium ${
-                  notif.priority === 'high' ? 'text-red-300' :
-                  notif.priority === 'medium' ? 'text-yellow-300' :
-                  'text-blue-300'
-                }`}>
-                  {notif.message}
-                </p>
-                <ArrowUp className="w-4 h-4 text-gray-400 rotate-45" />
-              </div>
-            </Link>
-          ))}
-        </div>
-      )}
-
-      {/* Acciones Rápidas - Solo para vendedores */}
+      <div className={`flex-1 min-w-0 p-4 sm:p-6 transition-all duration-300 ${sidebarCollapsed ? 'md:ml-[72px]' : 'md:ml-64'}`}>
       {(role === 'seller' || (role === null && loading)) && (
-        <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          <Link
-            href="/dashboard/new-product"
-            className="bg-gradient-to-br from-blue-600 to-blue-700 text-white rounded-lg p-4 shadow-md hover:shadow-lg transition-all flex items-center gap-3 group"
-          >
-            <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
-              <Plus className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="font-semibold">Nuevo Producto</p>
-              <p className="text-xs text-blue-100">Crear publicación</p>
-            </div>
-          </Link>
-          <Link
-            href="/dashboard/orders"
-            className="bg-gradient-to-br from-green-600 to-green-700 text-white rounded-lg p-4 shadow-md hover:shadow-lg transition-all flex items-center gap-3 group"
-          >
-            <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
-              <ShoppingCart className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="font-semibold">Mis Ventas</p>
-              <p className="text-xs text-green-100">Gestionar órdenes</p>
-            </div>
-          </Link>
-          <Link
-            href="/dashboard/payouts"
-            className="bg-gradient-to-br from-emerald-600 to-emerald-700 text-white rounded-lg p-4 shadow-md hover:shadow-lg transition-all flex items-center gap-3 group"
-          >
-            <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
-              <DollarSign className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="font-semibold">Retiros</p>
-              <p className="text-xs text-emerald-100">Solicitar pago</p>
-            </div>
-          </Link>
-          <Link
-            href="/dashboard/profile"
-            className="bg-gradient-to-br from-purple-600 to-purple-700 text-white rounded-lg p-4 shadow-md hover:shadow-lg transition-all flex items-center gap-3 group"
-          >
-            <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
-              <Edit className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="font-semibold">Mi Perfil</p>
-              <p className="text-xs text-purple-100">Editar información</p>
-            </div>
-          </Link>
-          {storeSlug ? (
-            <Link
-              href={`/store/${storeSlug}`}
-              className="bg-gradient-to-br from-orange-600 to-orange-700 text-white rounded-lg p-4 shadow-md hover:shadow-lg transition-all flex items-center gap-3 group"
-            >
-              <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
-                <Eye className="w-5 h-5" />
-              </div>
-              <div>
-                <p className="font-semibold">Ver Mi Tienda</p>
-                <p className="text-xs text-orange-100">Vista pública</p>
-              </div>
-            </Link>
-          ) : (
-            <Link
-              href="/dashboard/profile"
-              className="bg-gradient-to-br from-gray-600 to-gray-700 text-white rounded-lg p-4 shadow-md hover:shadow-lg transition-all flex items-center gap-3 group"
-            >
-              <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
-                <Eye className="w-5 h-5" />
-              </div>
-              <div>
-                <p className="font-semibold">Configurar Tienda</p>
-                <p className="text-xs text-gray-100">Crea tu tienda primero</p>
-              </div>
-            </Link>
-          )}
-        </div>
+        <SellerHomeHeader
+          stats={stats}
+          statsLoading={statsLoading}
+          isSeller={role === 'seller' || (role === null && loading)}
+          filterType={filterType}
+          allProductsCount={allProducts.length}
+          finishedAuctionsCount={finishedAuctions.length}
+          showcaseProducts={showcaseProducts}
+          storeSlug={storeSlug}
+          hasProducts={allProducts.length > 0}
+          updatingShowcase={updatingShowcase}
+          onFilterChange={(type) => {
+            setFilterType(type);
+            if (type === 'all') setProducts(allProducts);
+            else if (type === 'direct') setProducts(allProducts.filter((p) => p.sale_type === 'direct'));
+            else if (type === 'auction') setProducts(allProducts.filter((p) => p.sale_type === 'auction'));
+            else if (type === 'finished_auctions') setProducts(finishedAuctions);
+            else if (type === 'paused') setProducts(pausedProducts);
+          }}
+          onRemoveFromShowcase={(productId) => toggleShowcase(productId, true)}
+        />
       )}
 
-      {/* Vitrina de Ofertas - Solo para vendedores */}
-      {(role === 'seller' || (role === null && loading)) && (
-        <div className="mb-6 bg-gradient-to-br from-purple-900/30 to-blue-900/30 rounded-lg border border-purple-700/50 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-purple-600/20 rounded-lg flex items-center justify-center">
-                <Star className="w-5 h-5 text-purple-400" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold text-gray-200">Vitrina de Ofertas</h3>
-                <p className="text-sm text-gray-400">
-                  Destaca hasta 2 productos en la página de vitrina de ofertas
-                </p>
-              </div>
-            </div>
-            <Link
-              href="/vitrina"
-              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium flex items-center gap-2"
-            >
-              <Eye className="w-4 h-4" />
-              Ver Vitrina
-            </Link>
-          </div>
-
-          {showcaseProducts.length === 0 ? (
-            <div className="bg-[#1A1A1A]/50 rounded-lg p-6 text-center border border-gray-700">
-              <Star className="w-12 h-12 text-gray-600 mx-auto mb-3" />
-              <p className="text-gray-400 mb-2">No tienes productos en la vitrina</p>
-              <p className="text-sm text-gray-500">
-                Puedes destacar hasta 2 productos. Usa el botón de estrella (☆) en tus productos activos para agregarlos a la vitrina.
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {showcaseProducts.map((product) => (
-                <div
-                  key={product.id}
-                  className="bg-[#1A1A1A]/50 rounded-lg border border-gray-700 p-4 flex items-center gap-4"
-                >
-                  <div className="relative w-20 h-20 rounded-lg overflow-hidden bg-gray-700 flex-shrink-0">
-                    {product.cover_url ? (
-                      <Image
-                        src={product.cover_url}
-                        alt={product.title}
-                        fill
-                        className="object-cover"
-                        sizes="80px"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <Package className="w-8 h-8 text-gray-500" />
-                      </div>
-                    )}
-                    <div className="absolute top-1 right-1">
-                      <span className="px-1.5 py-0.5 bg-purple-600 text-white text-xs font-bold rounded">
-                        {product.showcase_position}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h4 className="font-medium text-gray-200 truncate mb-1">{product.title}</h4>
-                    <p className="text-sm text-purple-400 font-semibold">
-                      {product.price.toLocaleString('es-PY')} Gs.
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => toggleShowcase(product.id, true)}
-                    disabled={updatingShowcase === product.id}
-                    className="px-3 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
-                  >
-                    {updatingShowcase === product.id ? '⏳' : 'Quitar'}
-                  </button>
-                </div>
-              ))}
-              {showcaseProducts.length < 2 && (
-                <div className="bg-[#1A1A1A]/50 rounded-lg border border-dashed border-gray-600 p-4 flex items-center justify-center">
-                  <p className="text-gray-500 text-sm">
-                    Puedes agregar {2 - showcaseProducts.length} producto{2 - showcaseProducts.length !== 1 ? 's' : ''} más
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Sección de productos disponibles eliminada - Ahora se agregan directamente desde las cards de "Mis productos" */}
+      {role !== 'seller' && role !== null && !loading && (
+        <div className="mb-8">
+          <h1 className="text-2xl font-bold text-[hsl(var(--foreground))]">Mi cuenta</h1>
+          <p className="text-sm text-[hsl(var(--muted-foreground))] mt-1">
+            Pedidos, pujas y sorteos en un solo lugar
+          </p>
         </div>
       )}
-
-      {/* Estadísticas del Dashboard - OCULTAS por defecto, se muestran en el panel */}
-      {/* Las estadísticas ahora se muestran en el StatsPanel cuando se hace clic en el botón del sidebar */}
 
       {/* Órdenes Recientes */}
       {(role === 'seller' || (role === null && loading)) && stats && stats.recentOrders && stats.recentOrders.length > 0 && (
         <div className="mb-6">
-          <div className="bg-[#252525] rounded-lg border border-gray-700 p-4 shadow-sm">
+          <div className="rounded-2xl border border-[hsl(var(--border))] bg-white p-4 shadow-sm">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-gray-200 flex items-center gap-2">
-                <Clock className="w-5 h-5 text-gray-400" />
-                Órdenes Recientes
+              <h3 className="font-semibold text-[hsl(var(--foreground))] flex items-center gap-2">
+                <Clock className="w-5 h-5 text-[hsl(var(--muted-foreground))]" />
+                Pedidos recientes
               </h3>
               <Link
                 href="/dashboard/orders"
-                className="text-sm text-blue-400 hover:text-blue-300 font-medium"
+                className="text-sm text-[hsl(var(--primary))] hover:underline font-medium"
               >
-                Ver todas →
+                Ver todos
               </Link>
             </div>
             <div className="space-y-2">
@@ -1622,36 +1370,30 @@ export default function Dashboard() {
                 <Link
                   key={order.id}
                   href="/dashboard/orders"
-                  className="flex items-center justify-between p-3 bg-gray-800 rounded-lg hover:bg-gray-700 transition-colors"
+                  className="flex items-center justify-between p-3 rounded-xl border border-[hsl(var(--border))] hover:bg-[hsl(var(--muted))]/40 transition-colors"
                 >
                   <div className="flex items-center gap-3">
                     <div className={`w-2 h-2 rounded-full ${
-                      order.status === 'pending' ? 'bg-yellow-500' :
+                      order.status === 'pending' ? 'bg-amber-500' :
                       order.status === 'confirmed' ? 'bg-blue-500' :
-                      order.status === 'shipped' ? 'bg-purple-500' :
-                      order.status === 'delivered' ? 'bg-green-500' :
+                      order.status === 'shipped' ? 'bg-violet-500' :
+                      order.status === 'delivered' ? 'bg-[hsl(var(--primary))]' :
                       'bg-gray-400'
                     }`} />
                     <div>
-                      <p className="text-sm font-medium text-gray-200">
+                      <p className="text-sm font-medium text-[hsl(var(--foreground))]">
                         Orden #{order.id.slice(0, 8)}
                       </p>
-                      <p className="text-xs text-gray-400">
+                      <p className="text-xs text-[hsl(var(--muted-foreground))]">
                         {new Date(order.created_at).toLocaleDateString('es-PY')}
                       </p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-semibold text-gray-200">
+                    <p className="text-sm font-semibold text-[hsl(var(--foreground))]">
                       {order.total_amount.toLocaleString('es-PY')} Gs.
                     </p>
-                    <span className={`text-xs px-2 py-1 rounded ${
-                      order.status === 'pending' ? 'bg-yellow-900/50 text-yellow-300' :
-                      order.status === 'confirmed' ? 'bg-blue-900/50 text-blue-300' :
-                      order.status === 'shipped' ? 'bg-purple-900/50 text-purple-300' :
-                      order.status === 'delivered' ? 'bg-green-900/50 text-green-300' :
-                      'bg-gray-700 text-gray-300'
-                    }`}>
+                    <span className="text-xs text-[hsl(var(--muted-foreground))]">
                       {order.status === 'pending' ? 'Pendiente' :
                        order.status === 'confirmed' ? 'Confirmado' :
                        order.status === 'shipped' ? 'Enviado' :
@@ -1666,111 +1408,116 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Enlaces de configuración */}
+      {(role !== 'seller' || storeStatus !== 'active') && (
       <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
             {/* Ocultar "Mi Perfil & Tienda" cuando la tienda está activa */}
             {storeStatus !== 'active' && (
               <Link
                 href="/dashboard/profile"
-                className="bg-[#252525] rounded-lg border border-gray-700 p-4 hover:shadow-md transition-shadow"
+                className="rounded-2xl border border-[hsl(var(--border))] bg-white p-4 hover:shadow-sm transition-shadow"
               >
                 <div className="flex items-center gap-3">
-                  <div className={`w-12 h-12 rounded-full bg-purple-900/30 flex items-center justify-center text-2xl ${
-                    storeStatus === 'none' ? 'border-2 border-gray-600 sm:border-gray-700' : 'border-2 border-gray-700'
-                  }`}>
-                    👤
+                  <div className="w-12 h-12 rounded-full bg-[hsl(var(--muted))] flex items-center justify-center">
+                    <User className="w-6 h-6 text-[hsl(var(--primary))]" />
                   </div>
                   <div>
-                    <h3 className="font-semibold text-gray-200">Mi Perfil</h3>
-                    <p className="text-sm text-gray-400">Foto de perfil, portada, información personal</p>
+                    <h3 className="font-semibold text-[hsl(var(--foreground))]">Mi perfil</h3>
+                    <p className="text-sm text-[hsl(var(--muted-foreground))]">Foto, portada e información personal</p>
                   </div>
                 </div>
               </Link>
             )}
+            {role !== 'seller' && (
             <Link
               href="/dashboard/my-bids"
-              className="bg-[#252525] rounded-lg border border-gray-700 p-4 hover:shadow-md transition-shadow"
+              className="rounded-2xl border border-[hsl(var(--border))] bg-white p-4 hover:shadow-sm transition-shadow"
             >
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-full bg-emerald-900/30 flex items-center justify-center text-2xl">
-                  🔨
+                <div className="w-12 h-12 rounded-full bg-[hsl(var(--muted))] flex items-center justify-center">
+                  <Target className="w-6 h-6 text-[hsl(var(--primary))]" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-200">Mis Pujas</h3>
-                  <p className="text-sm text-gray-400">Historial de pujas, subastas ganadas y activas</p>
+                  <h3 className="font-semibold text-[hsl(var(--foreground))]">Mis pujas</h3>
+                  <p className="text-sm text-[hsl(var(--muted-foreground))]">Subastas activas y ganadas</p>
                 </div>
               </div>
             </Link>
+            )}
         {role !== 'seller' ? (
-          <Link href="/dashboard/become-seller" className="bg-[#252525] rounded-lg border border-gray-700 p-4 hover:shadow-md transition-shadow">
+          <Link href="/dashboard/become-seller" className="rounded-2xl border border-[hsl(var(--border))] bg-white p-4 hover:shadow-sm transition-shadow">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-blue-900/30 flex items-center justify-center text-2xl">🏪</div>
+              <div className="w-12 h-12 rounded-full bg-[hsl(var(--muted))] flex items-center justify-center">
+                <Store className="w-6 h-6 text-[hsl(var(--primary))]" />
+              </div>
               <div>
-                <h3 className="font-semibold text-gray-200">Convertirme en Tienda</h3>
-                <p className="text-sm text-gray-400">Suscripción y solicitud de verificación del local</p>
+                <h3 className="font-semibold text-[hsl(var(--foreground))]">Vender en Mercadito</h3>
+                <p className="text-sm text-[hsl(var(--muted-foreground))]">Solicitar verificación de tienda</p>
               </div>
             </div>
           </Link>
         ) : storeStatus === 'pending' ? (
-          <Link href="/dashboard/profile" className="bg-[#252525] rounded-lg border border-gray-700 p-4 hover:shadow-md transition-shadow">
+          <Link href="/dashboard/profile" className="rounded-2xl border border-amber-200 bg-amber-50/50 p-4 hover:shadow-sm transition-shadow">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-yellow-900/30 flex items-center justify-center text-2xl">⏳</div>
+              <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center">
+                <Clock className="w-6 h-6 text-amber-700" />
+              </div>
               <div>
-                <h3 className="font-semibold text-gray-200">Verificación en proceso</h3>
-                <p className="text-sm text-gray-400">Configura tu tienda mientras validamos el lugar</p>
+                <h3 className="font-semibold text-[hsl(var(--foreground))]">Verificación en proceso</h3>
+                <p className="text-sm text-[hsl(var(--muted-foreground))]">Completá los datos de tu tienda mientras revisamos</p>
               </div>
             </div>
           </Link>
         ) : storeStatus !== 'active' ? (
-          // Ocultar "Información de Tienda" cuando la tienda está activa
-          <Link href="/dashboard/profile" className="bg-[#252525] rounded-lg border border-gray-700 p-4 hover:shadow-md transition-shadow">
+          <Link href="/dashboard/profile" className="rounded-2xl border border-[hsl(var(--border))] bg-white p-4 hover:shadow-sm transition-shadow">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-blue-900/30 flex items-center justify-center text-2xl">🏪</div>
+              <div className="w-12 h-12 rounded-full bg-[hsl(var(--muted))] flex items-center justify-center">
+                <Store className="w-6 h-6 text-[hsl(var(--primary))]" />
+              </div>
               <div>
-                <h3 className="font-semibold text-gray-200">Información de Tienda</h3>
-                <p className="text-sm text-gray-400">Logo, portada, contacto, ubicación, rubros</p>
+                <h3 className="font-semibold text-[hsl(var(--foreground))]">Configurar tienda</h3>
+                <p className="text-sm text-[hsl(var(--muted-foreground))]">Logo, contacto y ubicación</p>
               </div>
             </div>
           </Link>
         ) : null}
       </div>
+      )}
 
-      {loading ? (
+      {role === 'seller' && (loading ? (
         <div className="flex justify-center items-center min-h-[400px]">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-400 mx-auto mb-4"></div>
-            <p className="text-gray-400">Cargando dashboard...</p>
+            <div className="animate-spin rounded-full h-12 w-12 border-2 border-[hsl(var(--primary))] border-t-transparent mx-auto mb-4"></div>
+            <p className="text-[hsl(var(--muted-foreground))]">Cargando…</p>
           </div>
         </div>
       ) : (filterType === 'finished_auctions' ? finishedAuctions.length === 0 : 
            filterType === 'paused' ? pausedProducts.length === 0 :
            products.length === 0) ? (
-        <div className="text-center py-12">
-          <div className="text-6xl mb-4">
-            {filterType === 'finished_auctions' ? '✓' : 
-             filterType === 'paused' ? '⏸️' :
-             '📦'}
-          </div>
-          <h2 className="text-xl font-medium text-gray-400 mb-2">
+        <div className="text-center py-12 rounded-2xl border border-dashed border-[hsl(var(--border))] bg-white">
+          <Package className="w-12 h-12 text-[hsl(var(--muted-foreground))] mx-auto mb-4" />
+          <h2 className="text-xl font-medium text-[hsl(var(--foreground))] mb-2">
             {filterType === 'finished_auctions' 
-              ? 'No tienes subastas finalizadas' 
+              ? 'No tenés subastas finalizadas' 
               : filterType === 'paused'
-              ? 'No tienes productos pausados'
-              : 'No tienes productos aún'}
+              ? 'No tenés productos pausados'
+              : role === 'seller'
+              ? 'Todavía no publicaste productos'
+              : 'Sin productos para mostrar'}
           </h2>
-          <p className="text-gray-500 mb-6">
+          <p className="text-[hsl(var(--muted-foreground))] mb-6 max-w-md mx-auto px-4">
             {filterType === 'finished_auctions'
-              ? 'Las subastas finalizadas aparecerán aquí durante 30 días antes de eliminarse automáticamente'
+              ? 'Las subastas finalizadas se guardan acá hasta 30 días.'
               : filterType === 'paused'
-              ? 'Todos tus productos están activos actualmente'
-              : 'Comienza agregando tu primer producto'}
+              ? 'Todos tus productos están activos.'
+              : 'Publicá tu primer producto para empezar a vender.'}
           </p>
-          {filterType !== 'finished_auctions' && filterType !== 'paused' && (
+          {filterType !== 'finished_auctions' && filterType !== 'paused' && role === 'seller' && (
             <Link
               href="/dashboard/new-product"
-              className="px-6 py-3 rounded bg-gray-700 text-white hover:bg-gray-600 transition-colors"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-[hsl(var(--primary))] text-white hover:opacity-90 transition-opacity"
             >
-              Crear mi primer producto
+              <Plus className="w-4 h-4" />
+              Crear producto
             </Link>
           )}
           {filterType === 'paused' && (
@@ -1787,43 +1534,25 @@ export default function Dashboard() {
         </div>
       ) : (
         <div className="space-y-4">
+          {role === 'seller' && (
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-200">
+            <h2 className="text-lg font-semibold text-[hsl(var(--foreground))]">
               {filterType === 'all' 
-                ? 'Mis productos' 
+                ? 'Listado de productos' 
                 : filterType === 'direct' 
-                ? 'Precios fijos' 
+                ? 'Precio fijo' 
                 : filterType === 'auction'
-                ? 'Mis subastas'
+                ? 'Subastas'
                 : filterType === 'paused'
-                ? 'Productos Pausados'
-                : 'Subastas Finalizadas'} ({
+                ? 'Pausados'
+                : 'Finalizadas'} ({
                 filterType === 'finished_auctions' ? finishedAuctions.length :
                 filterType === 'paused' ? pausedProducts.length :
                 products.length
               })
             </h2>
-            {filterType === 'auction' && products.length > 0 && (
-              <span className="text-sm text-yellow-400 bg-yellow-900/30 px-3 py-1 rounded-full border border-yellow-700">
-                🔨 {products.length} {products.length === 1 ? 'subasta activa' : 'subastas activas'}
-              </span>
-            )}
-            {filterType === 'finished_auctions' && finishedAuctions.length > 0 && (
-              <span className="text-sm text-gray-400 bg-gray-800 px-3 py-1 rounded-full border border-gray-600">
-                ✓ {finishedAuctions.length} {finishedAuctions.length === 1 ? 'subasta finalizada' : 'subastas finalizadas'}
-              </span>
-            )}
-            {filterType === 'direct' && products.length > 0 && (
-              <span className="text-sm text-blue-400 bg-blue-900/30 px-3 py-1 rounded-full border border-blue-700">
-                💰 {products.length} {products.length === 1 ? 'producto con precio fijo' : 'productos con precio fijo'}
-              </span>
-            )}
-            {filterType === 'paused' && pausedProducts.length > 0 && (
-              <span className="text-sm text-orange-400 bg-orange-900/30 px-3 py-1 rounded-full border border-orange-700">
-                ⏸️ {pausedProducts.length} {pausedProducts.length === 1 ? 'producto pausado' : 'productos pausados'}
-              </span>
-            )}
           </div>
+          )}
           {filterType === 'auction' && products.length === 0 && (
             <div className="text-center py-12 bg-yellow-900/20 border border-yellow-700 rounded-lg">
               <div className="text-6xl mb-4">🔨</div>
@@ -2034,31 +1763,31 @@ export default function Dashboard() {
                 }
                 
                 return (
-                <div key={product.id} className={`bg-[#252525] rounded-lg shadow-sm border overflow-hidden relative ${
-                  isFinishedAuction ? 'opacity-75 border-gray-700' :
-                  isPaused ? 'border-orange-700 border-2' :
-                  product.in_showcase ? 'border-purple-500 border-2' :
-                  'border-gray-700'
+                <div key={product.id} className={`bg-white rounded-2xl shadow-sm border overflow-hidden relative ${
+                  isFinishedAuction ? 'opacity-75 border-[hsl(var(--border))]' :
+                  isPaused ? 'border-amber-300 border-2' :
+                  product.in_showcase ? 'border-[hsl(var(--primary))] border-2' :
+                  'border-[hsl(var(--border))]'
                 }`}>
                   {product.in_showcase && !isPaused && !isFinishedAuction && (
-                    <div className="absolute top-2 left-2 bg-purple-600 text-white text-xs font-bold px-2 py-1 rounded z-10 flex items-center gap-1">
+                    <div className="absolute top-2 left-2 bg-[hsl(var(--primary))] text-white text-xs font-bold px-2 py-1 rounded-lg z-10 flex items-center gap-1">
                       <Star className="w-3 h-3 fill-current" />
-                      VITRINA #{product.showcase_position || ''}
+                      Vitrina {product.showcase_position || ''}
                     </div>
                   )}
                   {isPaused && (
-                    <div className="absolute top-2 right-2 bg-orange-600 text-white text-xs font-bold px-2 py-1 rounded z-10">
-                      ⏸️ PAUSADO
+                    <div className="absolute top-2 right-2 bg-amber-500 text-white text-xs font-bold px-2 py-1 rounded-lg z-10">
+                      Pausado
                     </div>
                   )}
                   {isFinishedAuction && !isPaused && (
-                    <div className="absolute top-2 right-2 bg-gray-600 text-white text-xs font-bold px-2 py-1 rounded z-10">
-                      ✓ FINALIZADA
+                    <div className="absolute top-2 right-2 bg-gray-500 text-white text-xs font-bold px-2 py-1 rounded-lg z-10">
+                      Finalizada
                     </div>
                   )}
                   {isAuction && !isFinishedAuction && !isPaused && !product.in_showcase && (
-                    <div className="absolute top-2 right-2 bg-yellow-500 text-white text-xs font-bold px-2 py-1 rounded z-10">
-                      🔨 SUBASTA
+                    <div className="absolute top-2 right-2 bg-amber-500 text-white text-xs font-bold px-2 py-1 rounded-lg z-10">
+                      Subasta
                     </div>
                   )}
                   {product.cover_url && (
@@ -2071,13 +1800,13 @@ export default function Dashboard() {
                     />
                   )}
                   {!product.cover_url && (isFinishedAuction || isPaused) && (
-                    <div className="w-full h-40 sm:h-48 bg-gray-700 flex items-center justify-center">
-                      <Package className="w-12 h-12 text-gray-500" />
+                    <div className="w-full h-40 sm:h-48 bg-[hsl(var(--muted))] flex items-center justify-center">
+                      <Package className="w-12 h-12 text-[hsl(var(--muted-foreground))]" />
                     </div>
                   )}
                   <div className="p-3 sm:p-4">
-                    <h3 className={`font-medium text-base sm:text-lg mb-2 line-clamp-2 ${isFinishedAuction ? 'text-gray-400' : 'text-gray-200'}`}>{product.title}</h3>
-                    <p className={`text-lg sm:text-2xl font-bold mb-3 ${isFinishedAuction ? 'text-gray-500' : 'text-emerald-400'}`}>
+                    <h3 className={`font-medium text-base sm:text-lg mb-2 line-clamp-2 ${isFinishedAuction ? 'text-[hsl(var(--muted-foreground))]' : 'text-[hsl(var(--foreground))]'}`}>{product.title}</h3>
+                    <p className={`text-lg sm:text-2xl font-bold mb-3 ${isFinishedAuction ? 'text-[hsl(var(--muted-foreground))]' : 'text-[hsl(var(--primary))]'}`}>
                       {product.price.toLocaleString()} Gs.
                       {isFinishedAuction && (
                         <span className="block text-xs text-gray-500 font-normal mt-1">Precio base final</span>
@@ -2092,67 +1821,62 @@ export default function Dashboard() {
                           <button
                             onClick={() => reactivateProduct(product.id)}
                             disabled={reactivatingId === product.id}
-                            className="flex-1 px-3 py-2 rounded text-center transition-colors text-sm bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="flex-1 px-3 py-2 rounded-lg text-center transition-colors text-sm bg-[hsl(var(--primary))] text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
-                            {reactivatingId === product.id ? '⏳ Reactivando...' : '🔄 Reactivar'}
+                            {reactivatingId === product.id ? 'Reactivando…' : 'Reactivar'}
                           </button>
                           <Link
                             href={`/dashboard/edit-product/${product.id}`}
-                            className="flex-1 px-3 py-2 rounded text-center transition-colors text-sm bg-gray-600 text-white hover:bg-gray-700"
+                            className="flex-1 px-3 py-2 rounded-lg text-center transition-colors text-sm border border-[hsl(var(--border))] hover:bg-[hsl(var(--muted))]"
                           >
-                            ✏️ Ver detalles
+                            Ver detalles
                           </Link>
                           <Link
                             href="/memberships"
-                            className="px-3 py-2 rounded text-center transition-colors text-sm bg-blue-600 text-white hover:bg-blue-700"
+                            className="px-3 py-2 rounded-lg text-center transition-colors text-sm border border-[hsl(var(--primary))] text-[hsl(var(--primary))] hover:bg-[hsl(var(--muted))]"
                           >
-                            💎 Upgrade
+                            Membresía
                           </Link>
                         </>
                       ) : (
                         <>
                           <Link
                             href={`/dashboard/edit-product/${product.id}`}
-                            className={`flex-1 px-3 py-2 rounded text-center transition-colors text-sm ${
+                            className={`flex-1 px-3 py-2 rounded-lg text-center transition-colors text-sm ${
                               isFinishedAuction 
-                                ? 'bg-gray-400 text-white hover:bg-gray-500' 
-                                : 'bg-blue-500 text-white hover:bg-blue-600'
+                                ? 'border border-[hsl(var(--border))] hover:bg-[hsl(var(--muted))]' 
+                                : 'bg-[hsl(var(--primary))] text-white hover:opacity-90'
                             }`}
                           >
-                            {isFinishedAuction ? '✏️ Ver detalles' : '✏️ Editar'}
+                            {isFinishedAuction ? 'Ver detalles' : 'Editar'}
                           </Link>
                           <Link
                             href={`/products/${product.id}`}
-                            className={`flex-1 px-3 py-2 rounded text-center transition-colors text-sm ${
-                              isFinishedAuction 
-                                ? 'bg-gray-500 text-white hover:bg-gray-600' 
-                                : 'bg-gray-500 text-white hover:bg-gray-600'
-                            }`}
+                            className="flex-1 px-3 py-2 rounded-lg text-center transition-colors text-sm border border-[hsl(var(--border))] hover:bg-[hsl(var(--muted))]"
                           >
-                            👁️ Ver
+                            Ver público
                           </Link>
-                          {/* Botón de vitrina - Solo para productos activos */}
                           {!isFinishedAuction && product.status === 'active' && (
                             <button
                               onClick={() => toggleShowcase(product.id, product.in_showcase || false)}
                               disabled={updatingShowcase === product.id || (!product.in_showcase && showcaseProducts.length >= 2)}
-                              className={`px-3 py-2 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm ${
+                              className={`px-3 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm border ${
                                 product.in_showcase
-                                  ? 'bg-yellow-500 text-white hover:bg-yellow-600'
-                                  : 'bg-purple-500 text-white hover:bg-purple-600'
+                                  ? 'border-[hsl(var(--primary))] bg-[hsl(var(--muted))] text-[hsl(var(--primary))]'
+                                  : 'border-[hsl(var(--border))] hover:bg-[hsl(var(--muted))]'
                               }`}
                               title={product.in_showcase ? 'Quitar de vitrina' : (showcaseProducts.length >= 2 ? 'Límite alcanzado (2 productos)' : 'Agregar a vitrina')}
                             >
-                              {updatingShowcase === product.id ? '⏳' : (product.in_showcase ? '⭐' : '☆')}
+                              {updatingShowcase === product.id ? '…' : (product.in_showcase ? 'En vitrina' : 'Vitrina')}
                             </button>
                           )}
                           {!isFinishedAuction && (
                             <button
                               onClick={() => deleteProduct(product.id)}
                               disabled={deletingId === product.id}
-                              className="px-3 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                              className="px-3 py-2 border border-red-200 text-red-700 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                             >
-                              {deletingId === product.id ? '⏳' : '🗑️'}
+                              {deletingId === product.id ? '…' : 'Eliminar'}
                             </button>
                           )}
                         </>
@@ -2172,11 +1896,10 @@ export default function Dashboard() {
           )}
 
         </div>
-      )}
+      ))}
 
       {/* Admin Role Assigner - Temporalmente comentado para debug */}
       {/* <div className="mt-8">
-        <AdminRoleAssigner />
       </div> */}
       </div>
     </div>

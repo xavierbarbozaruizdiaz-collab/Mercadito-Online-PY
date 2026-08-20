@@ -5,6 +5,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase, getCurrentUser, AuthUser } from '@/lib/supabase/client';
+import { syncAccessTokenCookie } from '@/lib/auth/clientAuthHeaders';
 import { multiTabSync } from '@/lib/utils/multiTabSync';
 
 // ============================================
@@ -74,7 +75,6 @@ export function useAuth() {
       const customEvent = event as CustomEvent;
       const { userId } = customEvent.detail || {};
       if (userId && user?.id === userId) {
-        // Si es el usuario actual, recargar perfil
         await loadUser();
       }
     };
@@ -85,7 +85,7 @@ export function useAuth() {
     };
   }, [user, loadUser]);
 
-  // Escuchar cambios en la autenticación
+  // Escuchar cambios en la autenticación + cookie para middleware/APIs
   useEffect(() => {
     let mounted = true;
     let subscription: any = null;
@@ -95,30 +95,38 @@ export function useAuth() {
         async (event, session) => {
           if (!mounted) return;
 
+          syncAccessTokenCookie(
+            session?.access_token ?? null,
+            session?.expires_at ?? null
+          );
+
           try {
             if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
               await loadUser();
-              // Notificar a otras pestañas
               multiTabSync.emit('auth_state_changed', { event: 'SIGNED_IN', userId: session?.user?.id });
             } else if (event === 'SIGNED_OUT') {
               setUser(null);
               setLoading(false);
-              // Notificar a otras pestañas
               multiTabSync.emit('auth_state_changed', { event: 'SIGNED_OUT' });
             } else if (event === 'USER_UPDATED') {
-              // Sincronizar cuando el usuario se actualiza en otra pestaña
               await loadUser();
             }
           } catch (err) {
             console.error('Error en onAuthStateChange:', err);
-            // No propagar el error para evitar que rompa otras pestañas
           }
         }
       );
 
       subscription = data.subscription;
 
-      // Escuchar cambios de otras pestañas usando multiTabSync
+      supabase.auth.getSession().then(({ data: sessionData }) => {
+        if (!mounted) return;
+        syncAccessTokenCookie(
+          sessionData.session?.access_token ?? null,
+          sessionData.session?.expires_at ?? null
+        );
+      });
+
       const unsubscribeMultiTab = multiTabSync.on('auth_state_changed', async (data) => {
         if (!mounted) return;
         
@@ -127,7 +135,6 @@ export function useAuth() {
             setUser(null);
             setLoading(false);
           } else if (data.event === 'SIGNED_IN') {
-            // Solo recargar si es el mismo usuario
             const { data: { session } } = await supabase.auth.getSession();
             if (session?.user?.id === data.userId) {
               await loadUser();
@@ -168,6 +175,7 @@ export function useAuth() {
       setLoading(true);
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
+      syncAccessTokenCookie(null);
       setUser(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al cerrar sesión');

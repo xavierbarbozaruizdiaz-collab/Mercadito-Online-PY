@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
-import { getAuctionById, getAuctionStats, type AuctionProduct } from '@/lib/services/auctionService';
+import { getAuctionById, getAuctionStats, getRelatedActiveAuctions, type AuctionProduct } from '@/lib/services/auctionService';
 import AuctionTimer from '@/components/auction/AuctionTimer';
 import BidForm from '@/components/auction/BidForm';
 import BidHistory from '@/components/auction/BidHistory';
@@ -266,7 +266,7 @@ export default function AuctionDetailPage() {
                   }
                   isInAntiSnipingRef.current = true; // Activar flag para polling ultra-rápido
                   requestsInLastSecondRef.current = 0; // Reset contador al activar anti-sniping
-                  setNewBidNotification(`⏰ +${Math.floor(extensionMs / 1000)}s bonus tiempo!`);
+                  setNewBidNotification(`⏰ Tiempo extendido por nueva puja (+${Math.floor(extensionMs / 1000)}s)`);
                   
                   // Reconfigurar polling inmediatamente para usar frecuencia anti-sniping
                   setupAdaptivePolling();
@@ -818,53 +818,15 @@ export default function AuctionDetailPage() {
         console.log('⚠️ Usando image_url como fallback');
       }
       
-      // Cargar subastas relacionadas (siguientes/anteriores) para navegación
+      // Cargar subastas relacionadas (misma lógica de filtrado que /auctions)
       try {
-        const { data: relatedData, error: relatedError } = await supabase
-          .from('products')
-          .select('id, title, cover_url')
-          .eq('sale_type', 'auction')
-          .not('seller_id', 'is', null)
-          .or('status.is.null,status.eq.active,status.eq.paused')
-          .neq('id', productId)
-          .order('auction_end_at', { ascending: true, nullsFirst: false })
-          .limit(10);
-        
-        if (!relatedError && relatedData) {
-          setRelatedAuctions(relatedData.map((a: any) => ({
-            id: a.id,
-            title: a.title,
-            image_url: a.cover_url || null
-          })));
-          console.log('🔗 Subastas relacionadas cargadas:', relatedData.length);
-        } else if (relatedError) {
-          // NO loguear errores 400/401 - estos son esperados y no deben aparecer en consola de producción
-          const isExpectedError = 
-            relatedError.code === 'PGRST116' || 
-            relatedError.message?.includes('400') ||
-            relatedError.message?.includes('401') ||
-            relatedError.status === 400 ||
-            relatedError.status === 401;
-          
-          if (!isExpectedError && process.env.NODE_ENV === 'development') {
-            console.warn('⚠️ Error cargando subastas relacionadas:', relatedError);
-          }
-          // Continuar sin subastas relacionadas - no romper el flujo
-        }
+        const related = await getRelatedActiveAuctions(productId, 10);
+        setRelatedAuctions(related);
+        console.log('🔗 Subastas relacionadas cargadas:', related.length);
       } catch (relatedErr: any) {
-        // Error silencioso para no romper la página
-        // NO loguear errores esperados (400, 401) en producción
-        const isExpectedError = 
-          relatedErr?.code === 'PGRST116' || 
-          relatedErr?.message?.includes('400') ||
-          relatedErr?.message?.includes('401') ||
-          relatedErr?.status === 400 ||
-          relatedErr?.status === 401;
-        
-        if (!isExpectedError && process.env.NODE_ENV === 'development') {
-          console.warn('⚠️ Excepción cargando subastas relacionadas (no crítico):', relatedErr?.message || relatedErr);
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('⚠️ Error cargando subastas relacionadas:', relatedErr?.message || relatedErr);
         }
-        // Continuar sin subastas relacionadas
       }
       
     } catch (err: any) {
@@ -1286,7 +1248,7 @@ export default function AuctionDetailPage() {
                           💳 Pagar Ahora
                         </Button>
                         <Button
-                          onClick={() => window.location.href = `/messages?user=${auction.seller_id}`}
+                          onClick={() => window.location.href = `/seller/${auction.seller_id}`}
                           variant="outline"
                           className="border-white text-white hover:bg-white hover:text-emerald-600"
                         >
@@ -1402,7 +1364,7 @@ export default function AuctionDetailPage() {
                   )}
                   
                   {/* Formulario de puja */}
-                  <div className={isConnected ? '' : 'opacity-50 pointer-events-none'}>
+                  <div className={isConnected ? '' : 'opacity-90'}>
                     <BidForm
                       productId={productId}
                       currentBid={currentBid}

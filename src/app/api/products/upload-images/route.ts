@@ -6,7 +6,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase/server';
 import { createClient } from '@supabase/supabase-js';
-import sharp from 'sharp';
 import { THUMBNAIL_SIZES, getThumbnailFileName } from '@/lib/utils/imageThumbnails';
 import { logger } from '@/lib/utils/logger';
 
@@ -124,6 +123,7 @@ export async function POST(request: NextRequest) {
     // Convertir File a Buffer
     const arrayBuffer = await file.arrayBuffer();
     const imageBuffer = Buffer.from(arrayBuffer);
+    const sharp = (await import('sharp')).default;
 
     // Generar thumbnails
     const fileExt = file.name.split('.').pop() || 'jpg';

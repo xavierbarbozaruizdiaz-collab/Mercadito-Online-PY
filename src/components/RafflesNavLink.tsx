@@ -1,32 +1,24 @@
 'use client';
 
-// ============================================
-// MERCADITO ONLINE PY - RAFFLES NAV LINK
-// Enlace de navegación a sorteos con contador
-// ============================================
-
 import { useState, useEffect } from 'react';
-import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { Ticket } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
-import Badge from '@/components/ui/Badge';
+import { HeaderNavPill } from '@/components/HeaderNavPill';
 
 export default function RafflesNavLink() {
-  const [activeCount, setActiveCount] = useState<number>(0);
+  const pathname = usePathname();
+  const [activeCount, setActiveCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadRafflesCount();
-    
-    // Actualizar cada 30 segundos
     const interval = setInterval(loadRafflesCount, 30000);
-    
     return () => clearInterval(interval);
   }, []);
 
   async function loadRafflesCount() {
     try {
-      // Verificar si el sistema de sorteos está habilitado
       const { data: settings } = await supabase
         .from('raffle_settings')
         .select('value')
@@ -41,7 +33,6 @@ export default function RafflesNavLink() {
         return;
       }
 
-      // Contar sorteos activos
       const { count, error } = await supabase
         .from('raffles')
         .select('*', { count: 'exact', head: true })
@@ -62,26 +53,15 @@ export default function RafflesNavLink() {
     }
   }
 
-  // Siempre mostrar el link, pero solo mostrar badge si hay sorteos activos
-  // El sistema puede estar habilitado pero sin sorteos activos aún
+  const isActive = pathname === '/raffles' || pathname?.startsWith('/raffles/');
+
   return (
-    <Link
+    <HeaderNavPill
       href="/raffles"
-      className="relative flex items-center gap-2 px-3 py-2 rounded-md text-gray-700 hover:text-gray-900 hover:bg-gray-100 transition-colors group"
-    >
-      <Ticket className="h-5 w-5" />
-      <span className="hidden sm:inline">Sorteos</span>
-      
-      {!loading && activeCount > 0 && (
-        <Badge 
-          variant="success" 
-          size="sm"
-          className="ml-1"
-        >
-          {activeCount}
-        </Badge>
-      )}
-    </Link>
+      label="Sorteos"
+      icon={Ticket}
+      active={isActive}
+      badge={!loading && activeCount > 0 ? activeCount : undefined}
+    />
   );
 }
-

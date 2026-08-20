@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
     // Obtener info de la subasta y verificar ganador
     const { data: auction, error: auctionError } = await (supabaseAdmin as any)
       .from('products')
-      .select('id, seller_id, auction_status, winner_id, current_bid')
+      .select('id, seller_id, auction_status, winner_id, current_bid, buy_now_price, approval_status, price')
       .eq('id', auctionId)
       .single();
 
@@ -63,6 +63,18 @@ export async function POST(request: NextRequest) {
 
     if (auction.winner_id !== user.id) {
       return NextResponse.json({ error: 'No eres el ganador de esta subasta' }, { status: 403 });
+    }
+
+    const winningBid = auction.current_bid || auction.price || 0;
+    if (
+      auction.buy_now_price &&
+      winningBid < auction.buy_now_price &&
+      auction.approval_status !== 'approved'
+    ) {
+      return NextResponse.json(
+        { error: 'El vendedor debe aprobar esta venta antes de crear el pedido' },
+        { status: 403 }
+      );
     }
 
     // Crear orden

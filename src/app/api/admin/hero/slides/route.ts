@@ -1,39 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseClient';
-import { createServerClient } from '@/lib/supabase/server';
+import { requireAdmin } from '@/lib/auth/apiAuth';
 
-// [SECURITY PATCH FASE2] Verificación de rol admin para gestionar hero slides
-async function verifyAdminAccess() {
-  const supabase = await createServerClient();
-  const { data: { session } } = await supabase.auth.getSession();
-  
-  if (!session?.user) {
-    return { authorized: false, error: 'No autenticado', status: 401 };
+export async function GET(req: NextRequest) {
+  const auth = await requireAdmin(req);
+  if (!auth.ok) return auth.response;
+
+  const { data, error } = await (supabaseAdmin as any)
+    .from('hero_slides')
+    .select('*')
+    .order('position', { ascending: true });
+
+  if (error) {
+    return NextResponse.json({ ok: false, error: error.message, slides: [] }, { status: 400 });
   }
 
-  const { data: profile, error: profileError } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', session.user.id)
-    .single();
-
-  if (profileError || !profile) {
-    return { authorized: false, error: 'Error verificando permisos', status: 500 };
-  }
-
-  if ((profile as any).role !== 'admin') {
-    return { authorized: false, error: 'No autorizado. Se requiere rol de administrador.', status: 403 };
-  }
-
-  return { authorized: true };
+  return NextResponse.json({ ok: true, slides: data || [] });
 }
 
 export async function POST(req: NextRequest) {
-  // [SECURITY PATCH FASE2] Verificación de rol admin para gestionar hero slides
-  const authCheck = await verifyAdminAccess();
-  if (!authCheck.authorized) {
-    return NextResponse.json({ ok: false, error: authCheck.error }, { status: authCheck.status });
-  }
+  const auth = await requireAdmin(req);
+  if (!auth.ok) return auth.response;
 
   const body = await req.json();
   if (body.bg_type === 'image' && !body.storage_path) {
@@ -45,11 +32,8 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PUT(req: NextRequest) {
-  // [SECURITY PATCH FASE2] Verificación de rol admin para gestionar hero slides
-  const authCheck = await verifyAdminAccess();
-  if (!authCheck.authorized) {
-    return NextResponse.json({ ok: false, error: authCheck.error }, { status: authCheck.status });
-  }
+  const auth = await requireAdmin(req);
+  if (!auth.ok) return auth.response;
 
   const body = await req.json();
   const { id, ...rest } = body || {};
@@ -63,11 +47,8 @@ export async function PUT(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  // [SECURITY PATCH FASE2] Verificación de rol admin para gestionar hero slides
-  const authCheck = await verifyAdminAccess();
-  if (!authCheck.authorized) {
-    return NextResponse.json({ ok: false, error: authCheck.error }, { status: authCheck.status });
-  }
+  const auth = await requireAdmin(req);
+  if (!auth.ok) return auth.response;
 
   const { searchParams } = new URL(req.url);
   const id = searchParams.get('id');
@@ -76,5 +57,3 @@ export async function DELETE(req: NextRequest) {
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
   return NextResponse.json({ ok: true });
 }
-
-

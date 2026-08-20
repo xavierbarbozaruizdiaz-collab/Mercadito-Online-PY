@@ -263,6 +263,9 @@ export default function SellerSourcingOrdersPage() {
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Pedidos por conseguir</h1>
               <p className="text-gray-600 mt-1">Gestiona los pedidos "por conseguir" asignados a tu tienda</p>
+              <Link href="/dashboard/sourced-catalog" className="inline-block mt-2 text-sm text-blue-700 hover:underline">
+                Catálogo internacional (AliExpress)
+              </Link>
             </div>
           </div>
 
@@ -322,6 +325,9 @@ export default function SellerSourcingOrdersPage() {
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Pedidos por conseguir</h1>
               <p className="text-gray-600 mt-1">Gestiona los pedidos "por conseguir" asignados a tu tienda</p>
+              <Link href="/dashboard/sourced-catalog" className="inline-block mt-2 text-sm text-blue-700 hover:underline">
+                Catálogo internacional (AliExpress)
+              </Link>
             </div>
           </div>
         </div>

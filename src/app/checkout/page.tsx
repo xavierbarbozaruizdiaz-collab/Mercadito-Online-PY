@@ -12,6 +12,7 @@ import toast from 'react-hot-toast';
 import { useFacebookPixel } from '@/lib/services/facebookPixelService';
 import { useGoogleAnalytics } from '@/lib/services/googleAnalyticsService';
 import { trackBeginCheckout } from '@/lib/analytics';
+import { getAuthHeaders } from '@/lib/auth/clientAuthHeaders';
 
 type CartItem = {
   id: string;
@@ -149,6 +150,16 @@ function CheckoutContent() {
           userId: (session as any)?.user?.id 
         });
         toast.error('No eres el ganador de esta subasta');
+        router.push(`/auctions/${auctionProductId}`);
+        return;
+      }
+
+      // Si la puja ganadora está por debajo del precio "compra ahora", requiere aprobación del vendedor
+      const buyNowPrice = auction.buy_now_price;
+      const winningBid = auction.current_bid || auction.price;
+      const approvalStatus = (auction as any).approval_status as string | null | undefined;
+      if (buyNowPrice && winningBid < buyNowPrice && approvalStatus !== 'approved') {
+        toast.error('El vendedor debe aprobar esta venta antes de que puedas pagar');
         router.push(`/auctions/${auctionProductId}`);
         return;
       }
@@ -738,32 +749,33 @@ function CheckoutContent() {
       logger.debug('Datos del pedido creado', { orderId, orderData });
 
       // Enviar email de confirmación (en segundo plano, no bloquea)
-      const buyerEmail = (session as any)?.user?.email;
-      if (buyerEmail) {
-        fetch('/api/email/order-confirmation', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: buyerEmail,
-            orderNumber: orderId,
-            orderDetails: {
-              items: cartItems.map(item => ({
-                name: item.product.title,
-                quantity: item.quantity,
-                price: item.product.price * item.quantity,
-              })),
-              total: totalPrice,
-              // Mapear al formato que espera el template de email
-              shippingAddress: {
-                name: address.fullName,
-                address: address.address,
-                city: address.city,
-                department: address.department,
-                phone: address.phone,
+      const buyerEmail = session.session.user.email || (session as any)?.user?.email;
+      if (buyerEmail && paymentMethod !== 'pagopar') {
+        getAuthHeaders().then((authHeaders) =>
+          fetch('/api/email/order-confirmation', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...authHeaders },
+            body: JSON.stringify({
+              email: buyerEmail,
+              orderNumber: orderId,
+              orderDetails: {
+                items: cartItems.map(item => ({
+                  name: item.product.title,
+                  quantity: item.quantity,
+                  price: item.product.price * item.quantity,
+                })),
+                total: totalPrice,
+                shippingAddress: {
+                  name: address.fullName,
+                  address: address.address,
+                  city: address.city,
+                  department: address.department,
+                  phone: address.phone,
+                },
               },
-            },
-          }),
-        }).catch(err => logger.error('Error enviando email', err, { orderId, email: buyerEmail }));
+            }),
+          })
+        ).catch(err => logger.error('Error enviando email', err, { orderId, email: buyerEmail }));
       }
 
       // Enviar notificaciones de WhatsApp a los vendedores (en segundo plano, no bloquea)
@@ -782,17 +794,19 @@ function CheckoutContent() {
 
         // Enviar notificación a cada vendedor
         for (const sellerId of sellerIds) {
-          fetch('/api/whatsapp/notify-seller', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              sellerId,
-              orderId,
-              orderData: orderData,
-              buyerPhone: address.phone,
-              buyerName: address.fullName,
-            }),
-          })
+          getAuthHeaders().then((authHeaders) =>
+            fetch('/api/whatsapp/notify-seller', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', ...authHeaders },
+              body: JSON.stringify({
+                sellerId,
+                orderId,
+                orderData: orderData,
+                buyerPhone: address.phone,
+                buyerName: address.fullName,
+              }),
+            })
+          )
           .then(res => res.json())
           .then(data => {
             if (data.success) {

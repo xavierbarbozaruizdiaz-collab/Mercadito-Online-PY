@@ -22,6 +22,7 @@ export default function EditProduct() {
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState<string>('');
   const [saleType, setSaleType] = useState<'direct' | 'auction' | 'negotiable'>('direct');
+  const [existingAuctionStatus, setExistingAuctionStatus] = useState<string | null>(null);
   const [condition, setCondition] = useState<'nuevo' | 'usado' | 'usado_como_nuevo'>('nuevo');
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [inShowcase, setInShowcase] = useState(false);
@@ -89,6 +90,7 @@ export default function EditProduct() {
         setDescription(product.description || '');
         setPrice(product.price?.toString() || '');
         setSaleType(product.sale_type || 'direct');
+        setExistingAuctionStatus(product.auction_status || null);
         setCondition(product.condition || 'nuevo');
         setCategoryId(product.category_id);
         setInShowcase(product.in_showcase || false);
@@ -371,8 +373,8 @@ export default function EditProduct() {
         
         finalPrice = Number(auctionStartingPrice);
         
-        // Calcular fecha de fin (2 minutos para pruebas, igual que new-product)
-        const durationMinutes = 2; // 2 minutos para pruebas - cambiar a 1440 para producción
+        // Calcular fecha de fin (24 horas desde el inicio)
+        const durationMinutes = 1440;
         const endDate = new Date(startDate.getTime() + durationMinutes * 60 * 1000);
         
         // Preparar atributos de subasta (para compatibilidad, pero usaremos campos directos)
@@ -383,6 +385,7 @@ export default function EditProduct() {
               ? Number(auctionBuyNowPrice) 
               : null,
             start_date: startDate.toISOString(),
+            duration_minutes: durationMinutes,
           }
         };
       } else {
@@ -411,35 +414,39 @@ export default function EditProduct() {
         wholesale_discount_percent: saleType === 'direct' && wholesaleEnabled && wholesaleDiscountPercent ? parseFloat(wholesaleDiscountPercent) || null : null,
       };
       
-      // Si es subasta, agregar campos directos de subasta (igual que new-product)
+      // Si es subasta, actualizar campos con cuidado según el estado actual
       if (saleType === 'auction') {
         const startDate = new Date(auctionStartDate);
-        
-        // Logs para debugging de zona horaria
-        const timezoneOffset = startDate.getTimezoneOffset();
-        const paraguayOffset = -240; // UTC-4
-        
-        console.log('🕐 Información de zona horaria (edición):', {
-          horaIngresada: auctionStartDate,
-          horaInterpretadaLocal: startDate.toString(),
-          horaUTC: startDate.toISOString(),
-          offsetZonaHoraria: timezoneOffset,
-          offsetParaguay: paraguayOffset,
-          diferenciaConParaguay: timezoneOffset - paraguayOffset
-        });
-        
-        const durationMinutes = 2; // 2 minutos para pruebas
-        const endDate = new Date(startDate.getTime() + durationMinutes * 60 * 1000);
-        
-        updateData.auction_status = 'scheduled';
-        updateData.auction_start_at = startDate.toISOString();
-        updateData.auction_end_at = endDate.toISOString();
-        updateData.current_bid = finalPrice; // Precio inicial
-        updateData.min_bid_increment = 1000; // Por defecto
-        
-        // También guardar buy_now_price en attributes si existe
-        if (attributes && attributes.auction?.buy_now_price) {
-          updateData.attributes = attributes;
+        const isLiveOrEnded =
+          existingAuctionStatus === 'active' || existingAuctionStatus === 'ended';
+
+        if (isLiveOrEnded) {
+          // No reiniciar subasta en curso o finalizada — solo metadata en attributes
+          if (attributes?.auction) {
+            updateData.attributes = {
+              ...(attributes as object),
+              auction: {
+                ...attributes.auction,
+                buy_now_price:
+                  auctionBuyNowPrice && Number(auctionBuyNowPrice) > 0
+                    ? Number(auctionBuyNowPrice)
+                    : null,
+              },
+            };
+          }
+        } else {
+          const durationMinutes = 1440;
+          const endDate = new Date(startDate.getTime() + durationMinutes * 60 * 1000);
+
+          updateData.auction_status = 'scheduled';
+          updateData.auction_start_at = startDate.toISOString();
+          updateData.auction_end_at = endDate.toISOString();
+          updateData.current_bid = finalPrice;
+          updateData.min_bid_increment = 1000;
+
+          if (attributes?.auction) {
+            updateData.attributes = attributes;
+          }
         }
       } else {
         // Si cambió de subasta a directa, limpiar campos de subasta
@@ -819,7 +826,7 @@ export default function EditProduct() {
                     // min={new Date().toISOString().slice(0, 16)}
                   />
                   <p className="text-xs text-gray-500 mt-1">
-                    La subasta comenzará automáticamente en esta fecha y hora. Duración para pruebas: 2 minutos desde el inicio. Puedes seleccionar una fecha pasada para iniciar inmediatamente.
+                    La subasta comenzará automáticamente en esta fecha y hora. Duración: 24 horas desde el inicio. Podés seleccionar una fecha pasada para iniciar inmediatamente.
                   </p>
                 </div>
               </div>
@@ -827,7 +834,7 @@ export default function EditProduct() {
                 <h4 className="font-semibold text-yellow-900 mb-2">¿Cómo funcionan las subastas?</h4>
                 <ul className="text-sm text-yellow-800 space-y-1 list-disc list-inside">
                   <li>Los compradores pujan incrementando el precio</li>
-                  <li>Duración: 2 minutos desde la fecha de inicio (modo prueba)</li>
+                  <li>Duración: 24 horas desde la fecha de inicio</li>
                   <li>Quien ofrezca el precio más alto al finalizar gana</li>
                   <li>Si configuraste "Compra ahora", alguien puede comprarlo inmediatamente</li>
                   <li>Puedes usar una fecha pasada para iniciar la subasta inmediatamente</li>

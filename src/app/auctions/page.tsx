@@ -11,7 +11,7 @@ import Select from '@/components/ui/Select';
 import Badge from '@/components/ui/Badge';
 import Link from 'next/link';
 import Pagination from '@/components/ui/Pagination';
-import { getActiveSubscription } from '@/lib/services/membershipService';
+import { getUserBidLimit } from '@/lib/services/membershipService';
 import { getSessionWithTimeout } from '@/lib/supabase/client';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
@@ -23,6 +23,7 @@ export default function AuctionsPage() {
   const [sortBy, setSortBy] = useState<'all' | 'recent' | 'ending_soon' | 'price_asc' | 'price_desc'>('all');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [hasPaidCanon, setHasPaidCanon] = useState<boolean | null>(null);
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [checkingCanon, setCheckingCanon] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -34,9 +35,11 @@ export default function AuctionsPage() {
       try {
         const { data: session } = await getSessionWithTimeout();
         if (session?.session?.user?.id) {
-          const subscription = await getActiveSubscription(session.session.user.id);
-          setHasPaidCanon(subscription !== null && subscription.amount_paid > 0);
+          setIsLoggedIn(true);
+          const limit = await getUserBidLimit(session.session.user.id);
+          setHasPaidCanon(limit.can_bid);
         } else {
+          setIsLoggedIn(false);
           setHasPaidCanon(null);
         }
       } catch (error) {
@@ -59,7 +62,7 @@ export default function AuctionsPage() {
     }, 15000); // Cada 15 segundos
     
     return () => clearInterval(refreshInterval);
-  }, [search, category]);
+  }, [search, category, sortBy, currentPage]);
   
   // También recargar cuando la ventana recupera el foco (usuario vuelve a la pestaña)
   useEffect(() => {
@@ -165,7 +168,7 @@ export default function AuctionsPage() {
 
   useEffect(() => {
     loadAuctions();
-  }, [sortBy]);
+  }, [sortBy, currentPage]);
 
   // Separar subastas que terminan pronto (en la próxima hora)
   // Si está en modo "TODAS", no separar, mostrar todas juntas
@@ -208,6 +211,34 @@ export default function AuctionsPage() {
           Puja en tiempo real y gana los mejores productos
         </p>
       </div>
+
+      {/* CTA para visitantes no logueados */}
+      {!checkingCanon && !isLoggedIn && (
+        <Alert className="mb-6 border-2 border-primary/30 bg-gradient-to-r from-emerald-50 to-green-50">
+          <Lock className="h-5 w-5 text-primary" />
+          <AlertDescription className="flex items-center justify-between flex-wrap gap-4">
+            <div className="flex-1">
+              <p className="font-semibold text-foreground mb-1">
+                ¿Querés pujar? Iniciá sesión y pagá el canon de participación
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Podés ver las subastas libremente, pero para participar necesitás una cuenta y membresía activa.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Link href="/auth/sign-in?redirect=/auctions">
+                <Button size="lg">Iniciar sesión</Button>
+              </Link>
+              <Link href="/memberships">
+                <Button variant="outline" size="lg">
+                  <Crown className="mr-2 h-5 w-5" />
+                  Ver planes
+                </Button>
+              </Link>
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* CTA para pagar canon de participación */}
       {!checkingCanon && hasPaidCanon === false && (

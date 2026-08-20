@@ -67,6 +67,11 @@ export default function AuctionTimer({
   // Para animación cuando entra nueva puja
   const [justReset, setJustReset] = useState<boolean>(false);
   const prevLastBidRef = useRef<number | undefined>(undefined);
+  const expiredEndAtRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    expiredEndAtRef.current = null;
+  }, [endAtMs]);
 
   useEffect(() => {
     if (lastBidAtMs && prevLastBidRef.current !== lastBidAtMs) {
@@ -120,9 +125,12 @@ export default function AuctionTimer({
   }, [danger, remainingMs]);
 
   useEffect(() => {
-    if (ended && onExpire) onExpire();
+    if (ended && onExpire && expiredEndAtRef.current !== endAtMs) {
+      expiredEndAtRef.current = endAtMs;
+      onExpire();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ended]);
+  }, [ended, endAtMs]);
 
   const label = ended ? 'Finalizado' : danger ? '¡ÚLTIMA OPORTUNIDAD!' : warning ? 'Última llamada' : 'En vivo';
 

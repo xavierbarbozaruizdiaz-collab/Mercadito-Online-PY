@@ -5,10 +5,14 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { productCatalog } from '@/lib/services/productCatalogService';
+import { requireSellerOrAdmin } from '@/lib/auth/apiAuth';
 
 // POST - Sincronizar producto
 export async function POST(request: NextRequest) {
   try {
+    const auth = await requireSellerOrAdmin(request);
+    if (!auth.ok) return auth.response;
+
     const body = await request.json();
     const { productId, platform } = body;
 
@@ -34,6 +38,9 @@ export async function POST(request: NextRequest) {
 // GET - Estado de sincronización
 export async function GET(request: NextRequest) {
   try {
+    const auth = await requireSellerOrAdmin(request);
+    if (!auth.ok) return auth.response;
+
     const searchParams = request.nextUrl.searchParams;
     const productId = searchParams.get('productId');
     const platform = searchParams.get('platform');

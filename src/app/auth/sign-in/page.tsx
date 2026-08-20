@@ -3,11 +3,15 @@
 import { useState, useRef, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Eye, EyeOff } from 'lucide-react';
 import { useToast } from '@/lib/hooks/useToast';
+import { getAuthHeaders, syncAccessTokenCookie } from '@/lib/auth/clientAuthHeaders';
+import { resolvePostLoginPath } from '@/lib/auth/postLoginRedirect';
+import { getPublicAppUrl } from '@/lib/config/site';
+import { Suspense } from 'react';
 
-export default function SignInPage() {
+function SignInPageContent() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -16,6 +20,7 @@ export default function SignInPage() {
   const [oauthLoading, setOauthLoading] = useState<'google' | 'facebook' | null>(null);
   const [isSignUp, setIsSignUp] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const toast = useToast();
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   
@@ -114,10 +119,9 @@ export default function SignInPage() {
         }
         setMsg('✅ Sesión iniciada. Redirigiendo...');
         setLoading(false);
-        // Redirigir a la página principal después del login exitoso
-        setTimeout(() => {
-          window.location.href = '/';
-        }, 500);
+        const preferred = searchParams.get('redirect');
+        const dest = await resolvePostLoginPath(preferred);
+        window.location.href = dest;
       }
     } catch (err) {
       if (timeoutRef.current) {
@@ -166,20 +170,21 @@ export default function SignInPage() {
         
         // Enviar email de bienvenida (en segundo plano)
         if (data.user?.email) {
-          fetch('/api/email/welcome', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              email: data.user.email,
-              userName: data.user.email.split('@')[0],
-            }),
-          }).catch(err => console.error('Error enviando email de bienvenida:', err));
+          getAuthHeaders().then((authHeaders) =>
+            fetch('/api/email/welcome', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', ...authHeaders },
+              body: JSON.stringify({
+                email: data.user.email,
+                userName: data.user.email.split('@')[0],
+              }),
+            })
+          ).catch(err => console.error('Error enviando email de bienvenida:', err));
         }
-        
-        // Redirigir a la página principal después de crear cuenta
-        setTimeout(() => {
-          window.location.href = '/';
-        }, 1000);
+
+        const preferred = searchParams.get('redirect');
+        const dest = await resolvePostLoginPath(preferred);
+        window.location.href = dest;
       }
     } catch (err) {
       if (timeoutRef.current) {
@@ -209,7 +214,7 @@ export default function SignInPage() {
       // Obtener la URL de callback basada en el entorno
       const redirectTo = typeof window !== 'undefined' 
         ? `${window.location.origin}/auth/callback`
-        : `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/auth/callback`;
+        : `${getPublicAppUrl()}/auth/callback`;
       
       // Configurar opciones según el proveedor
       const options: any = {
@@ -557,5 +562,19 @@ export default function SignInPage() {
         </p>
       </div>
     </main>
+  );
+}
+
+export default function SignInPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen flex items-center justify-center bg-gray-50">
+          <p className="text-gray-600">Cargando...</p>
+        </main>
+      }
+    >
+      <SignInPageContent />
+    </Suspense>
   );
 }

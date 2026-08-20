@@ -2,128 +2,88 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import ProfileEnsurer from '@/components/ProfileEnsurer';
-import AdminRoleAssigner from '@/components/AdminRoleAssigner';
+
+const NAV = [
+  { href: '/admin', label: 'Inicio', exact: true },
+  { href: '/dashboard/admin/hero', label: 'Portada' },
+  { href: '/admin/products', label: 'Productos' },
+  { href: '/admin/orders', label: 'Pedidos' },
+  { href: '/admin/stores', label: 'Tiendas' },
+  { href: '/dashboard/sourced-catalog', label: 'Catálogo Ubuy' },
+  { href: '/admin/users', label: 'Usuarios' },
+  { href: '/admin/raffles', label: 'Sorteos' },
+  { href: '/admin/marketing/catalogo-vitrina', label: 'Vitrina' },
+  { href: '/admin/settings', label: 'Ajustes' },
+];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
   const [allowed, setAllowed] = useState<boolean | null>(null);
   const [profileError, setProfileError] = useState(false);
+  const [email, setEmail] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
     let timeoutId: NodeJS.Timeout;
 
-    // Timeout de seguridad: si después de 10 segundos no hay respuesta, mostrar error
     timeoutId = setTimeout(() => {
       if (mounted && allowed === null) {
-        console.error('Timeout verificando permisos de admin');
         setProfileError(true);
       }
     }, 10000);
 
     (async () => {
       try {
-        console.log('🔐 Iniciando verificación de permisos admin...');
-        
-        // 1) sesión - usar getSession en lugar de getUser para evitar problemas
-        const { data: { session }, error: sessionErr } = await supabase.auth.getSession();
+        const {
+          data: { session },
+          error: sessionErr,
+        } = await supabase.auth.getSession();
         if (sessionErr || !session?.user) {
-          console.error('❌ Error de autenticación:', sessionErr);
-          if (mounted) {
-            window.location.href = '/auth/sign-in';
-          }
+          if (mounted) window.location.href = '/auth/sign-in?redirect=/admin';
           return;
         }
-        const user = session.user;
 
-        console.log('✅ Usuario autenticado:', user.email);
+        setEmail(session.user.email || null);
 
-        // 2) perfil por ID (con políticas RLS simplificadas)
-        console.log('📋 Consultando perfil...');
         const { data: profile, error: pErr } = await supabase
           .from('profiles')
           .select('id, role, email')
-          .eq('id', user.id)
+          .eq('id', session.user.id)
           .single();
 
         if (pErr) {
-          console.error('❌ Error cargando perfil:', pErr);
-          // Si es error de recursión u otro error RLS
           if (pErr.code === '42P27' || pErr.message?.includes('infinite recursion')) {
-            console.error('🚨 Error de recursión infinita detectado');
-            if (mounted) {
-              setProfileError(true);
-            }
+            if (mounted) setProfileError(true);
             return;
           }
-          
-          // Intentar crear perfil si no existe
-          console.log('🆕 Intentando crear perfil...');
+
           const { error: insertErr } = await (supabase as any)
             .from('profiles')
-            .insert([{ id: user.id, email: user.email || '', role: 'buyer' }]);
-          
+            .insert([{ id: session.user.id, email: session.user.email || '', role: 'buyer' }]);
+
           if (insertErr) {
-            console.error('❌ Error creando perfil:', insertErr);
-            if (mounted) {
-              setProfileError(true);
-            }
+            if (mounted) setProfileError(true);
             return;
           }
-          
-          // Recargar después de crear perfil
-          if (mounted) {
-            window.location.reload();
-          }
+          if (mounted) window.location.reload();
           return;
         }
 
         if (!profile) {
-          console.warn('⚠️ No se encontró perfil, creando uno con rol admin...');
-          // Si no hay perfil, intentar crear uno y asignar admin
-          const { error: insertErr } = await (supabase as any)
+          await (supabase as any)
             .from('profiles')
-            .insert([{ id: user.id, email: user.email || '', role: 'admin' }]);
-          
-          if (insertErr) {
-            console.error('❌ Error creando perfil admin:', insertErr);
-            if (mounted) {
-              setProfileError(true);
-            }
-            return;
-          }
-          
-          console.log('✅ Perfil admin creado, recargando...');
-          // Recargar para verificar el nuevo perfil
-          if (mounted) {
-            setAllowed(true);
-          }
+            .insert([{ id: session.user.id, email: session.user.email || '', role: 'buyer' }]);
+          if (mounted) setAllowed(false);
           return;
         }
 
-        const profileData = profile as { id: string; role: string; email?: string } | null;
-        console.log('📊 Perfil encontrado. Rol:', profileData?.role);
-        
-        // Si no es admin, mostrar opción de asignar rol
-        if (!profileData || profileData.role !== 'admin') {
-          console.warn('⚠️ Usuario no es admin. Rol actual:', profileData?.role);
-          // No redirigir inmediatamente, mostrar opción de asignar admin
-          if (mounted) {
-            setAllowed(false);
-          }
-          return;
-        }
-
-        console.log('✅ Usuario es admin, acceso permitido');
-        if (mounted) {
-          setAllowed(true);
-        }
-      } catch (err: any) {
-        console.error('❌ Error inesperado:', err);
-        if (mounted) {
-          setProfileError(true);
-        }
+        const role = (profile as { role?: string }).role;
+        if (mounted) setAllowed(role === 'admin');
+      } catch {
+        if (mounted) setProfileError(true);
       } finally {
         clearTimeout(timeoutId);
       }
@@ -137,7 +97,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   if (profileError) {
     return (
-      <div className="min-h-screen bg-gray-50 p-8">
+      <div className="min-h-screen bg-[hsl(var(--background))] p-6 sm:p-8">
         <div className="max-w-2xl mx-auto">
           <ProfileEnsurer />
         </div>
@@ -147,14 +107,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   if (allowed === null) {
     return (
-      <main className="p-8">
-        <div className="max-w-2xl mx-auto">
-          <div className="bg-white p-6 rounded-lg shadow-sm border">
-            <div className="flex items-center">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mr-3"></div>
-              <span className="text-gray-700">Verificando permisos de administrador…</span>
-            </div>
-          </div>
+      <main className="min-h-screen flex items-center justify-center bg-[hsl(var(--background))] p-6">
+        <div className="bg-white rounded-2xl border border-[hsl(var(--border))] px-6 py-5 flex items-center gap-3 shadow-sm">
+          <div className="animate-spin rounded-full h-5 w-5 border-2 border-[hsl(var(--primary))] border-t-transparent" />
+          <span className="text-[hsl(var(--foreground))]">Preparando tu panel…</span>
         </div>
       </main>
     );
@@ -162,36 +118,29 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   if (allowed === false) {
     return (
-      <main className="p-8">
-        <div className="max-w-2xl mx-auto space-y-4">
-          <div className="bg-white p-6 rounded-lg shadow-sm border">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Acceso Restringido</h2>
-            <p className="text-gray-700 mb-4">
-              No tienes permisos de administrador. Necesitas el rol 'admin' en tu perfil para acceder al panel.
+      <main className="min-h-screen bg-[hsl(var(--background))] p-6 sm:p-8">
+        <div className="max-w-lg mx-auto space-y-4">
+          <div className="bg-white rounded-2xl border border-[hsl(var(--border))] p-6 shadow-sm">
+            <h2 className="text-xl font-semibold text-[hsl(var(--foreground))] mb-2">
+              Acceso restringido
+            </h2>
+            <p className="text-[hsl(var(--muted-foreground))] mb-5">
+              Esta sección es solo para administradores del sitio. Si necesitás acceso, contactá a
+              quien administra Mercadito Online PY.
             </p>
-          </div>
-          
-          {/* Componente para asignar rol de admin */}
-          <AdminRoleAssigner />
-          
-          <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-            <h3 className="font-semibold text-blue-900 mb-2">💡 Alternativa: Usar SQL Directo</h3>
-            <p className="text-sm text-blue-800 mb-2">
-              También puedes ejecutar el script <code className="bg-blue-100 px-2 py-1 rounded text-xs">assign_admin.sql</code> en Supabase SQL Editor.
-            </p>
-            <div className="mt-3 space-x-2">
-              <a 
-                href="/dashboard" 
-                className="inline-block px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm"
+            <div className="flex flex-wrap gap-2">
+              <Link
+                href="/dashboard"
+                className="inline-flex px-4 py-2 rounded-xl bg-[hsl(var(--primary))] text-white text-sm font-medium hover:opacity-90"
               >
-                Ir al Dashboard
-              </a>
-              <a 
-                href="/" 
-                className="inline-block px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors text-sm"
+                Ir a mi cuenta
+              </Link>
+              <Link
+                href="/"
+                className="inline-flex px-4 py-2 rounded-xl border border-[hsl(var(--border))] text-sm font-medium hover:bg-[hsl(var(--muted))]"
               >
                 Volver al inicio
-              </a>
+              </Link>
             </div>
           </div>
         </div>
@@ -200,16 +149,50 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="flex items-center justify-between px-6 py-4 border-b bg-white">
-        <nav className="flex gap-4">
-          <Link href="/admin" className="font-semibold">Panel Admin</Link>
-          <Link href="/admin/categories" className="underline">Categorías</Link>
-          <Link href="/admin/marketing/catalogo-vitrina" className="underline">Catálogo Vitrina</Link>
-        </nav>
-        <Link href="/" className="underline text-sm">← Volver</Link>
+    <div className="min-h-screen bg-[hsl(var(--background))]">
+      <header className="sticky top-0 z-40 border-b border-[hsl(var(--border))] bg-white/95 backdrop-blur-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex flex-col gap-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <Link href="/admin" className="text-lg font-bold text-[hsl(var(--primary))]">
+                Panel de control
+              </Link>
+              {email && (
+                <p className="text-xs text-[hsl(var(--muted-foreground))] mt-0.5 truncate max-w-[220px] sm:max-w-none">
+                  {email}
+                </p>
+              )}
+            </div>
+            <Link
+              href="/"
+              className="text-sm font-medium text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--primary))]"
+            >
+              Ver sitio
+            </Link>
+          </div>
+          <nav className="flex gap-1 overflow-x-auto pb-1 -mx-1 px-1">
+            {NAV.map((item) => {
+              const active = item.exact
+                ? pathname === item.href
+                : pathname === item.href || pathname?.startsWith(`${item.href}/`);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`shrink-0 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                    active
+                      ? 'bg-[hsl(var(--primary))] text-white'
+                      : 'text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]'
+                  }`}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
+          </nav>
+        </div>
       </header>
-      <main className="p-6">{children}</main>
+      <main className="max-w-7xl mx-auto p-4 sm:p-6">{children}</main>
     </div>
   );
 }

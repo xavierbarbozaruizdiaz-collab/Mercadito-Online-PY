@@ -14,6 +14,7 @@ interface AuctionCardProps {
     id: string;
     title: string;
     cover_url?: string;
+    image_url?: string;
     current_bid?: number;
     price: number;
     total_bids: number;
@@ -27,6 +28,7 @@ export default function AuctionCard({ auction, variant = 'default' }: AuctionCar
   const isEnded = auction.auction_status === 'ended' || auction.auction_status === 'cancelled';
   const isActive = auction.auction_status === 'active';
   
+  const imageUrl = auction.cover_url || auction.image_url;
   const currentBid = auction.current_bid || auction.price;
   
   // Calcular tiempo restante - usar tiempo sincronizado del servidor
@@ -60,9 +62,9 @@ export default function AuctionCard({ auction, variant = 'default' }: AuctionCar
           <div className="flex gap-3 p-3">
             {/* Imagen compacta */}
             <div className="relative w-20 h-20 flex-shrink-0 rounded-md overflow-hidden bg-muted">
-              {auction.cover_url ? (
+              {imageUrl ? (
                 <Image
-                  src={auction.cover_url}
+                  src={imageUrl}
                   alt={auction.title}
                   fill
                   className="object-cover"
@@ -118,9 +120,9 @@ export default function AuctionCard({ auction, variant = 'default' }: AuctionCar
       <Card className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer h-full flex flex-col">
         {/* Imagen */}
         <div className="relative w-full h-48 bg-muted">
-          {auction.cover_url ? (
+          {imageUrl ? (
             <Image
-              src={auction.cover_url}
+              src={imageUrl}
               alt={auction.title}
               fill
               className="object-cover"

@@ -555,6 +555,7 @@ export default function NewProduct() {
             ? Number(auctionBuyNowPrice) 
             : null,
           start_date: startDate.toISOString(),
+          duration_minutes: 1440, // 24 horas
         };
       }
 
@@ -602,9 +603,7 @@ export default function NewProduct() {
         
         auctionStartAt = startDate.toISOString();
         
-        // Duración para pruebas: 2 minutos (120 segundos)
-        // Cambiar a 1440 para producción (24 horas)
-        const durationMinutes = 2; // 2 minutos para pruebas - cambiar a 1440 para producción
+        const durationMinutes = cleanAttributes.auction.duration_minutes;
         auctionEndAt = new Date(startDate.getTime() + durationMinutes * 60 * 1000).toISOString();
         
         console.log('📅 Fechas de subasta configuradas:', {
@@ -1060,7 +1059,7 @@ export default function NewProduct() {
                   />
                   <p className="text-xs text-gray-600 mt-1 font-medium">📅 Inicio de la subasta</p>
                   <p className="text-xs text-gray-500">
-                    La subasta comenzará automáticamente en esta fecha y hora. <strong>Duración para pruebas: 2 minutos</strong> desde el inicio. Puedes seleccionar una fecha pasada para iniciar inmediatamente.
+                    La subasta comenzará automáticamente en esta fecha y hora. <strong>Duración: 24 horas</strong> desde el inicio. Podés seleccionar una fecha pasada para iniciar inmediatamente.
                   </p>
                 </div>
               </div>
@@ -1068,7 +1067,7 @@ export default function NewProduct() {
                 <p className="text-xs text-yellow-900">
                   <strong>💡 ¿Cómo funcionan las subastas?</strong><br/>
                   • Los compradores pujan incrementando el precio<br/>
-                  • <strong>Duración: 2 minutos</strong> desde la fecha de inicio (modo prueba)<br/>
+                  • <strong>Duración: 24 horas</strong> desde la fecha de inicio<br/>
                   • Quien ofrezca el precio más alto al finalizar gana<br/>
                   • Si configuraste "Compra ahora", alguien puede comprarlo inmediatamente<br/>
                   • Puedes usar una fecha pasada para iniciar la subasta inmediatamente
