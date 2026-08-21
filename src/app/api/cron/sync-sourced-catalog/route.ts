@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { logger } from '@/lib/utils/logger';
 import { isAliExpressConfigured } from '@/lib/services/aliexpressClient';
-import { syncSourcedCatalog } from '@/lib/services/sourcedCatalogService';
+import { importDropshipRecommended, syncSourcedCatalog } from '@/lib/services/sourcedCatalogService';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -19,9 +19,20 @@ export async function GET(request: NextRequest) {
 
   try {
     logger.info('[cron/sync-sourced-catalog] inicio');
-    const result = await syncSourcedCatalog(80);
-    logger.info('[cron/sync-sourced-catalog] fin', result);
-    return NextResponse.json(result);
+    const sync = await syncSourcedCatalog(40);
+    let recommended = null;
+    try {
+      recommended = await importDropshipRecommended({
+        categoryOffset: 0,
+        categoryLimit: 6,
+        pageSize: 10,
+      });
+    } catch (recommendError: any) {
+      logger.warn('[cron/sync-sourced-catalog] import recomendados', recommendError);
+      recommended = { error: recommendError?.message || 'Error importando recomendados' };
+    }
+    logger.info('[cron/sync-sourced-catalog] fin', { sync, recommended });
+    return NextResponse.json({ sync, recommended });
   } catch (error: any) {
     logger.error('[cron/sync-sourced-catalog]', error);
     return NextResponse.json({ error: error.message || 'Error' }, { status: 500 });

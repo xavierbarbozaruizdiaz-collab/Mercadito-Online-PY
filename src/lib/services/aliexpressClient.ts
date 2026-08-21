@@ -28,6 +28,7 @@ export interface AliExpressProduct {
   shippingPrice: number;
   evaluateRate?: string;
   lastestVolume?: number;
+  categoryId?: string;
 }
 
 export interface AliExpressSearchResult {
@@ -123,7 +124,7 @@ function mapRawProduct(raw: Record<string, any>): AliExpressProduct | null {
     raw.target_sale_price_currency || raw.sale_price_currency || raw.currency || 'USD'
   );
   const shippingPrice = parseMoney(
-    raw.ship_to_days || raw.freight || raw.shipping_cost || raw.logistics_cost || 0
+    raw.freight || raw.shipping_cost || raw.logistics_cost || raw.target_original_freight || 0
   );
 
   const productUrl =
@@ -148,8 +149,17 @@ function mapRawProduct(raw: Record<string, any>): AliExpressProduct | null {
   };
 }
 
+export function isAliExpressPermissionError(error: unknown): boolean {
+  const msg = error instanceof Error ? error.message : String(error || '');
+  return /permission to access this api|app does not have permission|isp\.insufficient-isv-permissions/i.test(
+    msg
+  );
+}
+
 function extractList(payload: any): { products: any[]; total: number } {
   const root =
+    payload?.aliexpress_ds_recommend_feed_get_response?.resp_result?.result ||
+    payload?.aliexpress_ds_recommend_feed_get_response?.result ||
     payload?.aliexpress_affiliate_product_query_response?.resp_result?.result ||
     payload?.aliexpress_affiliate_product_query_response?.result ||
     payload?.resp_result?.result ||
@@ -293,4 +303,109 @@ export async function getAffiliateProductDetails(
   return extractDetail(payload)
     .map((p) => mapRawProduct(p))
     .filter((p): p is AliExpressProduct => !!p);
+}
+
+const MAX_AIR_WEIGHT_KG = 2;
+
+function mapDsProductDetail(payload: any): AliExpressProduct | null {
+  const result =
+    payload?.aliexpress_ds_product_get_response?.result ||
+    payload?.result ||
+    payload;
+  const base = result?.ae_item_base_info_dto || result?.ae_item_base_info || {};
+  const productId = String(base.product_id || result?.product_id || '').trim();
+  if (!productId) return null;
+
+  const title = String(base.subject || base.product_title || '').trim();
+  if (!title) return null;
+
+  const skus = asArray(result?.ae_item_sku_info_dtos || result?.ae_item_sku_info);
+  const inStock = skus.find((s: any) => s?.sku_stock !== false && parseMoney(s?.offer_sale_price || s?.sku_price) > 0) || skus[0];
+  const salePrice = parseMoney(inStock?.offer_sale_price || inStock?.sku_price || base.price);
+  const originalPrice = parseMoney(inStock?.sku_price);
+
+  const media = result?.ae_multimedia_info_dto || {};
+  const imageUrls = String(media.image_urls || '')
+    .split(/[;,]/)
+    .map((u: string) => u.trim())
+    .filter((u: string) => u.startsWith('http'));
+
+  const weight = parseFloat(String(result?.package_info_dto?.gross_weight || '0'));
+  if (Number.isFinite(weight) && weight > MAX_AIR_WEIGHT_KG) {
+    return null;
+  }
+
+  return {
+    productId,
+    title,
+    description: base.detail ? String(base.detail).slice(0, 2000) : undefined,
+    imageUrl: imageUrls[0] || null,
+    imageUrls: imageUrls.slice(0, 8),
+    productUrl: `https://www.aliexpress.com/item/${productId}.html`,
+    salePrice,
+    originalPrice: originalPrice > salePrice ? originalPrice : null,
+    currency: String(inStock?.currency_code || base.currency_code || 'USD'),
+    shippingPrice: 0,
+    categoryId: base.category_id != null ? String(base.category_id) : undefined,
+  };
+}
+
+export async function getDsRecommendFeed(options: {
+  categoryId: string;
+  feedName?: string;
+  page?: number;
+  pageSize?: number;
+}): Promise<AliExpressSearchResult> {
+  const page = options.page || 1;
+  const pageSize = Math.min(Math.max(options.pageSize || 20, 1), 50);
+  const payload = await callApi('aliexpress.ds.recommend.feed.get', {
+    feed_name: options.feedName || 'DS bestseller',
+    category_id: String(options.categoryId),
+    country: 'PY',
+    target_currency: 'USD',
+    target_language: 'ES',
+    page_no: String(page),
+    page_size: String(pageSize),
+  });
+  const extracted = extractList(payload);
+  const products = extracted.products
+    .map((p) => mapRawProduct(p))
+    .filter((p): p is AliExpressProduct => !!p)
+    .map((p) => ({ ...p, categoryId: options.categoryId }));
+
+  return {
+    products,
+    total: extracted.total || products.length,
+    page,
+    pageSize,
+  };
+}
+
+export async function getDsProduct(productId: string): Promise<AliExpressProduct | null> {
+  const payload = await callApi('aliexpress.ds.product.get', {
+    product_id: String(productId),
+    ship_to_country: 'PY',
+    target_currency: 'USD',
+    target_language: 'ES',
+  });
+  return mapDsProductDetail(payload);
+}
+
+export async function getSourcedProductDetails(productIds: string[]): Promise<AliExpressProduct[]> {
+  if (productIds.length === 0) return [];
+  try {
+    return await getAffiliateProductDetails(productIds);
+  } catch (error) {
+    if (!isAliExpressPermissionError(error)) throw error;
+    const out: AliExpressProduct[] = [];
+    for (const id of productIds.slice(0, 15)) {
+      try {
+        const detail = await getDsProduct(id);
+        if (detail) out.push(detail);
+      } catch (inner) {
+        logger.warn('[AliExpress] ds.product.get falló', { id, error: inner });
+      }
+    }
+    return out;
+  }
 }

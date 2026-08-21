@@ -8,10 +8,13 @@ import { Database } from '@/types/database';
 import { logger } from '@/lib/utils/logger';
 import {
   AliExpressProduct,
-  getAffiliateProductDetails,
+  getDsRecommendFeed,
+  getSourcedProductDetails,
   isAliExpressConfigured,
+  isAliExpressPermissionError,
   searchAffiliateProducts,
 } from '@/lib/services/aliexpressClient';
+import { resolveAliExpressFeeds } from '@/lib/services/aliexpressCategoryMap';
 
 export const SOURCE_PLATFORM = 'aliexpress';
 
@@ -268,7 +271,8 @@ async function upsertProductImages(
 function buildProductPayload(
   ae: AliExpressProduct,
   store: { id: string; seller_id: string },
-  settings: SourcedCatalogSettings
+  settings: SourcedCatalogSettings,
+  categoryId?: string | null
 ) {
   const price = computeLandedPricePyg({
     sourcePrice: ae.salePrice,
@@ -315,6 +319,7 @@ function buildProductPayload(
     estimated_delivery_max_days: settings.default_delivery_max_days,
     last_source_synced_at: new Date().toISOString(),
     source_available: true,
+    ...(categoryId ? { category_id: categoryId } : {}),
   };
 }
 
@@ -352,7 +357,7 @@ export async function importAliExpressProducts(params: {
   const errors: string[] = [];
 
   try {
-    const details = await getAffiliateProductDetails(uniqueIds);
+    const details = await getSourcedProductDetails(uniqueIds);
     const byId = new Map(details.map((p) => [p.productId, p]));
 
     for (const id of uniqueIds) {
@@ -434,6 +439,143 @@ export async function importAliExpressProducts(params: {
   return { imported, updated, skipped, errors };
 }
 
+async function loadStoreCategories(db: ReturnType<typeof getAdminClient>) {
+  const { data, error } = await (db as any)
+    .from('categories')
+    .select('id, name')
+    .order('name', { ascending: true });
+  if (error) throw error;
+  return (data || []) as Array<{ id: string; name: string }>;
+}
+
+async function upsertSourcedProduct(
+  db: ReturnType<typeof getAdminClient>,
+  ae: AliExpressProduct,
+  store: { id: string; seller_id: string },
+  settings: SourcedCatalogSettings,
+  categoryId?: string | null
+): Promise<'imported' | 'updated'> {
+  const payload = buildProductPayload(ae, store, settings, categoryId);
+  const { data: existing } = await (db as any)
+    .from('products')
+    .select('id')
+    .eq('store_id', store.id)
+    .eq('source_platform', SOURCE_PLATFORM)
+    .eq('source_product_id', ae.productId)
+    .maybeSingle();
+
+  if (existing?.id) {
+    const { error } = await (db as any).from('products').update(payload).eq('id', existing.id);
+    if (error) throw error;
+    await upsertProductImages(db, existing.id, ae.imageUrls.length ? ae.imageUrls : ae.imageUrl ? [ae.imageUrl] : []);
+    return 'updated';
+  }
+
+  const { data: created, error } = await (db as any).from('products').insert(payload).select('id').single();
+  if (error || !created?.id) throw new Error(error?.message || 'insert falló');
+  await upsertProductImages(db, created.id, ae.imageUrls.length ? ae.imageUrls : ae.imageUrl ? [ae.imageUrl] : []);
+  return 'imported';
+}
+
+export async function importDropshipRecommended(params: {
+  userId?: string;
+  categoryOffset?: number;
+  categoryLimit?: number;
+  pageSize?: number;
+}): Promise<{
+  imported: number;
+  updated: number;
+  skipped: number;
+  errors: string[];
+  categories: Array<{ aeName: string; mercadito: string; count: number }>;
+  nextOffset: number;
+  totalFeeds: number;
+  done: boolean;
+}> {
+  if (!isAliExpressConfigured()) {
+    throw new Error('AliExpress no está configurado en el servidor');
+  }
+
+  const db = getAdminClient();
+  let store: { id: string; seller_id: string; settings: Record<string, any> | null };
+
+  if (params.userId) {
+    const ownership = await assertUserOwnsFallbackStore(params.userId, db);
+    if (!ownership.ok || !ownership.store) {
+      throw new Error(ownership.error);
+    }
+    store = ownership.store;
+  } else {
+    const fallback = await getFallbackStore(db);
+    if (!fallback) {
+      throw new Error('No hay tienda Ubuy (fallback) configurada');
+    }
+    store = fallback;
+  }
+
+  const settings = parseSourcedSettings(store.settings);
+  const mercaditoCategories = await loadStoreCategories(db);
+  const feeds = resolveAliExpressFeeds(mercaditoCategories);
+  const offset = Math.max(0, params.categoryOffset || 0);
+  const limit = Math.min(12, Math.max(1, params.categoryLimit || 8));
+  const pageSize = Math.min(20, Math.max(5, params.pageSize || 12));
+  const slice = feeds.slice(offset, offset + limit);
+
+  let imported = 0;
+  let updated = 0;
+  let skipped = 0;
+  const errors: string[] = [];
+  const categories: Array<{ aeName: string; mercadito: string; count: number }> = [];
+
+  for (const feed of slice) {
+    let count = 0;
+    try {
+      const result = await getDsRecommendFeed({
+        categoryId: feed.aeCategoryId,
+        page: 1,
+        pageSize,
+      });
+
+      for (const ae of result.products) {
+        if (!ae.salePrice || ae.salePrice <= 0) {
+          skipped += 1;
+          continue;
+        }
+        try {
+          const kind = await upsertSourcedProduct(db, ae, store, settings, feed.mercadito.id);
+          if (kind === 'imported') imported += 1;
+          else updated += 1;
+          count += 1;
+        } catch (err: any) {
+          skipped += 1;
+          errors.push(`${ae.productId}: ${err?.message || 'error'}`);
+        }
+      }
+    } catch (err: any) {
+      const message = err?.message || 'Error de feed DS';
+      errors.push(`${feed.aeName}: ${message}`);
+      if (isAliExpressPermissionError(err)) {
+        throw new Error(
+          'Esta app Drop Shipping no tiene permiso del feed de recomendados, o falta ALIEXPRESS_ACCESS_TOKEN (autorizar la cuenta en ds.aliexpress.com).'
+        );
+      }
+    }
+    categories.push({ aeName: feed.aeName, mercadito: feed.mercadito.name, count });
+  }
+
+  const nextOffset = offset + slice.length;
+  return {
+    imported,
+    updated,
+    skipped,
+    errors: errors.slice(0, 12),
+    categories,
+    nextOffset,
+    totalFeeds: feeds.length,
+    done: nextOffset >= feeds.length,
+  };
+}
+
 export async function searchAliExpressForDashboard(params: {
   keywords: string;
   page?: number;
@@ -485,7 +627,7 @@ export async function syncSourcedCatalog(limit = 80): Promise<{
     const chunk = list.slice(i, i + SYNC_BATCH);
     const ids = chunk.map((p) => p.source_product_id);
     try {
-      const details = await getAffiliateProductDetails(ids);
+      const details = await getSourcedProductDetails(ids);
       const byId = new Map(details.map((d) => [d.productId, d]));
 
       for (const product of chunk) {
