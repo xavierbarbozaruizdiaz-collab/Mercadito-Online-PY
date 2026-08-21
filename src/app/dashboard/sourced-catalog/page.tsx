@@ -4,16 +4,19 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   ArrowLeft,
+  ExternalLink,
   Globe,
   Loader2,
   Package,
   RefreshCw,
   Search,
   Settings,
+  ShoppingCart,
   Truck,
 } from 'lucide-react';
 import { getAuthHeaders } from '@/lib/auth/clientAuthHeaders';
 import { useToast } from '@/lib/hooks/useToast';
+import EnqueueSourcedPurchaseModal from '@/components/sourced/EnqueueSourcedPurchaseModal';
 import {
   ALIEXPRESS_CATEGORY_FEEDS,
   defaultAirFriendlyCategoryIds,
@@ -74,6 +77,8 @@ export default function SourcedCatalogPage() {
   const [selectedAeCategories, setSelectedAeCategories] = useState<Record<string, boolean>>(() =>
     initialImportSelection()
   );
+  const [enqueueProduct, setEnqueueProduct] = useState<ImportedProduct | null>(null);
+  const [enqueueSubmitting, setEnqueueSubmitting] = useState(false);
 
   const authFetch = useCallback(async (url: string, init?: RequestInit) => {
     const headers = await getAuthHeaders();
@@ -335,7 +340,7 @@ export default function SourcedCatalogPage() {
           </p>
           <div className="mt-3 flex flex-wrap gap-3 text-sm">
             <Link href="/dashboard/sourced-fulfillments" className="text-blue-700 hover:underline inline-flex items-center gap-1">
-              <Truck className="w-4 h-4" /> Cola de fulfillment
+              <Truck className="w-4 h-4" /> Pedidos a AliExpress
             </Link>
             <Link href="/dashboard/sourcing-orders" className="text-blue-700 hover:underline">
               Pedidos por conseguir
@@ -590,20 +595,43 @@ export default function SourcedCatalogPage() {
           ) : (
             <ul className="divide-y">
               {imported.map((p) => (
-                <li key={p.id} className="py-3 flex items-center gap-3">
-                  {p.cover_url ? (
-                    <img src={p.cover_url} alt="" className="w-12 h-12 object-cover rounded" />
-                  ) : (
-                    <div className="w-12 h-12 bg-gray-100 rounded" />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <Link href={`/products/${p.id}`} className="font-medium hover:underline line-clamp-1">
-                      {p.title}
-                    </Link>
-                    <p className="text-sm text-gray-500">
-                      {Number(p.price).toLocaleString('es-PY')} Gs. · {p.status}
-                      {p.source_available === false ? ' · origen no disponible' : ''}
-                    </p>
+                <li key={p.id} className="py-3 flex flex-col sm:flex-row sm:items-center gap-3">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    {p.cover_url ? (
+                      <img src={p.cover_url} alt="" className="w-12 h-12 object-cover rounded shrink-0" />
+                    ) : (
+                      <div className="w-12 h-12 bg-gray-100 rounded shrink-0" />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <Link href={`/products/${p.id}`} className="font-medium hover:underline line-clamp-1">
+                        {p.title}
+                      </Link>
+                      <p className="text-sm text-gray-500">
+                        {Number(p.price).toLocaleString('es-PY')} Gs. · {p.status}
+                        {p.source_available === false ? ' · origen no disponible' : ''}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2 sm:justify-end shrink-0">
+                    {p.source_url && (
+                      <a
+                        href={p.source_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-50"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        Abrir en AliExpress
+                      </a>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setEnqueueProduct(p)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm bg-black text-white rounded-lg hover:bg-gray-800"
+                    >
+                      <ShoppingCart className="w-3.5 h-3.5" />
+                      Encolar compra
+                    </button>
                   </div>
                 </li>
               ))}
@@ -611,6 +639,33 @@ export default function SourcedCatalogPage() {
           )}
         </div>
       </div>
+
+      <EnqueueSourcedPurchaseModal
+        open={Boolean(enqueueProduct)}
+        product={enqueueProduct}
+        submitting={enqueueSubmitting}
+        onClose={() => setEnqueueProduct(null)}
+        onSubmit={async (payload) => {
+          setEnqueueSubmitting(true);
+          try {
+            const res = await authFetch('/api/sourced-fulfillments', {
+              method: 'POST',
+              body: JSON.stringify(payload),
+            });
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(json.error || 'No se pudo encolar');
+            toast.success('Compra encolada. Abrí AliExpress desde la cola.');
+            setEnqueueProduct(null);
+            if (enqueueProduct?.source_url) {
+              window.open(enqueueProduct.source_url, '_blank', 'noopener,noreferrer');
+            }
+          } catch (err: any) {
+            toast.error(err.message || 'Error al encolar');
+          } finally {
+            setEnqueueSubmitting(false);
+          }
+        }}
+      />
     </main>
   );
 }

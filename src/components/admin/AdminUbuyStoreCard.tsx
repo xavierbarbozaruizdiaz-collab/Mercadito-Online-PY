@@ -81,7 +81,7 @@ export default function AdminUbuyStoreCard() {
           href="/dashboard/sourced-fulfillments"
           className="inline-flex px-4 py-2 rounded-xl bg-white border border-indigo-200 text-indigo-900 text-sm font-medium hover:bg-indigo-50"
         >
-          Fulfillment
+          Pedidos a AliExpress
         </Link>
       </div>
     </section>

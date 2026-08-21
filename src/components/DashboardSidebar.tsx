@@ -68,7 +68,7 @@ const sellerMoreItems: SidebarItem[] = [
 
 const adminSourcedItems: SidebarItem[] = [
   { icon: Globe, label: 'Catálogo internacional', href: '/dashboard/sourced-catalog' },
-  { icon: Truck, label: 'Fulfillment sourced', href: '/dashboard/sourced-fulfillments' },
+  { icon: Truck, label: 'Pedidos a AliExpress', href: '/dashboard/sourced-fulfillments' },
 ];
 
 interface DashboardSidebarProps {

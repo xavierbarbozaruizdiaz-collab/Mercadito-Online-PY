@@ -5,6 +5,13 @@ import { assertUserOwnsFallbackStore, getAdminClient } from '@/lib/services/sour
 
 export const runtime = 'nodejs';
 
+function trimOrNull(value: unknown, max = 200): string | null {
+  if (typeof value !== 'string') return null;
+  const t = value.trim();
+  if (!t) return null;
+  return t.slice(0, max);
+}
+
 export async function GET(request: NextRequest) {
   const auth = await requireUser(request);
   if (!auth.ok) return auth.response;
@@ -35,6 +42,10 @@ export async function GET(request: NextRequest) {
         source_product_id,
         source_url,
         status,
+        origin,
+        customer_name,
+        customer_phone,
+        customer_notes,
         tracking_number,
         notes,
         purchased_at,
@@ -42,7 +53,15 @@ export async function GET(request: NextRequest) {
         created_at,
         updated_at,
         products (id, title, cover_url, price),
-        orders (id, status, total_amount, created_at)
+        orders (
+          id,
+          status,
+          total_amount,
+          created_at,
+          buyer_id,
+          shipping_address,
+          notes
+        )
       `,
         { count: 'exact' }
       )
@@ -68,6 +87,104 @@ export async function GET(request: NextRequest) {
     });
   } catch (error: any) {
     logger.error('[sourced-fulfillments GET]', error);
+    return NextResponse.json({ error: error.message || 'Error' }, { status: 500 });
+  }
+}
+
+export async function POST(request: NextRequest) {
+  const auth = await requireUser(request);
+  if (!auth.ok) return auth.response;
+
+  try {
+    const ownership = await assertUserOwnsFallbackStore(auth.user.id);
+    if (!ownership.ok || !ownership.store) {
+      return NextResponse.json({ error: ownership.error }, { status: 403 });
+    }
+
+    const body = await request.json().catch(() => ({}));
+    const productId = typeof body.product_id === 'string' ? body.product_id.trim() : '';
+    if (!productId) {
+      return NextResponse.json({ error: 'product_id es requerido' }, { status: 400 });
+    }
+
+    const customerName = trimOrNull(body.customer_name, 120);
+    const customerPhone = trimOrNull(body.customer_phone, 40);
+    const customerNotes = trimOrNull(body.customer_notes, 500);
+
+    const db = getAdminClient();
+    const { data: product, error: productError } = await (db as any)
+      .from('products')
+      .select(
+        'id, store_id, fulfillment_type, source_platform, source_product_id, source_url, title, status'
+      )
+      .eq('id', productId)
+      .eq('store_id', ownership.store.id)
+      .maybeSingle();
+
+    if (productError) throw productError;
+    if (!product) {
+      return NextResponse.json({ error: 'Producto no encontrado en la tienda Ubuy' }, { status: 404 });
+    }
+    if (product.fulfillment_type !== 'sourced') {
+      return NextResponse.json(
+        { error: 'Solo se pueden encolar productos sourced (AliExpress)' },
+        { status: 400 }
+      );
+    }
+    if (!product.source_url && !product.source_product_id) {
+      return NextResponse.json(
+        { error: 'El producto no tiene link ni ID de AliExpress' },
+        { status: 400 }
+      );
+    }
+
+    const { data, error } = await (db as any)
+      .from('sourced_fulfillments')
+      .insert({
+        order_id: null,
+        order_item_id: null,
+        product_id: product.id,
+        store_id: ownership.store.id,
+        source_platform: product.source_platform || 'aliexpress',
+        source_product_id: product.source_product_id || null,
+        source_url: product.source_url || null,
+        status: 'pending_purchase',
+        origin: 'manual',
+        customer_name: customerName,
+        customer_phone: customerPhone,
+        customer_notes: customerNotes,
+      })
+      .select(
+        `
+        id,
+        order_id,
+        order_item_id,
+        product_id,
+        store_id,
+        source_platform,
+        source_product_id,
+        source_url,
+        status,
+        origin,
+        customer_name,
+        customer_phone,
+        customer_notes,
+        tracking_number,
+        notes,
+        purchased_at,
+        shipped_at,
+        created_at,
+        updated_at,
+        products (id, title, cover_url, price)
+      `
+      )
+      .single();
+
+    if (error) throw error;
+
+    return NextResponse.json({ data }, { status: 201 });
+  } catch (error: any) {
+    logger.error('[sourced-fulfillments POST]', error);
     return NextResponse.json({ error: error.message || 'Error' }, { status: 500 });
   }
 }

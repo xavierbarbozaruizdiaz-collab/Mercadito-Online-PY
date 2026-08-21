@@ -35,8 +35,8 @@ const SECTIONS: { title: string; subtitle: string; items: AdminLink[] }[] = [
       },
       {
         href: '/dashboard/sourced-fulfillments',
-        title: 'Fulfillment Ubuy',
-        description: 'Comprar en origen y cargar tracking',
+        title: 'Pedidos a AliExpress',
+        description: 'Encolar compras manuales, abrir origen y cargar tracking',
       },
       {
         href: '/admin/users',
