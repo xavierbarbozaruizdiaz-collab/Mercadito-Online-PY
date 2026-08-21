@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
           sourceUrl: item.sourceUrl,
           source: 'Cellshop',
           currency: 'PYG',
-          status: 'draft',
+          status: 'paused',
         });
         if (result.created) imported += 1;
         else updated += 1;
