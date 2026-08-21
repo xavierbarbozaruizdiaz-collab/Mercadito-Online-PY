@@ -51,6 +51,9 @@ export default function SourcedFulfillmentsPage() {
   const [manualOpen, setManualOpen] = useState(false);
   const [manualSubmitting, setManualSubmitting] = useState(false);
   const [productOptions, setProductOptions] = useState<EnqueueProductOption[]>([]);
+  const [productsTotal, setProductsTotal] = useState(0);
+  const [productsPage, setProductsPage] = useState(0);
+  const [loadingProducts, setLoadingProducts] = useState(false);
 
   const authFetch = useCallback(async (url: string, init?: RequestInit) => {
     const headers = await getAuthHeaders();
@@ -90,24 +93,37 @@ export default function SourcedFulfillmentsPage() {
     }
   }, [authFetch, status]);
 
-  const loadProducts = useCallback(async () => {
-    try {
-      const res = await authFetch('/api/sourced-catalog/products?limit=50');
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) return;
-      setProductOptions((json.data || []) as EnqueueProductOption[]);
-    } catch {
-      /* ignore */
-    }
-  }, [authFetch]);
+  const loadProductsPage = useCallback(
+    async (page: number, append: boolean) => {
+      setLoadingProducts(true);
+      try {
+        const res = await authFetch(`/api/sourced-catalog/products?page=${page}&limit=40`);
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) return;
+        const rows = (json.data || []) as EnqueueProductOption[];
+        setProductsTotal(json.pagination?.total || 0);
+        setProductsPage(page);
+        setProductOptions((prev) => {
+          if (!append) return rows;
+          const seen = new Set(prev.map((p) => p.id));
+          return [...prev, ...rows.filter((r) => !seen.has(r.id))];
+        });
+      } catch {
+        /* ignore */
+      } finally {
+        setLoadingProducts(false);
+      }
+    },
+    [authFetch]
+  );
 
   useEffect(() => {
     load();
   }, [load]);
 
   useEffect(() => {
-    loadProducts();
-  }, [loadProducts]);
+    loadProductsPage(1, false);
+  }, [loadProductsPage]);
 
   async function updateFulfillment(id: string, patch: Record<string, string>) {
     setSavingId(id);
@@ -338,6 +354,9 @@ export default function SourcedFulfillmentsPage() {
       <EnqueueSourcedPurchaseModal
         open={manualOpen}
         products={productOptions}
+        productsTotal={productsTotal}
+        loadingProducts={loadingProducts}
+        onLoadMoreProducts={() => loadProductsPage(productsPage + 1, true)}
         submitting={manualSubmitting}
         onClose={() => setManualOpen(false)}
         onSubmit={async (payload) => {
