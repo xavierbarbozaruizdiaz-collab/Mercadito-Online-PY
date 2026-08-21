@@ -412,7 +412,7 @@ export default function NewProduct() {
   function removeImage(idx: number) {
     setImagePreviews(prev => {
       const newPreviews = [...prev];
-      newPreviews[idx] && URL.revokeObjectURL(newPreviews[idx].preview);
+      if (newPreviews[idx]) URL.revokeObjectURL(newPreviews[idx].preview);
       const filtered = newPreviews.filter((_, i) => i !== idx);
       
       // Validar imágenes después de eliminar
@@ -446,7 +446,7 @@ export default function NewProduct() {
 
   // [IMAGES LEVEL2] Usar API route optimizado en lugar de subir directo
   // El API route genera thumbnails y WebP automáticamente
-  async function uploadToBucket(f: File, productId: string, idx: number) {
+  async function uploadToBucket(f: File, productId: string) {
     const formData = new FormData();
     formData.append('file', f);
     formData.append('productId', productId);
@@ -705,19 +705,44 @@ export default function NewProduct() {
       console.log('✅ Producto creado:', newProduct.id);
       showMsg('success', '📦 Producto creado. Comprimiendo imágenes...');
 
-      // [IMAGES LEVEL2] Pipeline optimizado: el API route ya comprime, genera thumbnails y WebP
-      // 2. Subir imágenes usando API route optimizado
+      // Subir en secuencia para que la portada sea determinista y para
+      // conservar los uploads exitosos si una imagen puntual falla.
       showMsg('success', '🖼️ Procesando y subiendo imágenes...');
-      const uploadResults = await Promise.all(
-        imagePreviews.map(({ file }, idx) => 
-          uploadToBucket(file, newProduct.id.toString(), idx)
-            .then(url => ({ url, idx, isCover: idx === 0 }))
-            .catch(err => {
-              console.error(`Error subiendo imagen ${idx}:`, err);
-              throw err;
-            })
-        )
-      );
+      const uploadResults: Array<{ url: string; idx: number; isCover: boolean }> = [];
+      const uploadErrors: Array<{ idx: number; message: string }> = [];
+
+      for (const [idx, { file }] of imagePreviews.entries()) {
+        try {
+          const compressedFile = await compress(file);
+          const url = await uploadToBucket(compressedFile, newProduct.id.toString());
+          uploadResults.push({ url, idx, isCover: uploadResults.length === 0 });
+        } catch (uploadError) {
+          const message =
+            uploadError instanceof Error ? uploadError.message : 'Error al subir imagen';
+          console.error(`Error subiendo imagen ${idx}:`, uploadError);
+          uploadErrors.push({ idx, message });
+        }
+      }
+
+      if (uploadResults.length === 0) {
+        const { error: pauseError } = await supabase
+          .from('products')
+          .update({ status: 'paused' })
+          .eq('id', newProduct.id);
+
+        if (pauseError) {
+          console.error('No se pudo pausar el producto sin imágenes:', pauseError);
+        }
+
+        showMsg(
+          'error',
+          '⚠️ El producto quedó guardado y pausado, pero no se pudieron subir sus imágenes. Abriremos el editor para que puedas reintentarlo sin crear otro producto.'
+        );
+        setTimeout(() => {
+          window.location.href = `/dashboard/edit-product/${newProduct.id}`;
+        }, 3500);
+        return;
+      }
 
       // El API route ya guarda en product_images y actualiza cover_url/thumbnail_url
       // Solo necesitamos verificar que todo se subió correctamente
@@ -743,7 +768,12 @@ export default function NewProduct() {
 
       console.log('✅ Producto y imágenes creadas exitosamente');
       
-      showMsg('success', '✅ Producto creado exitosamente. Redirigiendo...');
+      showMsg(
+        'success',
+        uploadErrors.length > 0
+          ? `✅ Producto creado con ${uploadResults.length} imagen(es). ${uploadErrors.length} no se pudieron subir; podés agregarlas luego desde Editar. Redirigiendo...`
+          : '✅ Producto creado exitosamente. Redirigiendo...'
+      );
       
       // Limpiar formulario
       setTitle('');

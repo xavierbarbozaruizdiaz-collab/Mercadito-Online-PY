@@ -3,6 +3,16 @@ import type { NextConfig } from 'next';
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  // Sharp carga binarios nativos en runtime. Debe quedar externo al bundle y
+  // sus paquetes Linux deben copiarse a la función serverless de upload.
+  serverExternalPackages: ['sharp'],
+  outputFileTracingIncludes: {
+    '/api/products/upload-images': [
+      './node_modules/sharp/**/*',
+      './node_modules/@img/sharp-linux-x64/**/*',
+      './node_modules/@img/sharp-libvips-linux-x64/**/*',
+    ],
+  },
   webpack: (config, { isServer }) => {
     // Manejar módulos nativos de Tailwind v4 en Vercel
     if (!isServer) {
