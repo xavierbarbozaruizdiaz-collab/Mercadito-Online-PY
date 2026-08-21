@@ -17,6 +17,7 @@ import { useToast } from '@/lib/hooks/useToast';
 import {
   ALIEXPRESS_CATEGORY_FEEDS,
   defaultAirFriendlyCategoryIds,
+  initialImportSelection,
 } from '@/lib/services/aliexpressCategoryMap';
 
 type CatalogSettings = {
@@ -70,14 +71,9 @@ export default function SourcedCatalogPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [autoImporting, setAutoImporting] = useState(false);
   const [autoImportLog, setAutoImportLog] = useState<string | null>(null);
-  const [selectedAeCategories, setSelectedAeCategories] = useState<Record<string, boolean>>(() => {
-    const initial: Record<string, boolean> = {};
-    const air = new Set(defaultAirFriendlyCategoryIds());
-    for (const feed of ALIEXPRESS_CATEGORY_FEEDS) {
-      initial[feed.aeCategoryId] = air.has(feed.aeCategoryId);
-    }
-    return initial;
-  });
+  const [selectedAeCategories, setSelectedAeCategories] = useState<Record<string, boolean>>(() =>
+    initialImportSelection()
+  );
 
   const authFetch = useCallback(async (url: string, init?: RequestInit) => {
     const headers = await getAuthHeaders();
@@ -116,12 +112,7 @@ export default function SourcedCatalogPage() {
       setStoreName(settingsJson.store?.name || '');
       setSettings(settingsJson.settings);
       if (Array.isArray(settingsJson.importCategoryIds) && settingsJson.importCategoryIds.length > 0) {
-        const saved = new Set(settingsJson.importCategoryIds.map(String));
-        const next: Record<string, boolean> = {};
-        for (const feed of ALIEXPRESS_CATEGORY_FEEDS) {
-          next[feed.aeCategoryId] = saved.has(feed.aeCategoryId);
-        }
-        setSelectedAeCategories(next);
+        setSelectedAeCategories(initialImportSelection(settingsJson.importCategoryIds));
       }
 
       if (productsRes.ok) {
@@ -227,7 +218,7 @@ export default function SourcedCatalogPage() {
       let done = false;
       let guard = 0;
 
-      while (!done && guard < 12) {
+      while (!done && guard < 20) {
         const res = await authFetch('/api/sourced-catalog/import-recommended', {
           method: 'POST',
           body: JSON.stringify({
