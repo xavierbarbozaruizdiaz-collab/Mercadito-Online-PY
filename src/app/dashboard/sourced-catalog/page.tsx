@@ -51,9 +51,40 @@ type ImportedProduct = {
   source_product_id: string;
   source_url: string | null;
   source_price: number | null;
+  source_shipping_price?: number | null;
+  source_currency?: string | null;
+  fx_rate_used?: number | null;
+  markup_percent?: number | null;
   last_source_synced_at: string | null;
   source_available: boolean | null;
 };
+
+const IMPORTED_PAGE_SIZE = 40;
+
+function formatMoney(n: number, digits = 2) {
+  return n.toLocaleString('es-PY', {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
+}
+
+function costBreakdown(p: ImportedProduct, fallbackFx?: number) {
+  const currency = (p.source_currency || 'USD').toUpperCase();
+  const source = Number(p.source_price);
+  const shipping = Number(p.source_shipping_price) || 0;
+  const fx = Number(p.fx_rate_used) || Number(fallbackFx) || 0;
+  const hasSource = Number.isFinite(source) && source > 0;
+  const costSource = hasSource ? source + shipping : null;
+  const costPyg =
+    costSource != null && fx > 0 ? Math.round(costSource * fx) : null;
+  const sale = Number(p.price) || 0;
+  const marginPyg = costPyg != null ? sale - costPyg : null;
+  const marginPct =
+    marginPyg != null && costPyg != null && costPyg > 0
+      ? (marginPyg / costPyg) * 100
+      : null;
+  return { currency, source, shipping, hasSource, costSource, costPyg, sale, marginPyg, marginPct };
+}
 
 export default function SourcedCatalogPage() {
   const toast = useToast();
@@ -71,6 +102,8 @@ export default function SourcedCatalogPage() {
 
   const [imported, setImported] = useState<ImportedProduct[]>([]);
   const [importedTotal, setImportedTotal] = useState(0);
+  const [importedPage, setImportedPage] = useState(1);
+  const [importedLoadingMore, setImportedLoadingMore] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [autoImporting, setAutoImporting] = useState(false);
   const [autoImportLog, setAutoImportLog] = useState<string | null>(null);
@@ -99,7 +132,7 @@ export default function SourcedCatalogPage() {
     try {
       const [settingsRes, productsRes] = await Promise.all([
         authFetch('/api/sourced-catalog/settings'),
-        authFetch('/api/sourced-catalog/products?limit=20'),
+        authFetch(`/api/sourced-catalog/products?page=1&limit=${IMPORTED_PAGE_SIZE}`),
       ]);
 
       if (settingsRes.status === 403) {
@@ -124,6 +157,7 @@ export default function SourcedCatalogPage() {
         const productsJson = await productsRes.json();
         setImported(productsJson.data || []);
         setImportedTotal(productsJson.pagination?.total || 0);
+        setImportedPage(1);
       }
     } catch (err: any) {
       const message = err.message || 'Error cargando el catálogo';
@@ -133,6 +167,30 @@ export default function SourcedCatalogPage() {
       setLoading(false);
     }
   }, [authFetch, toast]);
+
+  const loadMoreImported = useCallback(async () => {
+    if (importedLoadingMore) return;
+    const nextPage = importedPage + 1;
+    setImportedLoadingMore(true);
+    try {
+      const res = await authFetch(
+        `/api/sourced-catalog/products?page=${nextPage}&limit=${IMPORTED_PAGE_SIZE}`
+      );
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || 'Error cargando más productos');
+      const rows = (json.data || []) as ImportedProduct[];
+      setImported((prev) => {
+        const seen = new Set(prev.map((p) => p.id));
+        return [...prev, ...rows.filter((r) => !seen.has(r.id))];
+      });
+      setImportedTotal(json.pagination?.total || importedTotal);
+      setImportedPage(nextPage);
+    } catch (err: any) {
+      toast.error(err.message || 'Error cargando más');
+    } finally {
+      setImportedLoadingMore(false);
+    }
+  }, [authFetch, importedLoadingMore, importedPage, importedTotal, toast]);
 
   useEffect(() => {
     loadSettingsAndProducts();
@@ -587,55 +645,117 @@ export default function SourcedCatalogPage() {
         )}
 
         <div className="bg-white rounded-xl border p-5">
-          <h2 className="font-bold text-gray-900 flex items-center gap-2 mb-4">
-            <Package className="w-5 h-5" /> Ya publicados ({importedTotal})
-          </h2>
+          <div className="mb-4">
+            <h2 className="font-bold text-gray-900 flex items-center gap-2">
+              <Package className="w-5 h-5" /> Ya publicados ({importedTotal})
+            </h2>
+            <p className="text-sm text-gray-500 mt-1">
+              Mostrando {imported.length} de {importedTotal}. Costo = precio AE + envío (lo que
+              pagás vos); Venta = precio público en Mercadito.
+            </p>
+          </div>
           {imported.length === 0 ? (
             <p className="text-gray-500 text-sm">Todavía no hay SKUs sourced en esta tienda.</p>
           ) : (
-            <ul className="divide-y">
-              {imported.map((p) => (
-                <li key={p.id} className="py-3 flex flex-col sm:flex-row sm:items-center gap-3">
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    {p.cover_url ? (
-                      <img src={p.cover_url} alt="" className="w-12 h-12 object-cover rounded shrink-0" />
-                    ) : (
-                      <div className="w-12 h-12 bg-gray-100 rounded shrink-0" />
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <Link href={`/products/${p.id}`} className="font-medium hover:underline line-clamp-1">
-                        {p.title}
-                      </Link>
-                      <p className="text-sm text-gray-500">
-                        {Number(p.price).toLocaleString('es-PY')} Gs. · {p.status}
-                        {p.source_available === false ? ' · origen no disponible' : ''}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap gap-2 sm:justify-end shrink-0">
-                    {p.source_url && (
-                      <a
-                        href={p.source_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-50"
-                      >
-                        <ExternalLink className="w-3.5 h-3.5" />
-                        Abrir en AliExpress
-                      </a>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => setEnqueueProduct(p)}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm bg-black text-white rounded-lg hover:bg-gray-800"
-                    >
-                      <ShoppingCart className="w-3.5 h-3.5" />
-                      Encolar compra
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
+            <>
+              <ul className="divide-y">
+                {imported.map((p) => {
+                  const c = costBreakdown(p, settings?.usd_pyg);
+                  return (
+                    <li key={p.id} className="py-3 flex flex-col sm:flex-row sm:items-center gap-3">
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        {p.cover_url ? (
+                          <img
+                            src={p.cover_url}
+                            alt=""
+                            className="w-12 h-12 object-cover rounded shrink-0"
+                          />
+                        ) : (
+                          <div className="w-12 h-12 bg-gray-100 rounded shrink-0" />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <Link
+                            href={`/products/${p.id}`}
+                            className="font-medium hover:underline line-clamp-1"
+                            title={p.title}
+                          >
+                            {p.title}
+                          </Link>
+                          <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-sm">
+                            {c.hasSource ? (
+                              <span className="text-amber-800">
+                                Costo{' '}
+                                <span className="font-semibold">
+                                  {c.currency} {formatMoney(c.costSource!)}
+                                </span>
+                                {c.shipping > 0
+                                  ? ` (${formatMoney(c.source)} + envío ${formatMoney(c.shipping)})`
+                                  : ''}
+                                {c.costPyg != null
+                                  ? ` · ≈ ${c.costPyg.toLocaleString('es-PY')} Gs.`
+                                  : ''}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400">Costo AE no disponible</span>
+                            )}
+                            <span className="text-gray-900">
+                              Venta{' '}
+                              <span className="font-semibold">
+                                {c.sale.toLocaleString('es-PY')} Gs.
+                              </span>
+                            </span>
+                            {c.marginPyg != null && (
+                              <span className={c.marginPyg >= 0 ? 'text-emerald-700' : 'text-red-700'}>
+                                Margen {c.marginPyg.toLocaleString('es-PY')} Gs.
+                                {c.marginPct != null ? ` (${formatMoney(c.marginPct, 0)}%)` : ''}
+                              </span>
+                            )}
+                            <span className="text-gray-400">{p.status}</span>
+                            {p.source_available === false && (
+                              <span className="text-red-600">origen no disponible</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-2 sm:justify-end shrink-0">
+                        {p.source_url && (
+                          <a
+                            href={p.source_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-50"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                            Abrir en AliExpress
+                          </a>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setEnqueueProduct(p)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm bg-black text-white rounded-lg hover:bg-gray-800"
+                        >
+                          <ShoppingCart className="w-3.5 h-3.5" />
+                          Encolar compra
+                        </button>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+              {imported.length < importedTotal && (
+                <div className="mt-4 flex justify-center">
+                  <button
+                    type="button"
+                    onClick={loadMoreImported}
+                    disabled={importedLoadingMore}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-medium hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    {importedLoadingMore ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                    Cargar más ({imported.length} de {importedTotal})
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
