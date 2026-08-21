@@ -7,8 +7,10 @@ export type MercaditoCategory = { id: string; name: string };
 export type AliExpressCategoryFeed = {
   aeCategoryId: string;
   aeName: string;
+  labelEs: string;
   mercaditoAliases: string[];
-  skipAir?: boolean;
+  /** Poco apto para envío aéreo (voluminoso o pesado). */
+  heavyAir?: boolean;
 };
 
 function norm(value: string): string {
@@ -20,32 +22,36 @@ function norm(value: string): string {
     .trim();
 }
 
-/** Máximo de rubros top-level de AliExpress DS, salvo comida/muebles (malos para avión). */
+/** Rubros top-level de AliExpress DS. Comida/muebles grandes no están. */
 export const ALIEXPRESS_CATEGORY_FEEDS: AliExpressCategoryFeed[] = [
-  { aeCategoryId: '3', aeName: 'Apparel & Accessories', mercaditoAliases: ['ropa y calzado', 'ropa y accesorios', 'ropa', 'accesorios'] },
-  { aeCategoryId: '322', aeName: 'Shoes', mercaditoAliases: ['ropa y calzado', 'calzado', 'zapatos'] },
-  { aeCategoryId: '200001075', aeName: 'Underwear', mercaditoAliases: ['ropa y calzado', 'ropa'] },
-  { aeCategoryId: '34', aeName: 'Automobiles & Motorcycles', mercaditoAliases: ['autos', 'automotriz', 'motos'] },
-  { aeCategoryId: '44', aeName: 'Consumer Electronics', mercaditoAliases: ['electronica', 'electronicos'] },
-  { aeCategoryId: '7', aeName: 'Computer & Office', mercaditoAliases: ['electronica', 'electronicos'] },
-  { aeCategoryId: '509', aeName: 'Phones & Telecommunications', mercaditoAliases: ['electronica', 'electronicos'] },
-  { aeCategoryId: '530', aeName: 'Electronic Components', mercaditoAliases: ['electronica', 'electronicos'] },
-  { aeCategoryId: '30', aeName: 'Security & Protection', mercaditoAliases: ['electronica', 'electronicos', 'herramientas'] },
-  { aeCategoryId: '6', aeName: 'Home Appliances', mercaditoAliases: ['hogar', 'hogar y jardin'] },
-  { aeCategoryId: '15', aeName: 'Home & Garden', mercaditoAliases: ['hogar', 'hogar y jardin'] },
-  { aeCategoryId: '13', aeName: 'Home Improvement', mercaditoAliases: ['herramientas', 'hogar', 'hogar y jardin'] },
-  { aeCategoryId: '39', aeName: 'Lights & Lighting', mercaditoAliases: ['hogar', 'hogar y jardin'] },
-  { aeCategoryId: '18', aeName: 'Sports & Entertainment', mercaditoAliases: ['deportes', 'deportes y fitness'] },
-  { aeCategoryId: '26', aeName: 'Toys & Hobbies', mercaditoAliases: ['juguetes', 'juguetes y juegos'] },
-  { aeCategoryId: '1503', aeName: 'Mother & Kids', mercaditoAliases: ['juguetes', 'juguetes y juegos'] },
-  { aeCategoryId: '1420', aeName: 'Tools', mercaditoAliases: ['herramientas'] },
-  { aeCategoryId: '5', aeName: 'Electrical Equipment', mercaditoAliases: ['herramientas', 'electronica', 'electronicos'] },
-  { aeCategoryId: '66', aeName: 'Beauty & Health', mercaditoAliases: ['belleza y salud', 'accesorios'] },
-  { aeCategoryId: '36', aeName: 'Jewelry & Watches', mercaditoAliases: ['accesorios'] },
-  { aeCategoryId: '21', aeName: 'Office & School Supplies', mercaditoAliases: ['libros', 'libros y musica', 'accesorios'] },
-  { aeCategoryId: '200000345', aeName: 'Weddings & Events', mercaditoAliases: ['accesorios'] },
-  { aeCategoryId: '201355635', aeName: 'Hair Extensions & Wigs', mercaditoAliases: ['belleza y salud', 'accesorios'] },
+  { aeCategoryId: '3', aeName: 'Apparel & Accessories', labelEs: 'Ropa y accesorios', mercaditoAliases: ['ropa y calzado', 'ropa y accesorios', 'ropa', 'accesorios'] },
+  { aeCategoryId: '322', aeName: 'Shoes', labelEs: 'Calzado', mercaditoAliases: ['ropa y calzado', 'calzado', 'zapatos'] },
+  { aeCategoryId: '200001075', aeName: 'Underwear', labelEs: 'Ropa interior', mercaditoAliases: ['ropa y calzado', 'ropa'] },
+  { aeCategoryId: '44', aeName: 'Consumer Electronics', labelEs: 'Electrónica', mercaditoAliases: ['electronica', 'electronicos'] },
+  { aeCategoryId: '7', aeName: 'Computer & Office', labelEs: 'Computación', mercaditoAliases: ['electronica', 'electronicos'] },
+  { aeCategoryId: '509', aeName: 'Phones & Telecommunications', labelEs: 'Celulares', mercaditoAliases: ['electronica', 'electronicos'] },
+  { aeCategoryId: '530', aeName: 'Electronic Components', labelEs: 'Componentes electrónicos', mercaditoAliases: ['electronica', 'electronicos'] },
+  { aeCategoryId: '30', aeName: 'Security & Protection', labelEs: 'Seguridad', mercaditoAliases: ['electronica', 'electronicos', 'herramientas'] },
+  { aeCategoryId: '66', aeName: 'Beauty & Health', labelEs: 'Belleza y salud', mercaditoAliases: ['belleza y salud', 'accesorios'] },
+  { aeCategoryId: '36', aeName: 'Jewelry & Watches', labelEs: 'Joyería y relojes', mercaditoAliases: ['accesorios'] },
+  { aeCategoryId: '201355635', aeName: 'Hair Extensions & Wigs', labelEs: 'Extensiones y pelucas', mercaditoAliases: ['belleza y salud', 'accesorios'] },
+  { aeCategoryId: '26', aeName: 'Toys & Hobbies', labelEs: 'Juguetes', mercaditoAliases: ['juguetes', 'juguetes y juegos'] },
+  { aeCategoryId: '1503', aeName: 'Mother & Kids', labelEs: 'Bebés y niños', mercaditoAliases: ['juguetes', 'juguetes y juegos'] },
+  { aeCategoryId: '21', aeName: 'Office & School Supplies', labelEs: 'Oficina y útiles', mercaditoAliases: ['libros', 'libros y musica', 'accesorios'] },
+  { aeCategoryId: '200000345', aeName: 'Weddings & Events', labelEs: 'Eventos', mercaditoAliases: ['accesorios'] },
+  { aeCategoryId: '18', aeName: 'Sports & Entertainment', labelEs: 'Deportes', mercaditoAliases: ['deportes', 'deportes y fitness'] },
+  { aeCategoryId: '39', aeName: 'Lights & Lighting', labelEs: 'Iluminación (puede ser voluminoso)', mercaditoAliases: ['hogar', 'hogar y jardin'], heavyAir: true },
+  { aeCategoryId: '1420', aeName: 'Tools', labelEs: 'Herramientas (puede ser pesado)', mercaditoAliases: ['herramientas'], heavyAir: true },
+  { aeCategoryId: '13', aeName: 'Home Improvement', labelEs: 'Ferretería / construcción', mercaditoAliases: ['herramientas', 'hogar', 'hogar y jardin'], heavyAir: true },
+  { aeCategoryId: '6', aeName: 'Home Appliances', labelEs: 'Electrodomésticos', mercaditoAliases: ['hogar', 'hogar y jardin'], heavyAir: true },
+  { aeCategoryId: '15', aeName: 'Home & Garden', labelEs: 'Hogar y jardín', mercaditoAliases: ['hogar', 'hogar y jardin'], heavyAir: true },
+  { aeCategoryId: '5', aeName: 'Electrical Equipment', labelEs: 'Equipo eléctrico industrial', mercaditoAliases: ['herramientas', 'electronica', 'electronicos'], heavyAir: true },
+  { aeCategoryId: '34', aeName: 'Automobiles & Motorcycles', labelEs: 'Automotriz', mercaditoAliases: ['autos', 'automotriz', 'motos'], heavyAir: true },
 ];
+
+export function defaultAirFriendlyCategoryIds(): string[] {
+  return ALIEXPRESS_CATEGORY_FEEDS.filter((f) => !f.heavyAir).map((f) => f.aeCategoryId);
+}
 
 const FALLBACK_ALIASES = ['accesorios', 'otros', 'electronica', 'electronicos'];
 
@@ -82,7 +88,6 @@ export function resolveAliExpressFeeds(categories: MercaditoCategory[]): Array<{
   const used = new Set<string>();
 
   for (const feed of ALIEXPRESS_CATEGORY_FEEDS) {
-    if (feed.skipAir) continue;
     const mercadito = matchMercaditoCategory(categories, feed.mercaditoAliases) || fallback;
     if (!mercadito) continue;
     const key = `${feed.aeCategoryId}:${mercadito.id}`;

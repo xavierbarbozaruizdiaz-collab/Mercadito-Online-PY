@@ -14,6 +14,10 @@ import {
 } from 'lucide-react';
 import { getAuthHeaders } from '@/lib/auth/clientAuthHeaders';
 import { useToast } from '@/lib/hooks/useToast';
+import {
+  ALIEXPRESS_CATEGORY_FEEDS,
+  defaultAirFriendlyCategoryIds,
+} from '@/lib/services/aliexpressCategoryMap';
 
 type CatalogSettings = {
   usd_pyg: number;
@@ -66,6 +70,14 @@ export default function SourcedCatalogPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [autoImporting, setAutoImporting] = useState(false);
   const [autoImportLog, setAutoImportLog] = useState<string | null>(null);
+  const [selectedAeCategories, setSelectedAeCategories] = useState<Record<string, boolean>>(() => {
+    const initial: Record<string, boolean> = {};
+    const air = new Set(defaultAirFriendlyCategoryIds());
+    for (const feed of ALIEXPRESS_CATEGORY_FEEDS) {
+      initial[feed.aeCategoryId] = air.has(feed.aeCategoryId);
+    }
+    return initial;
+  });
 
   const authFetch = useCallback(async (url: string, init?: RequestInit) => {
     const headers = await getAuthHeaders();
@@ -103,6 +115,14 @@ export default function SourcedCatalogPage() {
       const settingsJson = await settingsRes.json();
       setStoreName(settingsJson.store?.name || '');
       setSettings(settingsJson.settings);
+      if (Array.isArray(settingsJson.importCategoryIds) && settingsJson.importCategoryIds.length > 0) {
+        const saved = new Set(settingsJson.importCategoryIds.map(String));
+        const next: Record<string, boolean> = {};
+        for (const feed of ALIEXPRESS_CATEGORY_FEEDS) {
+          next[feed.aeCategoryId] = saved.has(feed.aeCategoryId);
+        }
+        setSelectedAeCategories(next);
+      }
 
       if (productsRes.ok) {
         const productsJson = await productsRes.json();
@@ -190,6 +210,11 @@ export default function SourcedCatalogPage() {
   }
 
   async function runAutoImport() {
+    const categoryIds = Object.keys(selectedAeCategories).filter((id) => selectedAeCategories[id]);
+    if (categoryIds.length === 0) {
+      toast.error('Seleccioná al menos una categoría liviana para avión');
+      return;
+    }
     setAutoImporting(true);
     setAutoImportLog(null);
     try {
@@ -205,7 +230,12 @@ export default function SourcedCatalogPage() {
       while (!done && guard < 12) {
         const res = await authFetch('/api/sourced-catalog/import-recommended', {
           method: 'POST',
-          body: JSON.stringify({ categoryOffset: offset, categoryLimit: 3, pageSize: 12 }),
+          body: JSON.stringify({
+            categoryOffset: offset,
+            categoryLimit: 3,
+            pageSize: 12,
+            categoryIds,
+          }),
         });
         const json = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(json.error || 'Error importando recomendados');
@@ -401,10 +431,71 @@ export default function SourcedCatalogPage() {
             <RefreshCw className="w-5 h-5" /> Importar recomendados (Drop Shipping)
           </h2>
           <p className="text-sm text-gray-600">
-            Trae los más vendidos de AliExpress en todas las categorías top y los publica en las
-            categorías de Mercadito (Electrónica, Hogar, Ropa, Autos, etc.). No usa la búsqueda Affiliate.
-            Primero autorizá tu cuenta Drop Shipping.
+            Elegí rubros livianos para avión. Electrodomésticos, hogar, ferretería y autos vienen
+            desmarcados porque suelen ser pesados o voluminosos. El feed de AliExpress no filtra por peso
+            exacto: esto evita importar categorías enteras que no conviene traer.
           </p>
+          <div className="flex flex-wrap gap-2 text-sm">
+            <button
+              type="button"
+              className="px-3 py-1 border rounded-lg"
+              onClick={() => {
+                const air = new Set(defaultAirFriendlyCategoryIds());
+                const next: Record<string, boolean> = {};
+                for (const feed of ALIEXPRESS_CATEGORY_FEEDS) {
+                  next[feed.aeCategoryId] = air.has(feed.aeCategoryId);
+                }
+                setSelectedAeCategories(next);
+              }}
+            >
+              Solo livianos
+            </button>
+            <button
+              type="button"
+              className="px-3 py-1 border rounded-lg"
+              onClick={() => {
+                const next: Record<string, boolean> = {};
+                for (const feed of ALIEXPRESS_CATEGORY_FEEDS) next[feed.aeCategoryId] = true;
+                setSelectedAeCategories(next);
+              }}
+            >
+              Todas
+            </button>
+            <button
+              type="button"
+              className="px-3 py-1 border rounded-lg"
+              onClick={() => {
+                const next: Record<string, boolean> = {};
+                for (const feed of ALIEXPRESS_CATEGORY_FEEDS) next[feed.aeCategoryId] = false;
+                setSelectedAeCategories(next);
+              }}
+            >
+              Ninguna
+            </button>
+          </div>
+          <div className="grid sm:grid-cols-2 gap-2 max-h-72 overflow-y-auto border rounded-lg p-3">
+            {ALIEXPRESS_CATEGORY_FEEDS.map((feed) => (
+              <label key={feed.aeCategoryId} className="flex items-start gap-2 text-sm text-gray-800">
+                <input
+                  type="checkbox"
+                  className="mt-1"
+                  checked={!!selectedAeCategories[feed.aeCategoryId]}
+                  onChange={(e) =>
+                    setSelectedAeCategories((prev) => ({
+                      ...prev,
+                      [feed.aeCategoryId]: e.target.checked,
+                    }))
+                  }
+                />
+                <span>
+                  {feed.labelEs}
+                  {feed.heavyAir ? (
+                    <span className="ml-1 text-xs text-amber-700">pesado</span>
+                  ) : null}
+                </span>
+              </label>
+            ))}
+          </div>
           <div className="flex flex-wrap gap-2">
             <a
               href="/api/auth/aliexpress/callback"
@@ -418,7 +509,7 @@ export default function SourcedCatalogPage() {
               disabled={autoImporting}
               className="px-4 py-2 bg-indigo-700 text-white rounded-lg disabled:opacity-50"
             >
-              {autoImporting ? 'Importando categorías…' : 'Importar todas las categorías'}
+              {autoImporting ? 'Importando categorías…' : 'Importar seleccionadas'}
             </button>
           </div>
           {autoImportLog && (

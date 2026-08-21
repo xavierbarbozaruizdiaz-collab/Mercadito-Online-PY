@@ -20,11 +20,15 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json().catch(() => ({}));
+    const categoryIds = Array.isArray(body.categoryIds)
+      ? body.categoryIds.map((id: unknown) => String(id)).filter(Boolean)
+      : undefined;
     const result = await importDropshipRecommended({
       userId: auth.user.id,
       categoryOffset: Number(body.categoryOffset) || 0,
       categoryLimit: Number(body.categoryLimit) || 8,
       pageSize: Number(body.pageSize) || 12,
+      categoryIds,
     });
 
     return NextResponse.json(result);

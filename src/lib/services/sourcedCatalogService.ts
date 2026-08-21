@@ -509,6 +509,7 @@ export async function importDropshipRecommended(params: {
   categoryOffset?: number;
   categoryLimit?: number;
   pageSize?: number;
+  categoryIds?: string[];
 }): Promise<{
   imported: number;
   updated: number;
@@ -551,7 +552,25 @@ export async function importDropshipRecommended(params: {
 
   const settings = parseSourcedSettings(store.settings);
   const mercaditoCategories = await loadStoreCategories(db);
-  const feeds = resolveAliExpressFeeds(mercaditoCategories);
+  let feeds = resolveAliExpressFeeds(mercaditoCategories);
+  const wanted = (params.categoryIds || [])
+    .map((id) => String(id).trim())
+    .filter(Boolean);
+  if (wanted.length > 0) {
+    const allow = new Set(wanted);
+    feeds = feeds.filter((f) => allow.has(f.aeCategoryId));
+    if (feeds.length === 0) {
+      throw new Error('Ninguna de las categorías seleccionadas se pudo mapear a Mercadito');
+    }
+    const nextSettings = {
+      ...(store.settings || {}),
+      sourced_catalog: {
+        ...((store.settings as any)?.sourced_catalog || {}),
+        import_category_ids: wanted,
+      },
+    };
+    await (db as any).from('stores').update({ settings: nextSettings }).eq('id', store.id);
+  }
   const offset = Math.max(0, params.categoryOffset || 0);
   const limit = Math.min(12, Math.max(1, params.categoryLimit || 8));
   const pageSize = Math.min(20, Math.max(5, params.pageSize || 12));
