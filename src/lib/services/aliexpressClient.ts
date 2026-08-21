@@ -57,8 +57,37 @@ export function isAliExpressConfigured(): boolean {
   return !!(process.env.ALIEXPRESS_APP_KEY?.trim() && process.env.ALIEXPRESS_APP_SECRET?.trim());
 }
 
+export function applyAliExpressUserToken(token: string) {
+  process.env.ALIEXPRESS_ACCESS_TOKEN = token.trim();
+}
+
 export function hasAliExpressAccessToken(): boolean {
   return !!process.env.ALIEXPRESS_ACCESS_TOKEN?.trim();
+}
+
+export function getAliExpressCallbackUrl(): string {
+  const fromEnv = process.env.ALIEXPRESS_REDIRECT_URI?.trim();
+  if (fromEnv) return fromEnv.replace(/\/$/, '');
+  const base = (
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    'https://mercadito-online-py-swart.vercel.app'
+  ).replace(/\/$/, '');
+  return `${base}/api/auth/aliexpress/callback`;
+}
+
+export function getAliExpressAuthorizeUrl(): string {
+  const { appKey } = getCredentials();
+  const redirectUri = getAliExpressCallbackUrl();
+  const params = new URLSearchParams({
+    response_type: 'code',
+    client_id: appKey,
+    redirect_uri: redirectUri,
+    sp: 'ae',
+    view: 'web',
+    force_auth: 'true',
+  });
+  return `https://oauth.aliexpress.com/authorize?${params.toString()}`;
 }
 
 function signRequest(params: Record<string, string>, appSecret: string): string {
