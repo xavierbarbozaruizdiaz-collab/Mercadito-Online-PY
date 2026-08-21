@@ -45,18 +45,12 @@ export default function Skeleton({
 // Componentes específicos para casos comunes
 export function ProductCardSkeleton() {
   return (
-    <div className="bg-white dark:bg-[#252525] rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 shadow-sm">
-      {/* Imagen */}
-      <Skeleton variant="rectangular" height={200} className="w-full" />
-      
-      {/* Contenido */}
-      <div className="p-4 space-y-3">
-        <Skeleton variant="text" width="80%" height={20} />
-        <Skeleton variant="text" width="60%" height={16} />
-        <div className="flex items-center justify-between pt-2">
-          <Skeleton variant="text" width="40%" height={24} />
-          <Skeleton variant="circular" width={32} height={32} />
-        </div>
+    <div>
+      <Skeleton variant="rectangular" className="w-full aspect-square rounded-[10px]" />
+      <div className="pt-2 space-y-1.5">
+        <Skeleton variant="text" width="55%" height={20} />
+        <Skeleton variant="text" width="90%" height={16} />
+        <Skeleton variant="text" width="40%" height={14} />
       </div>
     </div>
   );
@@ -64,7 +58,7 @@ export function ProductCardSkeleton() {
 
 export function ProductListSkeleton({ count = 8 }: { count?: number }) {
   return (
-    <div className="grid grid-cols-3 lg:grid-cols-9 gap-2 sm:gap-3 lg:gap-4">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-3 gap-y-5">
       {Array.from({ length: count }).map((_, i) => (
         <ProductCardSkeleton key={i} />
       ))}

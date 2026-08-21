@@ -1033,7 +1033,6 @@ export default function ProductsListClient() {
               const isActiveAuction = isAuction && product.auction_status === 'active';
               const auctionEndAt = product.auction_end_at ? new Date(product.auction_end_at).getTime() : 0;
               const serverNow = Date.now();
-              const endsInOneHour = isActiveAuction && auctionEndAt > serverNow && auctionEndAt <= serverNow + 60 * 60 * 1000;
               const href = isAuction ? `/auctions/${product.id}` : `/products/${product.id}`;
               const price = isAuction && isActiveAuction ? product.current_bid || product.price : product.price;
               const recent = isRecentlyPosted(product.created_at);
@@ -1042,39 +1041,43 @@ export default function ProductsListClient() {
                 <Link
                   key={product.id}
                   href={href}
-                  className={`group block ${endsInOneHour ? 'ring-2 ring-orange-300 rounded-xl' : ''}`}
+                  className="group block"
                 >
-                  <div className="relative aspect-square overflow-hidden rounded-lg bg-gray-100">
+                  <div className="relative aspect-square overflow-hidden rounded-[10px] bg-[#E4E6EB]">
                     <img
                       src={product.image_url ?? 'https://placehold.co/400x400?text=Producto'}
                       alt={product.title}
                       className="h-full w-full object-cover"
                     />
                     {recent && (
-                      <span className="absolute top-2 left-2 rounded-md bg-white px-2 py-0.5 text-[11px] font-medium text-gray-900 shadow-sm">
+                      <span className="absolute top-2 left-2 rounded-[4px] bg-white px-2 py-[3px] text-[11px] font-medium text-[#050505] shadow-[0_1px_2px_rgba(0,0,0,0.15)]">
                         Recién publicado
                       </span>
                     )}
                     {product.fulfillment_type === 'sourced' && (
-                      <span className="absolute top-2 right-2 rounded-md bg-white/95 px-2 py-0.5 text-[11px] font-medium text-indigo-700 shadow-sm">
+                      <span className="absolute top-2 right-2 rounded-[4px] bg-white px-2 py-[3px] text-[11px] font-medium text-[#050505] shadow-[0_1px_2px_rgba(0,0,0,0.15)]">
                         Internacional
                       </span>
                     )}
                     {isActiveAuction && product.total_bids !== undefined && product.total_bids > 0 && (
-                      <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-md bg-black/70 px-2 py-0.5 text-[11px] text-white">
+                      <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-[4px] bg-black/65 px-2 py-[3px] text-[11px] text-white">
                         <Users className="h-3 w-3" />
                         {product.total_bids}
                       </span>
                     )}
                   </div>
                   <div className="pt-2 text-left">
-                    <p className={`text-[17px] font-bold leading-tight ${isActiveAuction ? 'text-purple-700' : 'text-gray-900'}`}>
+                    <p className="text-[17px] font-bold leading-5 text-[#050505]">
                       {formatListingPrice(price)}
                     </p>
-                    <p className="mt-0.5 min-h-[1.25rem] text-sm text-gray-900 truncate">{product.title}</p>
-                    <p className="mt-0.5 text-sm text-gray-500 truncate">{listingPlace(product)}</p>
+                    <p className="mt-[2px] min-h-[20px] text-[15px] font-normal leading-5 text-[#050505] truncate">
+                      {product.title}
+                    </p>
+                    <p className="mt-[2px] text-[13px] leading-4 text-[#65676B] truncate">
+                      {listingPlace(product)}
+                    </p>
                     {isActiveAuction && product.auction_end_at && auctionEndAt > serverNow && (
-                      <div className="mt-1">
+                      <div className="mt-1 text-[#65676B]">
                         <AuctionTimer
                           endAtMs={auctionEndAt}
                           serverNowMs={serverNow}
