@@ -5,6 +5,7 @@ import Link from 'next/link';
 import {
   ArrowLeft,
   Copy,
+  Download,
   ExternalLink,
   Loader2,
   Package,
@@ -39,7 +40,7 @@ type LocalProduct = {
 const PAGE_SIZE = 40;
 
 function buildBookmarklet(apiUrl: string, token: string) {
-  const js = `javascript:(function(){try{var t=${JSON.stringify(token)};var api=${JSON.stringify(apiUrl)};var title=(document.querySelector('h1')||document.querySelector('[itemprop=name]')||document.querySelector('title'))?.innerText||document.title||'';var priceText='';var priceEl=document.querySelector('[itemprop=price],.price,.product-price,.precio,strong');if(priceEl)priceText=priceEl.textContent||'';if(!priceText){var m=document.body.innerText.match(/([\\d.\\s]{4,})\\s*Gs\\.?/i);if(m)priceText=m[1];}var img=(document.querySelector('meta[property=\"og:image\"]')||{}).content||(document.querySelector('img')||{}).src||'';var body={title:title.trim(),price:priceText,image_url:img,source:'Cellshop',currency:'PYG',source_url:location.href};fetch(api,{method:'POST',headers:{'Content-Type':'application/json','x-import-token':t},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(j){alert(j.ok?'Importado: '+(j.product&&j.product.title||'ok'):('Error: '+(j.error||r.status)));}).catch(function(e){alert('Error: '+e.message);});}catch(e){alert('Bookmarklet error: '+e.message);}})();`;
+  const js = `javascript:(function(){try{var t=${JSON.stringify(token)};var api=${JSON.stringify(apiUrl)};var title=(document.querySelector('h1')||document.querySelector('[itemprop=name]')||document.querySelector('title'))?.innerText||document.title||'';var priceText='';var priceEl=document.querySelector('[itemprop=price],.price,.product-price,.precio,strong');if(priceEl)priceText=priceEl.textContent||'';if(!priceText){var m=document.body.innerText.match(/([\\d.\\s]{4,})\\s*Gs\\.?/i);if(m)priceText=m[1];}var img=(document.querySelector('meta[property=\"og:image\"]')||{}).content||(document.querySelector('img')||{}).src||'';var body={title:title.trim(),price:priceText,image_url:img,source:'Cellshop',currency:'PYG',source_url:location.href};fetch(api,{method:'POST',headers:{'Content-Type':'application/json','x-import-token':t},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(j){alert(j.ok?'Importado (oculto hasta tildar En tienda): '+(j.product&&j.product.title||'ok'):('Error: '+(j.error||r.status)));}).catch(function(e){alert('Error: '+e.message);});}catch(e){alert('Bookmarklet error: '+e.message);}})();`;
   return js;
 }
 
@@ -53,11 +54,17 @@ export default function LocalCatalogPage() {
   const [saving, setSaving] = useState(false);
   const [products, setProducts] = useState<LocalProduct[]>([]);
   const [total, setTotal] = useState(0);
+  const [visibleTotal, setVisibleTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loadingMore, setLoadingMore] = useState(false);
   const [enqueueProduct, setEnqueueProduct] = useState<LocalProduct | null>(null);
   const [enqueueSubmitting, setEnqueueSubmitting] = useState(false);
   const [bookmarkletHref, setBookmarkletHref] = useState('');
+  const [categoryUrl, setCategoryUrl] = useState('');
+  const [maxPages, setMaxPages] = useState(1);
+  const [importing, setImporting] = useState(false);
+  const [importLog, setImportLog] = useState<string | null>(null);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
   const authFetch = useCallback(async (url: string, init?: RequestInit) => {
     const headers = await getAuthHeaders();
@@ -97,6 +104,7 @@ export default function LocalCatalogPage() {
         const productsJson = await productsRes.json();
         setProducts(productsJson.data || []);
         setTotal(productsJson.pagination?.total || 0);
+        setVisibleTotal(productsJson.pagination?.visible_total || 0);
         setPage(1);
       }
     } catch (err: any) {
@@ -163,6 +171,73 @@ export default function LocalCatalogPage() {
     }
   }
 
+  async function importCategory(e: React.FormEvent) {
+    e.preventDefault();
+    if (!categoryUrl.trim()) {
+      toast.error('Pegá la URL de una categoría de Cellshop');
+      return;
+    }
+    setImporting(true);
+    setImportLog(null);
+    try {
+      const res = await authFetch('/api/local-catalog/import-category', {
+        method: 'POST',
+        body: JSON.stringify({
+          category_url: categoryUrl.trim(),
+          max_pages: maxPages,
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || 'No se pudo importar');
+      const msg = `Encontrados ${json.found} · nuevos ${json.imported} · actualizados ${json.updated} · errores ${json.skipped} (páginas ${json.pages_fetched}). Quedan en borrador hasta tildar «En tienda».`;
+      setImportLog(msg);
+      toast.success('Categoría importada');
+      await load();
+    } catch (err: any) {
+      setImportLog(err.message || 'Error');
+      toast.error(err.message);
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  async function toggleVisible(product: LocalProduct, visible: boolean) {
+    setTogglingId(product.id);
+    const prevStatus = product.status;
+    setProducts((list) =>
+      list.map((p) =>
+        p.id === product.id ? { ...p, status: visible ? 'active' : 'draft' } : p
+      )
+    );
+    setVisibleTotal((n) => {
+      const wasVisible = prevStatus === 'active';
+      if (visible && !wasVisible) return n + 1;
+      if (!visible && wasVisible) return Math.max(0, n - 1);
+      return n;
+    });
+    try {
+      const res = await authFetch('/api/local-catalog/products', {
+        method: 'PATCH',
+        body: JSON.stringify({ id: product.id, visible }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || 'No se pudo cambiar visibilidad');
+    } catch (err: any) {
+      setProducts((list) =>
+        list.map((p) => (p.id === product.id ? { ...p, status: prevStatus } : p))
+      );
+      setVisibleTotal((n) => {
+        const wasVisible = prevStatus === 'active';
+        if (visible && !wasVisible) return Math.max(0, n - 1);
+        if (!visible && wasVisible) return n + 1;
+        return n;
+      });
+      toast.error(err.message);
+    } finally {
+      setTogglingId(null);
+    }
+  }
+
   async function loadMore() {
     if (loadingMore) return;
     const next = page + 1;
@@ -177,6 +252,9 @@ export default function LocalCatalogPage() {
         return [...prev, ...rows.filter((r) => !seen.has(r.id))];
       });
       setTotal(json.pagination?.total || total);
+      if (typeof json.pagination?.visible_total === 'number') {
+        setVisibleTotal(json.pagination.visible_total);
+      }
       setPage(next);
     } catch (err: any) {
       toast.error(err.message);
@@ -224,8 +302,8 @@ export default function LocalCatalogPage() {
             <ShoppingBag className="w-8 h-8" /> Catálogo local (Cellshop)
           </h1>
           <p className="text-gray-600 mt-1">
-            Segunda tienda oficial, aparte de Ubuy. Importás con bookmarklet desde Cellshop; el
-            cliente confirma y comprás a mano.
+            Importá por categoría o bookmarklet (entran ocultos). Tildá «En tienda» para publicar en
+            la vitrina. Cuando el cliente confirma, comprás a mano en Cellshop.
           </p>
           <div className="mt-3 flex flex-wrap gap-3 text-sm">
             <Link
@@ -307,6 +385,55 @@ export default function LocalCatalogPage() {
           </form>
         )}
 
+        <form onSubmit={importCategory} className="bg-white rounded-xl border p-5 space-y-3">
+          <h2 className="font-bold text-gray-900 flex items-center gap-2">
+            <Download className="w-5 h-5" /> Importar categoría Cellshop
+          </h2>
+          <p className="text-sm text-gray-600">
+            Pegá la URL de un listado (ej. smartphones). Se importan hasta ~24 productos por página
+            (máx. 3 páginas). Quedan en borrador; vos tildás cuáles van a la tienda.
+          </p>
+          <label className="block text-sm">
+            URL de categoría
+            <input
+              className="mt-1 w-full border rounded-lg px-3 py-2 font-mono text-xs sm:text-sm"
+              placeholder="https://cellshop.com.py/todos-los-departamentos/tecnologia/..."
+              value={categoryUrl}
+              onChange={(e) => setCategoryUrl(e.target.value)}
+            />
+          </label>
+          <label className="block text-sm w-40">
+            Páginas (1–3)
+            <select
+              className="mt-1 w-full border rounded-lg px-3 py-2"
+              value={maxPages}
+              onChange={(e) => setMaxPages(Number(e.target.value))}
+            >
+              <option value={1}>1</option>
+              <option value={2}>2</option>
+              <option value={3}>3</option>
+            </select>
+          </label>
+          <button
+            type="submit"
+            disabled={importing}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-700 text-white text-sm font-medium disabled:opacity-50"
+          >
+            {importing ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" /> Importando…
+              </>
+            ) : (
+              <>
+                <Download className="w-4 h-4" /> Importar
+              </>
+            )}
+          </button>
+          {importLog && (
+            <p className="text-sm text-gray-700 bg-gray-50 border rounded-lg px-3 py-2">{importLog}</p>
+          )}
+        </form>
+
         {settings && (
           <div className="bg-white rounded-xl border p-5 space-y-3">
             <h2 className="font-bold text-gray-900 flex items-center gap-2">
@@ -322,7 +449,7 @@ export default function LocalCatalogPage() {
               >
                 cellshop.com.py
               </a>
-              , abrí el favorito para mandar el producto a Mercadito.
+              , abrí el favorito para mandar el producto (también entra oculto).
             </p>
             <div className="flex flex-wrap gap-2 items-center">
               {bookmarkletHref ? (
@@ -359,10 +486,10 @@ export default function LocalCatalogPage() {
           <div className="mb-4 flex items-center justify-between gap-2">
             <div>
               <h2 className="font-bold text-gray-900 flex items-center gap-2">
-                <Package className="w-5 h-5" /> Publicados ({total})
+                <Package className="w-5 h-5" /> Catálogo ({total})
               </h2>
               <p className="text-sm text-gray-500 mt-1">
-                Mostrando {products.length} de {total}. Costo = Cellshop; Venta = con margen.
+                Visibles en tienda: {visibleTotal} de {total}. Mostrando {products.length}.
               </p>
             </div>
             <button
@@ -375,7 +502,9 @@ export default function LocalCatalogPage() {
             </button>
           </div>
           {products.length === 0 ? (
-            <p className="text-sm text-gray-500">Todavía no hay productos. Usá el bookmarklet.</p>
+            <p className="text-sm text-gray-500">
+              Todavía no hay productos. Importá una categoría o usá el bookmarklet.
+            </p>
           ) : (
             <>
               <ul className="divide-y">
@@ -383,11 +512,22 @@ export default function LocalCatalogPage() {
                   const cost = Number(p.source_price) || 0;
                   const sale = Number(p.price) || 0;
                   const margin = sale - cost;
+                  const inStore = p.status === 'active';
                   return (
                     <li
                       key={p.id}
                       className="py-3 flex flex-col sm:flex-row sm:items-center gap-3"
                     >
+                      <label className="flex items-center gap-2 shrink-0 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={inStore}
+                          disabled={togglingId === p.id}
+                          onChange={(e) => toggleVisible(p, e.target.checked)}
+                          className="w-4 h-4 rounded border-gray-300"
+                        />
+                        <span className="text-sm text-gray-700 whitespace-nowrap">En tienda</span>
+                      </label>
                       <div className="flex items-center gap-3 flex-1 min-w-0">
                         {p.cover_url ? (
                           <img
@@ -422,6 +562,9 @@ export default function LocalCatalogPage() {
                             <span className={margin >= 0 ? 'text-emerald-700' : 'text-red-700'}>
                               Margen {margin.toLocaleString('es-PY')} Gs.
                             </span>
+                            {!inStore && (
+                              <span className="text-gray-400">Borrador</span>
+                            )}
                           </div>
                         </div>
                       </div>

@@ -269,6 +269,8 @@ export async function importLocalCatalogProduct(params: {
   source?: string | null;
   sourceUrl?: string | null;
   currency?: string | null;
+  /** Default draft — publish via checkbox in local-catalog panel. */
+  status?: 'draft' | 'active';
 }) {
   const db = getAdminClient();
   const settings = parseLocalCatalogSettings(params.store.settings);
@@ -290,6 +292,7 @@ export async function importLocalCatalogProduct(params: {
   const sourceLabel = (params.source || settings.default_source || 'Cellshop').trim().slice(0, 80);
   const sourceUrl = params.sourceUrl?.trim() || null;
   const imageUrl = params.imageUrl?.trim() || null;
+  const status = params.status === 'active' ? 'active' : 'draft';
 
   const productPayload = {
     store_id: params.store.id,
@@ -299,7 +302,7 @@ export async function importLocalCatalogProduct(params: {
     price: salePrice,
     condition: 'nuevo',
     sale_type: 'direct',
-    status: 'active',
+    status,
     stock_quantity: 99,
     stock_management_enabled: false,
     tags: ['local-catalog', sourceLabel.toLowerCase()],
@@ -322,16 +325,18 @@ export async function importLocalCatalogProduct(params: {
   if (sourceUrl) {
     const { data: existing } = await (db as any)
       .from('products')
-      .select('id')
+      .select('id, status')
       .eq('store_id', params.store.id)
       .eq('source_url', sourceUrl)
       .eq('fulfillment_type', 'sourced')
       .maybeSingle();
 
     if (existing?.id) {
+      // Re-import refreshes price/title but keeps storefront visibility choice
+      const { status: _status, ...updatePayload } = productPayload;
       const { data, error } = await (db as any)
         .from('products')
-        .update(productPayload)
+        .update(updatePayload)
         .eq('id', existing.id)
         .select(
           'id, title, price, cover_url, source_price, source_currency, source_url, source_platform, status, updated_at'
@@ -352,4 +357,25 @@ export async function importLocalCatalogProduct(params: {
 
   if (error) throw error;
   return { product: data, created: true };
+}
+
+export async function setLocalCatalogProductVisibility(params: {
+  storeId: string;
+  productId: string;
+  visible: boolean;
+}) {
+  const db = getAdminClient();
+  const { data, error } = await (db as any)
+    .from('products')
+    .update({ status: params.visible ? 'active' : 'draft' })
+    .eq('id', params.productId)
+    .eq('store_id', params.storeId)
+    .eq('fulfillment_type', 'sourced')
+    .eq('source_platform', LOCAL_SOURCE_PLATFORM)
+    .select('id, title, status, price, cover_url, source_url, source_price')
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) throw new Error('Producto no encontrado en el catálogo local');
+  return data;
 }
