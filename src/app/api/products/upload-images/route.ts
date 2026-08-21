@@ -6,10 +6,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase/server';
 import { createClient } from '@supabase/supabase-js';
-import { THUMBNAIL_SIZES, getThumbnailFileName } from '@/lib/utils/imageThumbnails';
+import { THUMBNAIL_SIZES } from '@/lib/utils/imageThumbnails';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
+const MAX_UPLOAD_BYTES = 12 * 1024 * 1024;
 
 export async function POST(request: NextRequest) {
   let productId: string | null = null;
@@ -69,6 +70,15 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+    if (!file.type.startsWith('image/')) {
+      return NextResponse.json({ error: 'El archivo debe ser una imagen' }, { status: 415 });
+    }
+    if (file.size <= 0 || file.size > MAX_UPLOAD_BYTES) {
+      return NextResponse.json(
+        { error: 'La imagen está vacía o supera el límite de 12 MB' },
+        { status: 413 }
+      );
+    }
 
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(productId);
     if (!isUuid) {
@@ -123,31 +133,43 @@ export async function POST(request: NextRequest) {
     // Convertir File a Buffer
     const arrayBuffer = await file.arrayBuffer();
     const imageBuffer = Buffer.from(arrayBuffer);
-    const sharp = (await import('sharp')).default;
+    let sharp: ((input: Buffer) => import('sharp').Sharp) | null = null;
+    try {
+      sharp = (await import('sharp')).default;
+    } catch (sharpError) {
+      logger.warn('[upload-images] Sharp no disponible; subiendo imagen original', {
+        error: sharpError instanceof Error ? sharpError.message : String(sharpError),
+      });
+    }
 
     // Generar thumbnails
     const fileExt = file.name.split('.').pop() || 'jpg';
     const timestamp = Date.now();
-    const fileName = `${productId}-${timestamp}.${fileExt}`;
     const basePath = `products/${productId}`;
 
     const uploadedUrls: Record<string, string> = {};
+    const uploadedPaths: string[] = [];
 
     // [IMAGES LEVEL2] Subir imagen full optimizada (máx 1200px para reducir tamaño)
-    const compressedFull = await sharp(imageBuffer)
-      .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
-      .webp({ quality: 85 }) // Usar WebP para mejor compresión
-      .toBuffer();
+    const compressedFull = sharp
+      ? await sharp(imageBuffer)
+          .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
+          .webp({ quality: 85 })
+          .toBuffer()
+      : imageBuffer;
 
-    const fullPath = `${basePath}/full_${timestamp}.webp`;
+    const outputExt = sharp ? 'webp' : fileExt.replace(/[^a-zA-Z0-9]/g, '') || 'jpg';
+    const outputContentType = sharp ? 'image/webp' : file.type || 'application/octet-stream';
+    const fullPath = `${basePath}/full_${timestamp}.${outputExt}`;
     const { error: fullError } = await supabase.storage
       .from('product-images')
       .upload(fullPath, compressedFull, {
-        contentType: 'image/webp',
+        contentType: outputContentType,
         cacheControl: '31536000', // 1 año
       });
 
     if (fullError) throw fullError;
+    uploadedPaths.push(fullPath);
 
     const { data: fullUrlData } = supabase.storage
       .from('product-images')
@@ -157,32 +179,45 @@ export async function POST(request: NextRequest) {
 
     // [IMAGES LEVEL2] Generar y subir thumbnails en WebP (más livianos)
     const thumbnailSizes: Array<keyof typeof THUMBNAIL_SIZES> = ['thumbnail', 'small', 'medium'];
+    const sharpFactory = sharp;
     
-    for (const size of thumbnailSizes) {
-      const dimensions = THUMBNAIL_SIZES[size];
-      const thumbnail = await sharp(imageBuffer)
-        .resize(dimensions.width, dimensions.height, {
-          fit: 'inside',
-          withoutEnlargement: true,
-        })
-        .webp({ quality: 80 }) // WebP para thumbnails (30-50% más liviano que JPEG)
-        .toBuffer();
+    for (const size of sharpFactory ? thumbnailSizes : []) {
+      try {
+        const dimensions = THUMBNAIL_SIZES[size];
+        const thumbnail = await sharpFactory!(imageBuffer)
+          .resize(dimensions.width, dimensions.height, {
+            fit: 'inside',
+            withoutEnlargement: true,
+          })
+          .webp({ quality: 80 })
+          .toBuffer();
 
-      const thumbnailFileName = `thumb_${timestamp}_${size}.webp`;
-      const thumbnailPath = `${basePath}/${thumbnailFileName}`;
-
-      const { error: thumbError } = await supabase.storage
-        .from('product-images')
-        .upload(thumbnailPath, thumbnail, {
-          contentType: 'image/webp',
-          cacheControl: '31536000',
-        });
-
-      if (!thumbError) {
-        const { data: thumbUrlData } = supabase.storage
+        const thumbnailFileName = `thumb_${timestamp}_${size}.webp`;
+        const thumbnailPath = `${basePath}/${thumbnailFileName}`;
+        const { error: thumbError } = await supabase.storage
           .from('product-images')
-          .getPublicUrl(thumbnailPath);
-        uploadedUrls[size] = thumbUrlData.publicUrl;
+          .upload(thumbnailPath, thumbnail, {
+            contentType: 'image/webp',
+            cacheControl: '31536000',
+          });
+
+        if (!thumbError) {
+          uploadedPaths.push(thumbnailPath);
+          const { data: thumbUrlData } = supabase.storage
+            .from('product-images')
+            .getPublicUrl(thumbnailPath);
+          uploadedUrls[size] = thumbUrlData.publicUrl;
+        } else {
+          logger.warn('[upload-images] No se pudo subir un thumbnail; se conserva la imagen full', {
+            size,
+            error: thumbError.message,
+          });
+        }
+      } catch (thumbnailError) {
+        logger.warn('[upload-images] No se pudo generar un thumbnail; se conserva la imagen full', {
+          size,
+          error: thumbnailError instanceof Error ? thumbnailError.message : String(thumbnailError),
+        });
       }
     }
 
@@ -198,6 +233,20 @@ export async function POST(request: NextRequest) {
       uploadedUrls,
     });
 
+    const { count: existingImageCount, error: countError } = await admin
+      .from('product_images')
+      .select('id', { count: 'exact', head: true })
+      .eq('product_id', productId);
+
+    if (countError) {
+      logger.warn('[upload-images] No se pudo contar imágenes previas', {
+        productId,
+        error: countError.message,
+      });
+    }
+    const sortOrder = existingImageCount || 0;
+    const isFirstImage = sortOrder === 0;
+
     const insertResult = await admin
       .from('product_images')
       .insert({
@@ -205,8 +254,8 @@ export async function POST(request: NextRequest) {
         url: fullUrl,
         thumbnail_url: thumbnailUrl,
         alt_text: file.name || '',
-        sort_order: 0,
-        is_cover: false,
+        sort_order: sortOrder,
+        is_cover: isFirstImage,
       })
       .select('*')
       .single();
@@ -214,6 +263,7 @@ export async function POST(request: NextRequest) {
     const { data: insertedImage, error: insertError } = insertResult;
 
     if (insertError) {
+      await admin.storage.from('product-images').remove(uploadedPaths);
       logger.error('[upload-images][INSERT] ❌ INSERT falló', {
         error: insertError.message,
         errorCode: insertError.code,
@@ -232,6 +282,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (!insertedImage) {
+      await admin.storage.from('product-images').remove(uploadedPaths);
       logger.error('[upload-images][INSERT] No se pudo insertar la imagen');
       return NextResponse.json(
         { error: 'Error al guardar la imagen: no se retornaron datos' },
@@ -244,16 +295,8 @@ export async function POST(request: NextRequest) {
       productId,
     });
 
-    // [IMAGES LEVEL2] Si esta es la primera imagen o es cover, actualizar products.thumbnail_url
-    // Verificar si es la primera imagen del producto (será cover por defecto)
-    // SELECT usa cliente normal (anon)
-    const { data: existingImages } = await supabase
-      .from('product_images')
-      .select('id')
-      .eq('product_id', productId)
-      .neq('id', insertedImage.id);
-
-    if (!existingImages || existingImages.length === 0) {
+    // La subida secuencial y el conteo previo hacen determinista la portada.
+    if (isFirstImage) {
       // Primera imagen: actualizar cover_url y thumbnail_url
       // UPDATE con adminClient (service_role)
       logger.info('[upload-images][UPDATE] Intentando actualizar products (primera imagen)', {
