@@ -526,15 +526,40 @@ export async function importDropshipRecommended(params: {
   let skipped = 0;
   const errors: string[] = [];
   const categories: Array<{ aeName: string; mercadito: string; count: number }> = [];
+  const feedNames = ['DS bestseller', 'Best Selling', 'Hot Product'];
+  let feedName = feedNames[0];
+  let resolvedFeed = false;
 
   for (const feed of slice) {
     let count = 0;
     try {
-      const result = await getDsRecommendFeed({
+      let result = await getDsRecommendFeed({
         categoryId: feed.aeCategoryId,
+        feedName,
         page: 1,
         pageSize,
       });
+
+      if (!resolvedFeed && result.products.length === 0) {
+        for (const alt of feedNames.slice(1)) {
+          const probe = await getDsRecommendFeed({
+            categoryId: feed.aeCategoryId,
+            feedName: alt,
+            page: 1,
+            pageSize,
+          });
+          if (probe.products.length > 0) {
+            feedName = alt;
+            result = probe;
+            break;
+          }
+        }
+        resolvedFeed = true;
+      }
+
+      if (result.products.length === 0) {
+        errors.push(`${feed.aeName}: AliExpress no devolvió productos en el feed`);
+      }
 
       for (const ae of result.products) {
         if (!ae.salePrice || ae.salePrice <= 0) {
