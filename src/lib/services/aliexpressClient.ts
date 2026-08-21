@@ -65,29 +65,111 @@ export function hasAliExpressAccessToken(): boolean {
   return !!process.env.ALIEXPRESS_ACCESS_TOKEN?.trim();
 }
 
+const ALIEXPRESS_REGISTERED_CALLBACK =
+  'https://mercadito-online-py-swart.vercel.app/api/auth/aliexpress/callback';
+
 export function getAliExpressCallbackUrl(): string {
   const fromEnv = process.env.ALIEXPRESS_REDIRECT_URI?.trim();
   if (fromEnv) return fromEnv.replace(/\/$/, '');
-  const base = (
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    process.env.NEXT_PUBLIC_APP_URL ||
-    'https://mercadito-online-py-swart.vercel.app'
-  ).replace(/\/$/, '');
-  return `${base}/api/auth/aliexpress/callback`;
+  return ALIEXPRESS_REGISTERED_CALLBACK;
 }
 
 export function getAliExpressAuthorizeUrl(): string {
   const { appKey } = getCredentials();
-  const redirectUri = getAliExpressCallbackUrl();
   const params = new URLSearchParams({
     response_type: 'code',
-    client_id: appKey,
-    redirect_uri: redirectUri,
-    sp: 'ae',
-    view: 'web',
     force_auth: 'true',
+    redirect_uri: getAliExpressCallbackUrl(),
+    client_id: appKey,
   });
-  return `https://oauth.aliexpress.com/authorize?${params.toString()}`;
+  return `https://api-sg.aliexpress.com/oauth/authorize?${params.toString()}`;
+}
+
+function signRestRequest(method: string, params: Record<string, string>, appSecret: string): string {
+  const basestring =
+    method +
+    Object.keys(params)
+      .filter((k) => k !== 'sign' && k !== 'method' && params[k] != null && params[k] !== '')
+      .sort()
+      .map((k) => `${k}${params[k]}`)
+      .join('');
+  return crypto.createHmac('sha256', appSecret).update(basestring).digest('hex').toUpperCase();
+}
+
+function pickAccessToken(payload: any): {
+  access_token: string;
+  refresh_token?: string;
+  expires_in?: number;
+} | null {
+  const root = payload?.data || payload;
+  const accessToken = root?.access_token || root?.accessToken;
+  if (!accessToken) return null;
+  return {
+    access_token: String(accessToken),
+    refresh_token: root.refresh_token ? String(root.refresh_token) : undefined,
+    expires_in: root.expires_in ? Number(root.expires_in) : undefined,
+  };
+}
+
+export async function exchangeAliExpressAuthCode(code: string): Promise<{
+  access_token: string;
+  refresh_token?: string;
+  expires_in?: number;
+}> {
+  const { appKey, appSecret } = getCredentials();
+  const params: Record<string, string> = {
+    app_key: appKey,
+    code,
+    simplify: 'true',
+    sign_method: 'sha256',
+    timestamp: String(Date.now()),
+  };
+  params.sign = signRestRequest('/auth/token/create', params, appSecret);
+
+  const qs = new URLSearchParams(params);
+  const restRes = await fetch(`https://api-sg.aliexpress.com/rest/auth/token/create?${qs.toString()}`, {
+    method: 'POST',
+  });
+  const restText = await restRes.text();
+  let restJson: any = null;
+  try {
+    restJson = JSON.parse(restText);
+  } catch {
+    restJson = null;
+  }
+  const restToken = restJson ? pickAccessToken(restJson) : null;
+  if (restToken) return restToken;
+
+  const classicBody = new URLSearchParams({
+    grant_type: 'authorization_code',
+    code,
+    client_id: appKey,
+    client_secret: appSecret,
+    sp: 'ae',
+    redirect_uri: getAliExpressCallbackUrl(),
+  });
+  const classicRes = await fetch('https://oauth.aliexpress.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: classicBody,
+  });
+  const classicText = await classicRes.text();
+  let classicJson: any = null;
+  try {
+    classicJson = JSON.parse(classicText);
+  } catch {
+    classicJson = null;
+  }
+  const classicToken = classicJson ? pickAccessToken(classicJson) : null;
+  if (classicToken) return classicToken;
+
+  const restError =
+    restJson?.error_response?.sub_msg ||
+    restJson?.error_response?.msg ||
+    restJson?.error_description ||
+    restJson?.msg;
+  const classicError = classicJson?.error_description || classicJson?.error || classicJson?.msg;
+  throw new Error(restError || classicError || `AliExpress no devolvió access_token: ${restText.slice(0, 180)}`);
 }
 
 function signRequest(params: Record<string, string>, appSecret: string): string {
