@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { supabase } from '@/lib/supabaseClient';
 import SearchBar from '@/components/SearchBar';
 import AuctionTimer from '@/components/auction/AuctionTimer';
-import { Clock, Users, Gavel } from 'lucide-react';
+import { Users } from 'lucide-react';
 import { ProductListSkeleton } from '@/components/ui/Skeleton';
 
 type Product = { 
@@ -43,8 +43,25 @@ type Product = {
     id: string;
     name: string;
     slug: string;
+    city?: string | null;
+    location?: string | null;
   } | null;
 };
+
+function listingPlace(product: Product) {
+  if (product.fulfillment_type === 'sourced') return 'Envío internacional';
+  return product.store?.city || product.store?.location || 'Paraguay';
+}
+
+function formatListingPrice(amount: number) {
+  return `₲ ${Math.round(amount).toLocaleString('es-PY')}`;
+}
+
+function isRecentlyPosted(createdAt: string) {
+  const created = new Date(createdAt).getTime();
+  if (!Number.isFinite(created)) return false;
+  return Date.now() - created < 48 * 60 * 60 * 1000;
+}
 
 type Category = { id: string; name: string };
 
@@ -536,7 +553,7 @@ export default function ProductsListClient() {
             ? createQueryWithTimeout(
                 supabase
                   .from('stores')
-                  .select('id, name, slug')
+                  .select('id, name, slug, city, location')
                   .in('id', storeIds)
                   .eq('is_active', true),
                 15000
@@ -1009,147 +1026,65 @@ export default function ProductsListClient() {
             </p>
           </div>
 
-          <div className="grid grid-cols-3 lg:grid-cols-9 gap-2 sm:gap-3 lg:gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
             {products.map((product) => {
               const isAuction = product.sale_type === 'auction';
               const isActiveAuction = isAuction && product.auction_status === 'active';
               const auctionEndAt = product.auction_end_at ? new Date(product.auction_end_at).getTime() : 0;
-              const serverNow = Date.now(); // Tiempo actual para el timer
+              const serverNow = Date.now();
               const endsInOneHour = isActiveAuction && auctionEndAt > serverNow && auctionEndAt <= serverNow + 60 * 60 * 1000;
-              
+              const href = isAuction ? `/auctions/${product.id}` : `/products/${product.id}`;
+              const price = isAuction && isActiveAuction ? product.current_bid || product.price : product.price;
+              const recent = isRecentlyPosted(product.created_at);
+
               return (
-              <div key={product.id} className={`bg-white rounded-lg shadow-sm border overflow-hidden hover:shadow-md transition-shadow ${
-                endsInOneHour ? 'ring-2 ring-orange-300 bg-orange-50' : ''
-              }`}>
-                <div className="relative">
-                  <img
-                    src={product.image_url ?? 'https://placehold.co/400x300?text=Producto'}
-                    alt={product.title}
-                    className="w-full h-24 object-cover"
-                  />
-                  {/* Badges de condición y tipo de venta - OCULTOS */}
-                  {/* <div className="absolute top-2 left-2 flex flex-col gap-1">
-                    <span className={`px-2 py-1 text-xs rounded-full ${
-                      product.condition === 'nuevo' 
-                        ? 'bg-green-100 text-green-800' 
-                        : product.condition === 'usado_como_nuevo'
-                        ? 'bg-yellow-100 text-yellow-800'
-                        : 'bg-gray-100 text-gray-800'
-                    }`}>
-                      {product.condition === 'nuevo' ? 'Nuevo' : 
-                       product.condition === 'usado_como_nuevo' ? 'Usado como nuevo' : 'Usado'}
-                    </span>
-                    {endsInOneHour && (
-                      <span className="px-2 py-1 text-xs rounded-full bg-red-100 text-red-800 animate-pulse flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        Finaliza pronto
+                <Link
+                  key={product.id}
+                  href={href}
+                  className={`group block ${endsInOneHour ? 'ring-2 ring-orange-300 rounded-xl' : ''}`}
+                >
+                  <div className="relative aspect-square overflow-hidden rounded-xl bg-gray-100">
+                    <img
+                      src={product.image_url ?? 'https://placehold.co/400x400?text=Producto'}
+                      alt={product.title}
+                      className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.03]"
+                    />
+                    {recent && (
+                      <span className="absolute bottom-2 left-2 rounded bg-emerald-800/90 px-2 py-0.5 text-[11px] font-medium text-white">
+                        Recién publicado
                       </span>
                     )}
-                  </div> */}
-                  <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
-                    {product.fulfillment_type === 'sourced' && (
-                      <span className="px-2 py-0.5 text-[10px] rounded-full bg-indigo-600 text-white">
+                    {!recent && product.fulfillment_type === 'sourced' && (
+                      <span className="absolute bottom-2 left-2 rounded bg-indigo-700/90 px-2 py-0.5 text-[11px] font-medium text-white">
                         Internacional
                       </span>
                     )}
-                    {/* Badge de tipo de venta - OCULTO */}
-                    {/* <span className={`px-2 py-1 text-xs rounded-full flex items-center gap-1 ${
-                      isAuction 
-                        ? 'bg-purple-100 text-purple-800' 
-                        : 'bg-blue-100 text-blue-800'
-                    }`}>
-                      {isAuction && <Gavel className="h-3 w-3" />}
-                      {isAuction ? 'Subasta' : 'Directa'}
-                    </span> */}
                     {isActiveAuction && product.total_bids !== undefined && product.total_bids > 0 && (
-                      <span className="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800 flex items-center gap-1">
+                      <span className="absolute top-2 right-2 inline-flex items-center gap-1 rounded bg-black/70 px-2 py-0.5 text-[11px] text-white">
                         <Users className="h-3 w-3" />
-                        {product.total_bids} {product.total_bids === 1 ? 'puja' : 'pujas'}
+                        {product.total_bids}
                       </span>
                     )}
                   </div>
-                </div>
-                
-                <div className="p-1.5 sm:p-2">
-                  <h3 className="font-semibold text-[10px] sm:text-xs mb-0.5 line-clamp-2 leading-tight">{product.title}</h3>
-                  {/* Descripción removida de la página principal */}
-                  
-                  {/* Timer para subastas activas */}
-                  {isActiveAuction && product.auction_end_at && auctionEndAt > serverNow && (
-                    <div className="mb-1.5 pb-1.5 border-b border-gray-200">
-                      <AuctionTimer
-                        endAtMs={auctionEndAt}
-                        serverNowMs={serverNow}
-                        variant="compact"
-                        size="md"
-                        tickMs={1000}
-                      />
-                    </div>
-                  )}
-                  
-                  {/* Información del vendedor/tienda */}
-                  {(product.store || product.seller) && (
-                    <div className="mb-1 pb-1 border-b text-[9px] sm:text-[10px]">
-                      {product.store ? (
-                        <Link
-                          href={`/store/${product.store.slug}`}
-                          onClick={(e) => e.stopPropagation()}
-                          className="inline-flex items-center gap-0.5 sm:gap-1 text-[9px] sm:text-[10px] font-medium text-blue-600 hover:text-blue-800 hover:underline transition-colors cursor-pointer"
-                        >
-                          <span className="text-[9px] sm:text-[10px]">🏪</span>
-                          <span className="truncate">{product.store.name}</span>
-                        </Link>
-                      ) : product.seller ? (
-                        <Link
-                          href={(product.store as any)?.slug ? `/store/${(product.store as any).slug}` : `/seller/${product.seller?.id}`}
-                          onClick={(e) => e.stopPropagation()}
-                          className="inline-flex items-center gap-0.5 sm:gap-1 text-[9px] sm:text-[10px] font-medium text-blue-600 hover:text-blue-800 hover:underline transition-colors cursor-pointer"
-                        >
-                          <span className="text-[9px] sm:text-[10px]">👤</span>
-                          <span className="truncate">
-                            {(product.seller as any)?.display_name || 
-                             ((product.seller as any)?.first_name || (product.seller as any)?.last_name 
-                              ? `${(product.seller as any)?.first_name || ''} ${(product.seller as any)?.last_name || ''}`.trim()
-                              : (product.seller as any)?.full_name || (product.seller as any)?.email?.split('@')[0] || `Vendedor ${product.seller_id?.slice(0, 6) || ''}`)}
-                          </span>
-                        </Link>
-                      ) : product.seller_id ? (
-                        <Link
-                          href={`/seller/${product.seller_id}`}
-                          onClick={(e) => e.stopPropagation()}
-                          className="inline-flex items-center gap-0.5 sm:gap-1 text-[9px] sm:text-[10px] font-medium text-blue-600 hover:text-blue-800 hover:underline transition-colors cursor-pointer"
-                        >
-                          <span className="text-[9px] sm:text-[10px]">👤</span>
-                          <span className="truncate">{`Vendedor ${product.seller_id.slice(0, 6)}`}</span>
-                        </Link>
-                      ) : null}
-                    </div>
-                  )}
-                  
-                  <div className="flex flex-col gap-1 sm:gap-1.5">
-                    <div className="flex justify-between items-center">
-                      {isAuction && isActiveAuction ? (
-                        <div className="flex flex-col">
-                          <span className="text-[9px] sm:text-[10px] text-gray-500 hidden sm:block">Puja actual</span>
-                          <p className="text-xs sm:text-sm font-bold text-purple-600">
-                            {(product.current_bid || product.price).toLocaleString('es-PY')} Gs.
-                          </p>
-                        </div>
-                      ) : (
-                        <p className="text-xs sm:text-sm font-bold text-green-600">
-                          {product.price.toLocaleString('es-PY')} Gs.
-                        </p>
-                      )}
-                    </div>
-                    <a
-                      href={isAuction ? `/auctions/${product.id}` : `/products/${product.id}`}
-                      className="px-1.5 py-1 sm:px-2 sm:py-1.5 bg-blue-500 text-white text-[9px] sm:text-[10px] rounded hover:bg-blue-600 transition-colors text-center font-medium"
-                    >
-                      {isAuction ? 'Ver subasta' : 'Ver detalles'}
-                    </a>
+                  <div className="pt-2 px-0.5">
+                    <p className={`text-base sm:text-lg font-bold leading-tight ${isActiveAuction ? 'text-purple-700' : 'text-gray-900'}`}>
+                      {formatListingPrice(price)}
+                    </p>
+                    <p className="mt-0.5 text-sm text-gray-800 line-clamp-2 leading-snug">{product.title}</p>
+                    <p className="mt-0.5 text-sm text-gray-500 truncate">{listingPlace(product)}</p>
+                    {isActiveAuction && product.auction_end_at && auctionEndAt > serverNow && (
+                      <div className="mt-1">
+                        <AuctionTimer
+                          endAtMs={auctionEndAt}
+                          serverNowMs={serverNow}
+                          variant="compact"
+                          size="md"
+                          tickMs={1000}
+                        />
+                      </div>
+                    )}
                   </div>
-                </div>
-        </div>
+                </Link>
               );
             })}
           </div>
