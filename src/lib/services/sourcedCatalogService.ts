@@ -8,10 +8,10 @@ import { Database } from '@/types/database';
 import { logger } from '@/lib/utils/logger';
 import {
   AliExpressProduct,
+  applyAliExpressUserToken,
   getDsFeedNames,
   getDsRecommendFeed,
   getSourcedProductDetails,
-  hasAliExpressAccessToken,
   isAliExpressConfigured,
   isAliExpressPermissionError,
   searchAffiliateProducts,
@@ -124,6 +124,30 @@ export async function getFallbackStore(admin?: SupabaseClient<Database>) {
     is_fallback_store: boolean;
     is_active: boolean;
   } | null;
+}
+
+export async function saveAliExpressOAuthTokens(tokens: {
+  access_token: string;
+  refresh_token?: string;
+  expires_in?: number;
+}) {
+  const db = getAdminClient();
+  const store = await getFallbackStore(db);
+  if (!store) {
+    throw new Error('No hay tienda Ubuy para guardar el token');
+  }
+  const nextSettings = {
+    ...(store.settings || {}),
+    sourced_catalog: {
+      ...((store.settings as any)?.sourced_catalog || {}),
+      access_token: tokens.access_token,
+      refresh_token: tokens.refresh_token || null,
+      token_saved_at: new Date().toISOString(),
+      token_expires_in: tokens.expires_in || null,
+    },
+  };
+  const { error } = await (db as any).from('stores').update({ settings: nextSettings }).eq('id', store.id);
+  if (error) throw error;
 }
 
 async function isAdminUser(userId: string, db: SupabaseClient<Database>): Promise<boolean> {
@@ -497,11 +521,6 @@ export async function importDropshipRecommended(params: {
   if (!isAliExpressConfigured()) {
     throw new Error('AliExpress no está configurado en el servidor');
   }
-  if (!hasAliExpressAccessToken()) {
-    throw new Error(
-      'Falta ALIEXPRESS_ACCESS_TOKEN. El AppKey alcanza para registrar la app, pero el feed Drop Shipping exige autorizar tu cuenta en ds.aliexpress.com. Generá el token en Open Platform, pegalo en Vercel (Production) y hacé redeploy.'
-    );
-  }
 
   const db = getAdminClient();
   let store: { id: string; seller_id: string; settings: Record<string, any> | null };
@@ -519,6 +538,15 @@ export async function importDropshipRecommended(params: {
     }
     store = fallback;
   }
+
+  const storedToken = String(store.settings?.sourced_catalog?.access_token || '').trim();
+  const token = process.env.ALIEXPRESS_ACCESS_TOKEN?.trim() || storedToken;
+  if (!token) {
+    throw new Error(
+      'Falta autorizar AliExpress. Abrí /api/auth/aliexpress/callback y pulsá Autorizar con AliExpress, o cargá ALIEXPRESS_ACCESS_TOKEN en Vercel.'
+    );
+  }
+  applyAliExpressUserToken(token);
 
   const settings = parseSourcedSettings(store.settings);
   const mercaditoCategories = await loadStoreCategories(db);

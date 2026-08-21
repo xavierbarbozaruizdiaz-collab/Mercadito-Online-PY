@@ -400,15 +400,24 @@ export default function SourcedCatalogPage() {
           <p className="text-sm text-gray-600">
             Trae los más vendidos de AliExpress en todas las categorías top y los publica en las
             categorías de Mercadito (Electrónica, Hogar, Ropa, Autos, etc.). No usa la búsqueda Affiliate.
+            Primero autorizá tu cuenta Drop Shipping.
           </p>
-          <button
-            type="button"
-            onClick={runAutoImport}
-            disabled={autoImporting}
-            className="px-4 py-2 bg-indigo-700 text-white rounded-lg disabled:opacity-50"
-          >
-            {autoImporting ? 'Importando categorías…' : 'Importar todas las categorías'}
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <a
+              href="/api/auth/aliexpress/callback"
+              className="px-4 py-2 bg-white border border-indigo-200 text-indigo-900 rounded-lg"
+            >
+              Autorizar AliExpress
+            </a>
+            <button
+              type="button"
+              onClick={runAutoImport}
+              disabled={autoImporting}
+              className="px-4 py-2 bg-indigo-700 text-white rounded-lg disabled:opacity-50"
+            >
+              {autoImporting ? 'Importando categorías…' : 'Importar todas las categorías'}
+            </button>
+          </div>
           {autoImportLog && (
             <pre className="text-xs bg-gray-50 border rounded-lg p-3 whitespace-pre-wrap text-gray-700">
               {autoImportLog}
