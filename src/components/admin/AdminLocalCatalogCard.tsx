@@ -48,8 +48,8 @@ export default function AdminLocalCatalogCard() {
         {loading ? 'Cargando…' : store?.name || 'Mercadito Local'}
       </h2>
       <p className="mt-2 text-sm text-gray-600 max-w-2xl">
-        Catálogo Cellshop (y similares): importás con bookmarklet, fijás márgenes en Gs. y comprás a
-        mano cuando el cliente confirma. Independiente de la tienda Ubuy / AliExpress.
+        Catálogo Cellshop (y similares): importás por categoría o bookmarklet, fijás márgenes en Gs. y
+        comprás a mano cuando el cliente confirma. Independiente de la tienda Ubuy / AliExpress.
       </p>
       {error && <p className="mt-2 text-sm text-red-700">{error}</p>}
       {store?.slug && (
@@ -61,6 +61,12 @@ export default function AdminLocalCatalogCard() {
           className="inline-flex px-4 py-2 rounded-xl bg-emerald-700 text-white text-sm font-medium hover:bg-emerald-800"
         >
           Ver vitrina pública
+        </Link>
+        <Link
+          href="/dashboard"
+          className="inline-flex px-4 py-2 rounded-xl bg-white border border-emerald-200 text-emerald-900 text-sm font-medium hover:bg-emerald-50"
+        >
+          Panel normal de la tienda
         </Link>
         <Link
           href="/dashboard/local-catalog"
