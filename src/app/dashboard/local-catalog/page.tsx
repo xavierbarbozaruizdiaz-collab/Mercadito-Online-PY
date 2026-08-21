@@ -391,7 +391,7 @@ export default function LocalCatalogPage() {
           </h2>
           <p className="text-sm text-gray-600">
             Pegá la URL de un listado (ej. smartphones). Se importan hasta ~24 productos por página
-            (máx. 3 páginas). Quedan en borrador; vos tildás cuáles van a la tienda.
+            (máx. 3 páginas). Quedan pausados; vos tildás cuáles van a la tienda.
           </p>
           <label className="block text-sm">
             URL de categoría
