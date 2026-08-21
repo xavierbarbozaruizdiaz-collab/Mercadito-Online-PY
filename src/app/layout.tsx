@@ -96,16 +96,16 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     icons: {
       icon: [
-        { url: '/favicon.ico', sizes: 'any' },
-        { url: '/favicon.svg', type: 'image/svg+xml' },
-        { url: '/icons/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
-        { url: '/icons/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
+        { url: '/favicon.svg?v=20260821', type: 'image/svg+xml' },
+        { url: '/icons/favicon-32x32.png?v=20260821', sizes: '32x32', type: 'image/png' },
+        { url: '/icons/favicon-16x16.png?v=20260821', sizes: '16x16', type: 'image/png' },
+        { url: '/favicon.ico?v=20260821', sizes: 'any' },
       ],
       apple: [
-        { url: '/icons/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
-        { url: '/icons/apple-touch-icon-152x152.png', sizes: '152x152', type: 'image/png' },
-        { url: '/icons/apple-touch-icon-167x167.png', sizes: '167x167', type: 'image/png' },
-        { url: '/icons/apple-touch-icon-180x180.png', sizes: '180x180', type: 'image/png' },
+        { url: '/icons/apple-touch-icon.png?v=20260821', sizes: '180x180', type: 'image/png' },
+        { url: '/icons/apple-touch-icon-152x152.png?v=20260821', sizes: '152x152', type: 'image/png' },
+        { url: '/icons/apple-touch-icon-167x167.png?v=20260821', sizes: '167x167', type: 'image/png' },
+        { url: '/icons/apple-touch-icon-180x180.png?v=20260821', sizes: '180x180', type: 'image/png' },
       ],
     },
     manifest: '/manifest.json',
@@ -154,11 +154,11 @@ export default function RootLayout({
           }}
         />
 
-        <link rel="icon" type="image/x-icon" href="/favicon.ico" />
-        <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-        <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16x16.png" />
-        <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png" />
-        <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=20260821" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png?v=20260821" />
+        <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16x16.png?v=20260821" />
+        <link rel="icon" type="image/x-icon" href="/favicon.ico?v=20260821" />
+        <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png?v=20260821" />
         {/* Deshabilitar preload automático problemático */}
         <meta name="next-head-count" content="0" />
       </head>
