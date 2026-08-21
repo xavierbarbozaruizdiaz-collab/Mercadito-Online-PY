@@ -7,6 +7,7 @@ import {
   Globe,
   Loader2,
   Package,
+  RefreshCw,
   Search,
   Settings,
   Truck,
@@ -63,6 +64,8 @@ export default function SourcedCatalogPage() {
   const [imported, setImported] = useState<ImportedProduct[]>([]);
   const [importedTotal, setImportedTotal] = useState(0);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [autoImporting, setAutoImporting] = useState(false);
+  const [autoImportLog, setAutoImportLog] = useState<string | null>(null);
 
   const authFetch = useCallback(async (url: string, init?: RequestInit) => {
     const headers = await getAuthHeaders();
@@ -183,6 +186,50 @@ export default function SourcedCatalogPage() {
       toast.error(err.message);
     } finally {
       setImporting(false);
+    }
+  }
+
+  async function runAutoImport() {
+    setAutoImporting(true);
+    setAutoImportLog(null);
+    try {
+      let offset = 0;
+      let imported = 0;
+      let updated = 0;
+      let skipped = 0;
+      const lines: string[] = [];
+      let totalFeeds = 0;
+      let done = false;
+      let guard = 0;
+
+      while (!done && guard < 8) {
+        const res = await authFetch('/api/sourced-catalog/import-recommended', {
+          method: 'POST',
+          body: JSON.stringify({ categoryOffset: offset, categoryLimit: 6, pageSize: 12 }),
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(json.error || 'Error importando recomendados');
+        imported += json.imported || 0;
+        updated += json.updated || 0;
+        skipped += json.skipped || 0;
+        totalFeeds = json.totalFeeds || totalFeeds;
+        (json.categories || []).forEach((row: { aeName: string; mercadito: string; count: number }) => {
+          lines.push(`${row.mercadito} ← ${row.aeName}: ${row.count}`);
+        });
+        offset = json.nextOffset || offset;
+        done = !!json.done;
+        guard += 1;
+      }
+
+      const summary = `Listo. ${imported} nuevos, ${updated} actualizados, ${skipped} omitidos. Rubros AliExpress: ${totalFeeds}.`;
+      setAutoImportLog([summary, ...lines].join('\n'));
+      toast.success(summary);
+      await loadSettingsAndProducts();
+    } catch (err: any) {
+      toast.error(err.message);
+      setAutoImportLog(err.message);
+    } finally {
+      setAutoImporting(false);
     }
   }
 
@@ -341,6 +388,29 @@ export default function SourcedCatalogPage() {
             </button>
           </form>
         )}
+
+        <div className="bg-white rounded-xl border p-5 space-y-3">
+          <h2 className="font-bold text-gray-900 flex items-center gap-2">
+            <RefreshCw className="w-5 h-5" /> Importar recomendados (Drop Shipping)
+          </h2>
+          <p className="text-sm text-gray-600">
+            Trae los más vendidos de AliExpress en todas las categorías top y los publica en las
+            categorías de Mercadito (Electrónica, Hogar, Ropa, Autos, etc.). No usa la búsqueda Affiliate.
+          </p>
+          <button
+            type="button"
+            onClick={runAutoImport}
+            disabled={autoImporting}
+            className="px-4 py-2 bg-indigo-700 text-white rounded-lg disabled:opacity-50"
+          >
+            {autoImporting ? 'Importando categorías…' : 'Importar todas las categorías'}
+          </button>
+          {autoImportLog && (
+            <pre className="text-xs bg-gray-50 border rounded-lg p-3 whitespace-pre-wrap text-gray-700">
+              {autoImportLog}
+            </pre>
+          )}
+        </div>
 
         <form onSubmit={runSearch} className="bg-white rounded-xl border p-5 space-y-4">
           <h2 className="font-bold text-gray-900 flex items-center gap-2">
