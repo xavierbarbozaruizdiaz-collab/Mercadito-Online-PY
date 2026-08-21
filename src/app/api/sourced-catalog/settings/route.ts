@@ -22,6 +22,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       store: { id: ownership.store.id, name: ownership.store.name, slug: ownership.store.slug },
       settings: parseSourcedSettings(ownership.store.settings),
+      importCategoryIds: Array.isArray(ownership.store.settings?.sourced_catalog?.import_category_ids)
+        ? ownership.store.settings.sourced_catalog.import_category_ids
+        : null,
     });
   } catch (error: any) {
     logger.error('[sourced-catalog/settings GET]', error);
