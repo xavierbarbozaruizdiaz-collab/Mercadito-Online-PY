@@ -162,14 +162,18 @@ export interface Database {
       sourced_fulfillments: {
         Row: {
           id: string;
-          order_id: string;
-          order_item_id: string;
+          order_id: string | null;
+          order_item_id: string | null;
           product_id: string;
           store_id: string;
           source_platform: string | null;
           source_product_id: string | null;
           source_url: string | null;
           status: string;
+          origin: 'checkout' | 'manual';
+          customer_name: string | null;
+          customer_phone: string | null;
+          customer_notes: string | null;
           tracking_number: string | null;
           notes: string | null;
           purchased_at: string | null;
@@ -179,14 +183,18 @@ export interface Database {
         };
         Insert: {
           id?: string;
-          order_id: string;
-          order_item_id: string;
+          order_id?: string | null;
+          order_item_id?: string | null;
           product_id: string;
           store_id: string;
           source_platform?: string | null;
           source_product_id?: string | null;
           source_url?: string | null;
           status?: string;
+          origin?: 'checkout' | 'manual';
+          customer_name?: string | null;
+          customer_phone?: string | null;
+          customer_notes?: string | null;
           tracking_number?: string | null;
           notes?: string | null;
           purchased_at?: string | null;
@@ -196,14 +204,18 @@ export interface Database {
         };
         Update: {
           id?: string;
-          order_id?: string;
-          order_item_id?: string;
+          order_id?: string | null;
+          order_item_id?: string | null;
           product_id?: string;
           store_id?: string;
           source_platform?: string | null;
           source_product_id?: string | null;
           source_url?: string | null;
           status?: string;
+          origin?: 'checkout' | 'manual';
+          customer_name?: string | null;
+          customer_phone?: string | null;
+          customer_notes?: string | null;
           tracking_number?: string | null;
           notes?: string | null;
           purchased_at?: string | null;

@@ -2,21 +2,35 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Loader2, Truck } from 'lucide-react';
+import { ArrowLeft, Copy, ExternalLink, Loader2, Plus, Truck } from 'lucide-react';
 import { getAuthHeaders } from '@/lib/auth/clientAuthHeaders';
 import { useToast } from '@/lib/hooks/useToast';
+import EnqueueSourcedPurchaseModal, {
+  type EnqueueProductOption,
+} from '@/components/sourced/EnqueueSourcedPurchaseModal';
 
 type Fulfillment = {
   id: string;
-  order_id: string;
+  order_id: string | null;
   status: string;
+  origin: 'checkout' | 'manual' | string;
   source_url: string | null;
   source_product_id: string | null;
   tracking_number: string | null;
   notes: string | null;
+  customer_name: string | null;
+  customer_phone: string | null;
+  customer_notes: string | null;
   created_at: string;
   products: { id: string; title: string; cover_url: string | null; price: number } | null;
-  orders: { id: string; status: string; total_amount: number; created_at: string } | null;
+  orders: {
+    id: string;
+    status: string;
+    total_amount: number;
+    created_at: string;
+    shipping_address?: unknown;
+    notes?: string | null;
+  } | null;
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -34,6 +48,9 @@ export default function SourcedFulfillmentsPage() {
   const [status, setStatus] = useState('all');
   const [savingId, setSavingId] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Record<string, { tracking: string; notes: string }>>({});
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualSubmitting, setManualSubmitting] = useState(false);
+  const [productOptions, setProductOptions] = useState<EnqueueProductOption[]>([]);
 
   const authFetch = useCallback(async (url: string, init?: RequestInit) => {
     const headers = await getAuthHeaders();
@@ -58,7 +75,7 @@ export default function SourcedFulfillmentsPage() {
         setForbidden(json.error || 'Sin acceso');
         return;
       }
-      if (!res.ok) throw new Error(json.error || 'Error cargando fulfillments');
+      if (!res.ok) throw new Error(json.error || 'Error cargando pedidos');
       const rows = (json.data || []) as Fulfillment[];
       setItems(rows);
       const next: Record<string, { tracking: string; notes: string }> = {};
@@ -73,9 +90,24 @@ export default function SourcedFulfillmentsPage() {
     }
   }, [authFetch, status]);
 
+  const loadProducts = useCallback(async () => {
+    try {
+      const res = await authFetch('/api/sourced-catalog/products?limit=50');
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) return;
+      setProductOptions((json.data || []) as EnqueueProductOption[]);
+    } catch {
+      /* ignore */
+    }
+  }, [authFetch]);
+
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    loadProducts();
+  }, [loadProducts]);
 
   async function updateFulfillment(id: string, patch: Record<string, string>) {
     setSavingId(id);
@@ -92,6 +124,15 @@ export default function SourcedFulfillmentsPage() {
       toast.error(err.message);
     } finally {
       setSavingId(null);
+    }
+  }
+
+  async function copyText(label: string, value: string) {
+    try {
+      await navigator.clipboard.writeText(value);
+      toast.success(`${label} copiado`);
+    } catch {
+      toast.error('No se pudo copiar');
     }
   }
 
@@ -120,12 +161,25 @@ export default function SourcedFulfillmentsPage() {
         <Link href="/dashboard/sourced-catalog" className="inline-flex items-center gap-2 text-gray-600 mb-4">
           <ArrowLeft className="w-4 h-4" /> Catálogo internacional
         </Link>
-        <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
-          <Truck className="w-7 h-7" /> Fulfillment sourced
-        </h1>
-        <p className="text-gray-600 mt-1">
-          Pedidos pagados de productos estirados. Comprá en AliExpress, pegá el tracking y marcá enviado.
-        </p>
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
+              <Truck className="w-7 h-7" /> Pedidos a AliExpress
+            </h1>
+            <p className="text-gray-600 mt-1">
+              Cola para comprar a mano en AliExpress (checkout o confirmación por WhatsApp). Pegá el
+              tracking y marcá enviado.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setManualOpen(true)}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-black text-white text-sm font-medium shrink-0"
+          >
+            <Plus className="w-4 h-4" />
+            Nuevo pedido manual
+          </button>
+        </div>
 
         <div className="mt-4 flex gap-2 flex-wrap">
           {['all', 'pending_purchase', 'purchased', 'shipped', 'cancelled'].map((s) => (
@@ -142,103 +196,171 @@ export default function SourcedFulfillmentsPage() {
 
         <ul className="mt-6 space-y-4">
           {items.length === 0 && (
-            <li className="bg-white border rounded-xl p-6 text-gray-500">No hay fulfillments en este filtro.</li>
+            <li className="bg-white border rounded-xl p-6 text-gray-500">
+              No hay pedidos en este filtro. Usá &quot;Nuevo pedido manual&quot; o encolá desde el catálogo.
+            </li>
           )}
-          {items.map((item) => (
-            <li key={item.id} className="bg-white border rounded-xl p-4 space-y-3">
-              <div className="flex gap-3">
-                {item.products?.cover_url ? (
-                  <img src={item.products.cover_url} alt="" className="w-16 h-16 object-cover rounded" />
-                ) : (
-                  <div className="w-16 h-16 bg-gray-100 rounded" />
-                )}
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium">{item.products?.title || 'Producto'}</p>
-                  <p className="text-sm text-gray-500">
-                    Pedido {item.order_id.slice(0, 8)} · {STATUS_LABEL[item.status] || item.status}
-                  </p>
-                  {item.source_url && (
-                    <a href={item.source_url} target="_blank" rel="noreferrer" className="text-sm text-blue-700 hover:underline">
-                      Abrir en AliExpress
-                    </a>
+          {items.map((item) => {
+            const isManual = item.origin === 'manual';
+            return (
+              <li key={item.id} className="bg-white border rounded-xl p-4 space-y-3">
+                <div className="flex gap-3">
+                  {item.products?.cover_url ? (
+                    <img src={item.products.cover_url} alt="" className="w-16 h-16 object-cover rounded" />
+                  ) : (
+                    <div className="w-16 h-16 bg-gray-100 rounded" />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-medium">{item.products?.title || 'Producto'}</p>
+                      <span
+                        className={`text-[11px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-md ${
+                          isManual ? 'bg-amber-50 text-amber-800' : 'bg-emerald-50 text-emerald-800'
+                        }`}
+                      >
+                        {isManual ? 'Manual' : 'Checkout'}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-500">
+                      {item.order_id
+                        ? `Pedido ${item.order_id.slice(0, 8)} · `
+                        : ''}
+                      {STATUS_LABEL[item.status] || item.status}
+                    </p>
+                    {(item.customer_name || item.customer_phone || item.customer_notes) && (
+                      <p className="text-sm text-gray-700 mt-1">
+                        {[item.customer_name, item.customer_phone].filter(Boolean).join(' · ')}
+                        {item.customer_notes ? ` — ${item.customer_notes}` : ''}
+                      </p>
+                    )}
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {item.source_url && (
+                        <a
+                          href={item.source_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-700 hover:underline"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          Comprar en AliExpress
+                        </a>
+                      )}
+                      {item.source_product_id && (
+                        <button
+                          type="button"
+                          className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900"
+                          onClick={() => copyText('ID AliExpress', item.source_product_id!)}
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                          {item.source_product_id}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <input
+                    className="border rounded-lg px-3 py-2 text-sm"
+                    placeholder="Tracking"
+                    value={drafts[item.id]?.tracking || ''}
+                    onChange={(e) =>
+                      setDrafts((prev) => ({
+                        ...prev,
+                        [item.id]: { tracking: e.target.value, notes: prev[item.id]?.notes || '' },
+                      }))
+                    }
+                  />
+                  <input
+                    className="border rounded-lg px-3 py-2 text-sm"
+                    placeholder="Notas internas"
+                    value={drafts[item.id]?.notes || ''}
+                    onChange={(e) =>
+                      setDrafts((prev) => ({
+                        ...prev,
+                        [item.id]: { tracking: prev[item.id]?.tracking || '', notes: e.target.value },
+                      }))
+                    }
+                  />
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    disabled={savingId === item.id}
+                    className="px-3 py-1.5 text-sm border rounded-lg"
+                    onClick={() =>
+                      updateFulfillment(item.id, {
+                        tracking_number: drafts[item.id]?.tracking || '',
+                        notes: drafts[item.id]?.notes || '',
+                      })
+                    }
+                  >
+                    Guardar tracking
+                  </button>
+                  {item.status === 'pending_purchase' && (
+                    <button
+                      type="button"
+                      disabled={savingId === item.id}
+                      className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg"
+                      onClick={() => updateFulfillment(item.id, { status: 'purchased' })}
+                    >
+                      Marcar comprado
+                    </button>
+                  )}
+                  {item.status === 'purchased' && (
+                    <button
+                      type="button"
+                      disabled={savingId === item.id}
+                      className="px-3 py-1.5 text-sm bg-black text-white rounded-lg"
+                      onClick={() => updateFulfillment(item.id, { status: 'shipped' })}
+                    >
+                      Marcar enviado
+                    </button>
+                  )}
+                  {(item.status === 'pending_purchase' || item.status === 'purchased') && (
+                    <button
+                      type="button"
+                      disabled={savingId === item.id}
+                      className="px-3 py-1.5 text-sm text-red-700 border border-red-200 rounded-lg"
+                      onClick={() => updateFulfillment(item.id, { status: 'cancelled' })}
+                    >
+                      Cancelar
+                    </button>
                   )}
                 </div>
-              </div>
-
-              <div className="grid sm:grid-cols-2 gap-3">
-                <input
-                  className="border rounded-lg px-3 py-2 text-sm"
-                  placeholder="Tracking"
-                  value={drafts[item.id]?.tracking || ''}
-                  onChange={(e) =>
-                    setDrafts((prev) => ({
-                      ...prev,
-                      [item.id]: { tracking: e.target.value, notes: prev[item.id]?.notes || '' },
-                    }))
-                  }
-                />
-                <input
-                  className="border rounded-lg px-3 py-2 text-sm"
-                  placeholder="Notas"
-                  value={drafts[item.id]?.notes || ''}
-                  onChange={(e) =>
-                    setDrafts((prev) => ({
-                      ...prev,
-                      [item.id]: { tracking: prev[item.id]?.tracking || '', notes: e.target.value },
-                    }))
-                  }
-                />
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  disabled={savingId === item.id}
-                  className="px-3 py-1.5 text-sm border rounded-lg"
-                  onClick={() =>
-                    updateFulfillment(item.id, {
-                      tracking_number: drafts[item.id]?.tracking || '',
-                      notes: drafts[item.id]?.notes || '',
-                    })
-                  }
-                >
-                  Guardar tracking
-                </button>
-                {item.status === 'pending_purchase' && (
-                  <button
-                    type="button"
-                    disabled={savingId === item.id}
-                    className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg"
-                    onClick={() => updateFulfillment(item.id, { status: 'purchased' })}
-                  >
-                    Marcar comprado
-                  </button>
-                )}
-                {item.status === 'purchased' && (
-                  <button
-                    type="button"
-                    disabled={savingId === item.id}
-                    className="px-3 py-1.5 text-sm bg-black text-white rounded-lg"
-                    onClick={() => updateFulfillment(item.id, { status: 'shipped' })}
-                  >
-                    Marcar enviado
-                  </button>
-                )}
-                {(item.status === 'pending_purchase' || item.status === 'purchased') && (
-                  <button
-                    type="button"
-                    disabled={savingId === item.id}
-                    className="px-3 py-1.5 text-sm text-red-700 border border-red-200 rounded-lg"
-                    onClick={() => updateFulfillment(item.id, { status: 'cancelled' })}
-                  >
-                    Cancelar
-                  </button>
-                )}
-              </div>
-            </li>
-          ))}
+              </li>
+            );
+          })}
         </ul>
       </div>
+
+      <EnqueueSourcedPurchaseModal
+        open={manualOpen}
+        products={productOptions}
+        submitting={manualSubmitting}
+        onClose={() => setManualOpen(false)}
+        onSubmit={async (payload) => {
+          setManualSubmitting(true);
+          try {
+            const res = await authFetch('/api/sourced-fulfillments', {
+              method: 'POST',
+              body: JSON.stringify(payload),
+            });
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(json.error || 'No se pudo crear');
+            toast.success('Pedido manual creado');
+            setManualOpen(false);
+            const url = json.data?.source_url as string | undefined;
+            if (url) window.open(url, '_blank', 'noopener,noreferrer');
+            await load();
+          } catch (err: any) {
+            toast.error(err.message || 'Error');
+          } finally {
+            setManualSubmitting(false);
+          }
+        }}
+      />
     </main>
   );
 }
