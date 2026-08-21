@@ -119,7 +119,11 @@ export default function SourcedCatalogPage() {
         const saved = new Set(settingsJson.importCategoryIds.map(String));
         const next: Record<string, boolean> = {};
         for (const feed of ALIEXPRESS_CATEGORY_FEEDS) {
-          next[feed.aeCategoryId] = saved.has(feed.aeCategoryId);
+          next[feed.aeCategoryId] =
+            saved.has(feed.aeCategoryId) ||
+            ((feed.aeCategoryId === '380230' || feed.aeCategoryId === '1511') &&
+              !saved.has('380230') &&
+              !saved.has('1511'));
         }
         setSelectedAeCategories(next);
       }
