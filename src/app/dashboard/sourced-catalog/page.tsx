@@ -216,6 +216,10 @@ export default function SourcedCatalogPage() {
         (json.categories || []).forEach((row: { aeName: string; mercadito: string; count: number }) => {
           lines.push(`${row.mercadito} ← ${row.aeName}: ${row.count}`);
         });
+        if ((json.errors || []).length) {
+          lines.push('Errores:');
+          json.errors.forEach((err: string) => lines.push(`- ${err}`));
+        }
         offset = json.nextOffset || offset;
         done = !!json.done;
         guard += 1;

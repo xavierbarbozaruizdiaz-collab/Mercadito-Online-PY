@@ -170,6 +170,8 @@ function extractList(payload: any): { products: any[]; total: number } {
     root?.products?.product ||
     root?.products ||
     root?.product_list ||
+    root?.data?.products?.product ||
+    root?.data?.products ||
     [];
 
   const total = Number(root?.current_record_count || root?.total_record_count || root?.total || 0);
@@ -230,12 +232,12 @@ async function callApi(
     throw new Error(`AliExpress devolvió una respuesta no JSON (${res.status})`);
   }
 
-  const errorCode = json?.error_response?.code || json?.code;
-  const errorMsg = json?.error_response?.msg || json?.msg || json?.error_response?.sub_msg;
+  const errorBody = json?.error_response;
+  const errorCode = errorBody?.code;
+  const errorMsg = errorBody?.sub_msg || errorBody?.msg || json?.msg;
 
-  if (!res.ok || errorCode) {
+  if (!res.ok || errorBody) {
     const codeStr = String(errorCode || res.status);
-    // Rate limit / ISP throttling
     if ((codeStr === '27' || codeStr === '7' || res.status === 429) && attempt < 4) {
       const wait = 400 * 2 ** attempt;
       logger.warn('[AliExpress] rate limit, reintento', { attempt, wait, method });
@@ -361,7 +363,7 @@ export async function getDsRecommendFeed(options: {
   const payload = await callApi('aliexpress.ds.recommend.feed.get', {
     feed_name: options.feedName || 'DS bestseller',
     category_id: String(options.categoryId),
-    country: 'PY',
+    country: 'US',
     target_currency: 'USD',
     target_language: 'ES',
     page_no: String(page),
