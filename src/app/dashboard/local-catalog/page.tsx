@@ -189,7 +189,7 @@ export default function LocalCatalogPage() {
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json.error || 'No se pudo importar');
-      const msg = `Encontrados ${json.found} · nuevos ${json.imported} · actualizados ${json.updated} · errores ${json.skipped} (páginas ${json.pages_fetched}). Quedan en borrador hasta tildar «En tienda».`;
+      const msg = `Encontrados ${json.found} · nuevos ${json.imported} · actualizados ${json.updated} · errores ${json.skipped} (páginas ${json.pages_fetched}). Quedan pausados hasta tildar «En tienda».`;
       setImportLog(msg);
       toast.success('Categoría importada');
       await load();
@@ -206,7 +206,7 @@ export default function LocalCatalogPage() {
     const prevStatus = product.status;
     setProducts((list) =>
       list.map((p) =>
-        p.id === product.id ? { ...p, status: visible ? 'active' : 'draft' } : p
+        p.id === product.id ? { ...p, status: visible ? 'active' : 'paused' } : p
       )
     );
     setVisibleTotal((n) => {
@@ -563,7 +563,7 @@ export default function LocalCatalogPage() {
                               Margen {margin.toLocaleString('es-PY')} Gs.
                             </span>
                             {!inStore && (
-                              <span className="text-gray-400">Borrador</span>
+                              <span className="text-gray-400">Pausado</span>
                             )}
                           </div>
                         </div>

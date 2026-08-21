@@ -269,8 +269,8 @@ export async function importLocalCatalogProduct(params: {
   source?: string | null;
   sourceUrl?: string | null;
   currency?: string | null;
-  /** Default draft — publish via checkbox in local-catalog panel. */
-  status?: 'draft' | 'active';
+  /** Default paused — publish via «En tienda» (active). DB allows active|paused|archived|sold. */
+  status?: 'paused' | 'active';
 }) {
   const db = getAdminClient();
   const settings = parseLocalCatalogSettings(params.store.settings);
@@ -292,7 +292,7 @@ export async function importLocalCatalogProduct(params: {
   const sourceLabel = (params.source || settings.default_source || 'Cellshop').trim().slice(0, 80);
   const sourceUrl = params.sourceUrl?.trim() || null;
   const imageUrl = params.imageUrl?.trim() || null;
-  const status = params.status === 'active' ? 'active' : 'draft';
+  const status = params.status === 'active' ? 'active' : 'paused';
 
   const productPayload = {
     store_id: params.store.id,
@@ -367,7 +367,7 @@ export async function setLocalCatalogProductVisibility(params: {
   const db = getAdminClient();
   const { data, error } = await (db as any)
     .from('products')
-    .update({ status: params.visible ? 'active' : 'draft' })
+    .update({ status: params.visible ? 'active' : 'paused' })
     .eq('id', params.productId)
     .eq('store_id', params.storeId)
     .eq('fulfillment_type', 'sourced')
