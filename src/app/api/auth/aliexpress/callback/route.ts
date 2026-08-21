@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { logger } from '@/lib/utils/logger';
 import {
+  exchangeAliExpressAuthCode,
   getAliExpressAuthorizeUrl,
-  getAliExpressCallbackUrl,
   isAliExpressConfigured,
 } from '@/lib/services/aliexpressClient';
 import { saveAliExpressOAuthTokens } from '@/lib/services/sourcedCatalogService';
@@ -21,45 +21,6 @@ function html(body: string, status = 200) {
   );
 }
 
-async function exchangeCodeForToken(code: string) {
-  const clientId = process.env.ALIEXPRESS_APP_KEY?.trim();
-  const clientSecret = process.env.ALIEXPRESS_APP_SECRET?.trim();
-  if (!clientId || !clientSecret) {
-    throw new Error('Faltan ALIEXPRESS_APP_KEY / ALIEXPRESS_APP_SECRET en el servidor');
-  }
-
-  const body = new URLSearchParams({
-    grant_type: 'authorization_code',
-    code,
-    client_id: clientId,
-    client_secret: clientSecret,
-    sp: 'ae',
-    redirect_uri: getAliExpressCallbackUrl(),
-  });
-
-  const res = await fetch('https://oauth.aliexpress.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body,
-  });
-  const text = await res.text();
-  let json: any = null;
-  try {
-    json = JSON.parse(text);
-  } catch {
-    throw new Error(`AliExpress token no JSON: ${text.slice(0, 200)}`);
-  }
-  const accessToken = json.access_token || json.accessToken;
-  if (!accessToken) {
-    throw new Error(json.error_description || json.error || json.msg || 'No vino access_token');
-  }
-  return {
-    access_token: String(accessToken),
-    refresh_token: json.refresh_token ? String(json.refresh_token) : undefined,
-    expires_in: json.expires_in ? Number(json.expires_in) : undefined,
-  };
-}
-
 export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get('code');
   const error = request.nextUrl.searchParams.get('error');
@@ -75,13 +36,14 @@ export async function GET(request: NextRequest) {
     const url = getAliExpressAuthorizeUrl();
     return html(`
       <h1>Autorizar AliExpress</h1>
-      <p>Entrá con la cuenta de dropshipping y aceptá. Después el token se guarda en la tienda Ubuy.</p>
+      <p>Entrá con la cuenta de dropshipping y <strong>aceptá los permisos de la app</strong>. Iniciar sesión no alcanza: AliExpress tiene que devolverte acá con un código.</p>
+      <p>Si después del login te deja en ds.aliexpress.com, volvé y pulsá el botón de nuevo. El éxito es la pantalla <strong>AliExpress autorizado</strong>.</p>
       <p><a class="btn" href="${url}">Autorizar con AliExpress</a></p>
     `);
   }
 
   try {
-    const tokens = await exchangeCodeForToken(code);
+    const tokens = await exchangeAliExpressAuthCode(code);
     await saveAliExpressOAuthTokens(tokens);
     return html(`
       <h1>AliExpress autorizado</h1>
