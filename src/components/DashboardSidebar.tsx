@@ -28,6 +28,7 @@ import {
   ExternalLink,
   Globe,
   Truck,
+  ShoppingBag,
 } from 'lucide-react';
 import Logo from '@/components/Logo';
 import { BrandWordmark } from '@/components/BrandWordmark';
@@ -68,7 +69,8 @@ const sellerMoreItems: SidebarItem[] = [
 
 const adminSourcedItems: SidebarItem[] = [
   { icon: Globe, label: 'Catálogo internacional', href: '/dashboard/sourced-catalog' },
-  { icon: Truck, label: 'Pedidos a AliExpress', href: '/dashboard/sourced-fulfillments' },
+  { icon: ShoppingBag, label: 'Catálogo local Cellshop', href: '/dashboard/local-catalog' },
+  { icon: Truck, label: 'Pedidos a origen', href: '/dashboard/sourced-fulfillments' },
 ];
 
 interface DashboardSidebarProps {
