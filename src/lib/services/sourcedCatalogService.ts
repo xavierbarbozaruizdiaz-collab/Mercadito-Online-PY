@@ -8,8 +8,10 @@ import { Database } from '@/types/database';
 import { logger } from '@/lib/utils/logger';
 import {
   AliExpressProduct,
+  getDsFeedNames,
   getDsRecommendFeed,
   getSourcedProductDetails,
+  hasAliExpressAccessToken,
   isAliExpressConfigured,
   isAliExpressPermissionError,
   searchAffiliateProducts,
@@ -495,6 +497,11 @@ export async function importDropshipRecommended(params: {
   if (!isAliExpressConfigured()) {
     throw new Error('AliExpress no está configurado en el servidor');
   }
+  if (!hasAliExpressAccessToken()) {
+    throw new Error(
+      'Falta ALIEXPRESS_ACCESS_TOKEN. El AppKey alcanza para registrar la app, pero el feed Drop Shipping exige autorizar tu cuenta en ds.aliexpress.com. Generá el token en Open Platform, pegalo en Vercel (Production) y hacé redeploy.'
+    );
+  }
 
   const db = getAdminClient();
   let store: { id: string; seller_id: string; settings: Record<string, any> | null };
@@ -526,7 +533,13 @@ export async function importDropshipRecommended(params: {
   let skipped = 0;
   const errors: string[] = [];
   const categories: Array<{ aeName: string; mercadito: string; count: number }> = [];
-  const feedNames = ['DS bestseller', 'Best Selling', 'Hot Product'];
+  let feedNames = ['DS bestseller', 'Best Selling', 'Hot Product'];
+  try {
+    const apiNames = await getDsFeedNames();
+    if (apiNames.length > 0) feedNames = apiNames;
+  } catch (err: any) {
+    logger.warn('[SourcedCatalog] feedname.get', err);
+  }
   let feedName = feedNames[0];
   let resolvedFeed = false;
 

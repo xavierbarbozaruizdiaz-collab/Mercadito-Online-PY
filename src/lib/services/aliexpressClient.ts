@@ -57,6 +57,10 @@ export function isAliExpressConfigured(): boolean {
   return !!(process.env.ALIEXPRESS_APP_KEY?.trim() && process.env.ALIEXPRESS_APP_SECRET?.trim());
 }
 
+export function hasAliExpressAccessToken(): boolean {
+  return !!process.env.ALIEXPRESS_ACCESS_TOKEN?.trim();
+}
+
 function signRequest(params: Record<string, string>, appSecret: string): string {
   const sorted = Object.keys(params)
     .filter((k) => k !== 'sign' && params[k] !== undefined && params[k] !== '')
@@ -156,6 +160,23 @@ export function isAliExpressPermissionError(error: unknown): boolean {
   );
 }
 
+function collectProductLike(node: any, acc: any[], depth: number, seen: Set<unknown>) {
+  if (!node || depth > 8 || seen.has(node)) return;
+  if (typeof node !== 'object') return;
+  seen.add(node);
+  if (Array.isArray(node)) {
+    node.forEach((item) => collectProductLike(item, acc, depth + 1, seen));
+    return;
+  }
+  const id = node.product_id || node.productId || node.item_id;
+  const title = node.product_title || node.productTitle || node.title;
+  if (id && title) {
+    acc.push(node);
+    return;
+  }
+  Object.values(node).forEach((value) => collectProductLike(value, acc, depth + 1, seen));
+}
+
 function extractList(payload: any): { products: any[]; total: number } {
   const root =
     payload?.aliexpress_ds_recommend_feed_get_response?.resp_result?.result ||
@@ -174,8 +195,15 @@ function extractList(payload: any): { products: any[]; total: number } {
     root?.data?.products ||
     [];
 
-  const total = Number(root?.current_record_count || root?.total_record_count || root?.total || 0);
-  return { products: asArray(productsNode), total };
+  let products = asArray(productsNode);
+  if (products.length === 0) {
+    const collected: any[] = [];
+    collectProductLike(payload, collected, 0, new Set());
+    products = collected;
+  }
+
+  const total = Number(root?.current_record_count || root?.total_record_count || root?.total || products.length || 0);
+  return { products, total };
 }
 
 function extractDetail(payload: any): any[] {
@@ -352,28 +380,61 @@ function mapDsProductDetail(payload: any): AliExpressProduct | null {
   };
 }
 
+export async function getDsFeedNames(): Promise<string[]> {
+  const payload = await callApi('aliexpress.ds.feedname.get', {
+    target_language: 'EN',
+  });
+  const result =
+    payload?.aliexpress_ds_feedname_get_response?.resp_result?.result ||
+    payload?.aliexpress_ds_feedname_get_response?.result ||
+    payload?.resp_result?.result ||
+    payload?.result;
+  const promos = asArray(result?.promos?.promo || result?.promos);
+  return promos
+    .map((p: any) => String(p?.promo_name || p?.feed_name || '').trim())
+    .filter(Boolean);
+}
+
 export async function getDsRecommendFeed(options: {
-  categoryId: string;
+  categoryId?: string;
   feedName?: string;
   page?: number;
   pageSize?: number;
 }): Promise<AliExpressSearchResult> {
   const page = options.page || 1;
   const pageSize = Math.min(Math.max(options.pageSize || 20, 1), 50);
-  const payload = await callApi('aliexpress.ds.recommend.feed.get', {
+  const biz: Record<string, string> = {
     feed_name: options.feedName || 'DS bestseller',
-    category_id: String(options.categoryId),
     country: 'US',
     target_currency: 'USD',
     target_language: 'ES',
     page_no: String(page),
     page_size: String(pageSize),
-  });
+  };
+  if (options.categoryId) biz.category_id = String(options.categoryId);
+
+  const payload = await callApi('aliexpress.ds.recommend.feed.get', biz);
+  const resp =
+    payload?.aliexpress_ds_recommend_feed_get_response?.resp_result ||
+    payload?.resp_result;
+  const respCode = resp?.resp_code;
+  if (respCode != null && Number(respCode) !== 0) {
+    throw new Error(String(resp?.resp_msg || `Feed DS código ${respCode}`));
+  }
+
   const extracted = extractList(payload);
   const products = extracted.products
     .map((p) => mapRawProduct(p))
     .filter((p): p is AliExpressProduct => !!p)
     .map((p) => ({ ...p, categoryId: options.categoryId }));
+
+  if (products.length === 0) {
+    logger.warn('[AliExpress] feed DS vacío', {
+      feedName: biz.feed_name,
+      categoryId: options.categoryId || null,
+      keys: payload && typeof payload === 'object' ? Object.keys(payload).slice(0, 8) : [],
+    });
+  }
 
   return {
     products,
