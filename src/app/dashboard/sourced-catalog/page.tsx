@@ -202,10 +202,10 @@ export default function SourcedCatalogPage() {
       let done = false;
       let guard = 0;
 
-      while (!done && guard < 8) {
+      while (!done && guard < 12) {
         const res = await authFetch('/api/sourced-catalog/import-recommended', {
           method: 'POST',
-          body: JSON.stringify({ categoryOffset: offset, categoryLimit: 6, pageSize: 12 }),
+          body: JSON.stringify({ categoryOffset: offset, categoryLimit: 3, pageSize: 12 }),
         });
         const json = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(json.error || 'Error importando recomendados');
@@ -223,6 +223,9 @@ export default function SourcedCatalogPage() {
         offset = json.nextOffset || offset;
         done = !!json.done;
         guard += 1;
+        if (!done) {
+          await new Promise((resolve) => setTimeout(resolve, 5000));
+        }
       }
 
       const summary = `Listo. ${imported} nuevos, ${updated} actualizados, ${skipped} omitidos. Rubros AliExpress: ${totalFeeds}.`;

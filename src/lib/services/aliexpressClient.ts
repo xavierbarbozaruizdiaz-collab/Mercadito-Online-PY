@@ -332,6 +332,13 @@ async function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+export function parseAliExpressRateLimitWaitMs(message: string): number | null {
+  if (!/frequency of app access|exceeds the limit|ban will last/i.test(message)) return null;
+  const match = message.match(/last\s+(\d+)\s+second/i);
+  const seconds = match ? Number(match[1]) : 3;
+  return Math.min(15000, Math.max(1500, (seconds + 1) * 1000));
+}
+
 async function callApi(
   method: string,
   bizParams: Record<string, string>,
@@ -377,10 +384,12 @@ async function callApi(
 
   if (!res.ok || errorBody) {
     const codeStr = String(errorCode || res.status);
-    if ((codeStr === '27' || codeStr === '7' || res.status === 429) && attempt < 4) {
-      const wait = 400 * 2 ** attempt;
-      logger.warn('[AliExpress] rate limit, reintento', { attempt, wait, method });
-      await sleep(wait);
+    const waitMs =
+      parseAliExpressRateLimitWaitMs(String(errorMsg || '')) ||
+      ((codeStr === '27' || codeStr === '7' || res.status === 429) ? 400 * 2 ** attempt : null);
+    if (waitMs && attempt < 6) {
+      logger.warn('[AliExpress] rate limit, reintento', { attempt, waitMs, method });
+      await sleep(waitMs);
       return callApi(method, bizParams, attempt + 1);
     }
     throw new Error(errorMsg || `Error AliExpress (${codeStr})`);
@@ -506,12 +515,15 @@ export async function getDsFeedNames(): Promise<string[]> {
     .filter(Boolean);
 }
 
-export async function getDsRecommendFeed(options: {
-  categoryId?: string;
-  feedName?: string;
-  page?: number;
-  pageSize?: number;
-}): Promise<AliExpressSearchResult> {
+export async function getDsRecommendFeed(
+  options: {
+    categoryId?: string;
+    feedName?: string;
+    page?: number;
+    pageSize?: number;
+  },
+  attempt = 1
+): Promise<AliExpressSearchResult> {
   const page = options.page || 1;
   const pageSize = Math.min(Math.max(options.pageSize || 20, 1), 50);
   const biz: Record<string, string> = {
@@ -530,7 +542,14 @@ export async function getDsRecommendFeed(options: {
     payload?.resp_result;
   const respCode = resp?.resp_code;
   if (respCode != null && Number(respCode) !== 0) {
-    throw new Error(String(resp?.resp_msg || `Feed DS código ${respCode}`));
+    const msg = String(resp?.resp_msg || `Feed DS código ${respCode}`);
+    const waitMs = parseAliExpressRateLimitWaitMs(msg);
+    if (waitMs && attempt < 6) {
+      logger.warn('[AliExpress] feed DS rate limit, reintento', { attempt, waitMs, categoryId: options.categoryId });
+      await sleep(waitMs);
+      return getDsRecommendFeed(options, attempt + 1);
+    }
+    throw new Error(msg);
   }
 
   const extracted = extractList(payload);

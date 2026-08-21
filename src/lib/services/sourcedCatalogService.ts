@@ -11,6 +11,7 @@ import {
   applyAliExpressUserToken,
   getDsFeedNames,
   getDsRecommendFeed,
+  parseAliExpressRateLimitWaitMs,
   getSourcedProductDetails,
   isAliExpressConfigured,
   isAliExpressPermissionError,
@@ -619,7 +620,40 @@ export async function importDropshipRecommended(params: {
       }
     } catch (err: any) {
       const message = err?.message || 'Error de feed DS';
-      errors.push(`${feed.aeName}: ${message}`);
+      const waitMs = parseAliExpressRateLimitWaitMs(message);
+      if (waitMs) {
+        await new Promise((resolve) => setTimeout(resolve, waitMs));
+        try {
+          const retry = await getDsRecommendFeed({
+            categoryId: feed.aeCategoryId,
+            feedName,
+            page: 1,
+            pageSize,
+          });
+          for (const ae of retry.products) {
+            if (!ae.salePrice || ae.salePrice <= 0) {
+              skipped += 1;
+              continue;
+            }
+            try {
+              const kind = await upsertSourcedProduct(db, ae, store, settings, feed.mercadito.id);
+              if (kind === 'imported') imported += 1;
+              else updated += 1;
+              count += 1;
+            } catch (inner: any) {
+              skipped += 1;
+              errors.push(`${ae.productId}: ${inner?.message || 'error'}`);
+            }
+          }
+          if (retry.products.length === 0) {
+            errors.push(`${feed.aeName}: AliExpress no devolvió productos en el feed`);
+          }
+        } catch (retryErr: any) {
+          errors.push(`${feed.aeName}: ${retryErr?.message || message}`);
+        }
+      } else {
+        errors.push(`${feed.aeName}: ${message}`);
+      }
       if (isAliExpressPermissionError(err)) {
         throw new Error(
           'Esta app Drop Shipping no tiene permiso del feed de recomendados, o falta ALIEXPRESS_ACCESS_TOKEN (autorizar la cuenta en ds.aliexpress.com).'
@@ -627,6 +661,7 @@ export async function importDropshipRecommended(params: {
       }
     }
     categories.push({ aeName: feed.aeName, mercadito: feed.mercadito.name, count });
+    await new Promise((resolve) => setTimeout(resolve, 900));
   }
 
   const nextOffset = offset + slice.length;
