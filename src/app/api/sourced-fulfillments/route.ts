@@ -29,7 +29,10 @@ async function resolveOfficialStoreIds(userId: string): Promise<{
   if (ids.length === 0) {
     return {
       ok: false,
-      error: fallback.error || local.error || 'Sin tienda oficial',
+      error:
+        (!fallback.ok && fallback.error) ||
+        (!local.ok && local.error) ||
+        'Sin tienda oficial',
       storeIds: [],
     };
   }
