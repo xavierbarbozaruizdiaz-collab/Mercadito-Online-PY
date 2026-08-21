@@ -1,5 +1,6 @@
 import AnalyticsDashboard from '@/components/AnalyticsDashboard';
 import AdminUbuyStoreCard from '@/components/admin/AdminUbuyStoreCard';
+import AdminLocalCatalogCard from '@/components/admin/AdminLocalCatalogCard';
 import Link from 'next/link';
 
 type AdminLink = {
@@ -34,9 +35,14 @@ const SECTIONS: { title: string; subtitle: string; items: AdminLink[] }[] = [
         description: 'Tienda oficial del admin: importar AliExpress',
       },
       {
+        href: '/dashboard/local-catalog',
+        title: 'Catálogo local Cellshop',
+        description: 'Segunda tienda: márgenes PYG, bookmarklet y cola de compra',
+      },
+      {
         href: '/dashboard/sourced-fulfillments',
-        title: 'Pedidos a AliExpress',
-        description: 'Encolar compras manuales, abrir origen y cargar tracking',
+        title: 'Pedidos a origen',
+        description: 'Encolar compras AliExpress o Cellshop y cargar tracking',
       },
       {
         href: '/admin/users',
@@ -185,6 +191,7 @@ export default function AdminDashboardPage() {
       </section>
 
       <AdminUbuyStoreCard />
+      <AdminLocalCatalogCard />
 
       {SECTIONS.map((section) => (
         <section key={section.title} className="space-y-4">

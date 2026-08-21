@@ -14,6 +14,7 @@ type Fulfillment = {
   order_id: string | null;
   status: string;
   origin: 'checkout' | 'manual' | string;
+  source_platform: string | null;
   source_url: string | null;
   source_product_id: string | null;
   tracking_number: string | null;
@@ -40,12 +41,23 @@ const STATUS_LABEL: Record<string, string> = {
   cancelled: 'Cancelado',
 };
 
+function platformLabel(platform: string | null | undefined) {
+  if (platform === 'cellshop') return 'Cellshop';
+  if (platform === 'aliexpress' || !platform) return 'AliExpress';
+  return platform;
+}
+
+function buyLabel(platform: string | null | undefined) {
+  return platform === 'cellshop' ? 'Comprar en Cellshop' : 'Comprar en AliExpress';
+}
+
 export default function SourcedFulfillmentsPage() {
   const toast = useToast();
   const [loading, setLoading] = useState(true);
   const [forbidden, setForbidden] = useState<string | null>(null);
   const [items, setItems] = useState<Fulfillment[]>([]);
   const [status, setStatus] = useState('all');
+  const [platform, setPlatform] = useState('all');
   const [savingId, setSavingId] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Record<string, { tracking: string; notes: string }>>({});
   const [manualOpen, setManualOpen] = useState(false);
@@ -71,7 +83,7 @@ export default function SourcedFulfillmentsPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ status, limit: '40' });
+      const params = new URLSearchParams({ status, limit: '40', platform });
       const res = await authFetch(`/api/sourced-fulfillments?${params}`);
       const json = await res.json().catch(() => ({}));
       if (res.status === 403) {
@@ -91,22 +103,32 @@ export default function SourcedFulfillmentsPage() {
     } finally {
       setLoading(false);
     }
-  }, [authFetch, status]);
+  }, [authFetch, status, platform]);
 
   const loadProductsPage = useCallback(
     async (page: number, append: boolean) => {
       setLoadingProducts(true);
       try {
-        const res = await authFetch(`/api/sourced-catalog/products?page=${page}&limit=40`);
-        const json = await res.json().catch(() => ({}));
-        if (!res.ok) return;
-        const rows = (json.data || []) as EnqueueProductOption[];
-        setProductsTotal(json.pagination?.total || 0);
+        const [ubuyRes, localRes] = await Promise.all([
+          authFetch(`/api/sourced-catalog/products?page=${page}&limit=40`),
+          authFetch(`/api/local-catalog/products?page=${page}&limit=40`),
+        ]);
+        const ubuyJson = await ubuyRes.json().catch(() => ({}));
+        const localJson = await localRes.json().catch(() => ({}));
+        const ubuyRows = ubuyRes.ok ? ((ubuyJson.data || []) as EnqueueProductOption[]) : [];
+        const localRows = localRes.ok ? ((localJson.data || []) as EnqueueProductOption[]) : [];
+        const ubuyTotal = ubuyJson.pagination?.total || 0;
+        const localTotal = localJson.pagination?.total || 0;
+        setProductsTotal(ubuyTotal + localTotal);
         setProductsPage(page);
         setProductOptions((prev) => {
-          if (!append) return rows;
-          const seen = new Set(prev.map((p) => p.id));
-          return [...prev, ...rows.filter((r) => !seen.has(r.id))];
+          const merged = append ? [...prev, ...ubuyRows, ...localRows] : [...ubuyRows, ...localRows];
+          const seen = new Set<string>();
+          return merged.filter((p) => {
+            if (seen.has(p.id)) return false;
+            seen.add(p.id);
+            return true;
+          });
         });
       } catch {
         /* ignore */
@@ -124,6 +146,15 @@ export default function SourcedFulfillmentsPage() {
   useEffect(() => {
     loadProductsPage(1, false);
   }, [loadProductsPage]);
+
+  useEffect(() => {
+    try {
+      const p = new URLSearchParams(window.location.search).get('platform');
+      if (p) setPlatform(p);
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   async function updateFulfillment(id: string, patch: Record<string, string>) {
     setSavingId(id);
@@ -174,17 +205,21 @@ export default function SourcedFulfillmentsPage() {
   return (
     <main className="min-h-screen bg-gray-50 p-4 sm:p-8">
       <div className="max-w-5xl mx-auto">
-        <Link href="/dashboard/sourced-catalog" className="inline-flex items-center gap-2 text-gray-600 mb-4">
-          <ArrowLeft className="w-4 h-4" /> Catálogo internacional
-        </Link>
+        <div className="flex flex-wrap gap-3 text-sm mb-4">
+          <Link href="/dashboard/sourced-catalog" className="inline-flex items-center gap-2 text-gray-600">
+            <ArrowLeft className="w-4 h-4" /> Catálogo Ubuy
+          </Link>
+          <Link href="/dashboard/local-catalog" className="text-gray-600 hover:underline">
+            Catálogo Cellshop
+          </Link>
+        </div>
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
-              <Truck className="w-7 h-7" /> Pedidos a AliExpress
+              <Truck className="w-7 h-7" /> Pedidos a origen
             </h1>
             <p className="text-gray-600 mt-1">
-              Cola para comprar a mano en AliExpress (checkout o confirmación por WhatsApp). Pegá el
-              tracking y marcá enviado.
+              Cola para comprar a mano en AliExpress o Cellshop. Pegá el tracking y marcá enviado.
             </p>
           </div>
           <button
@@ -206,6 +241,22 @@ export default function SourcedFulfillmentsPage() {
               className={`px-3 py-1 rounded-full text-sm ${status === s ? 'bg-black text-white' : 'bg-white border'}`}
             >
               {s === 'all' ? 'Todos' : STATUS_LABEL[s]}
+            </button>
+          ))}
+        </div>
+        <div className="mt-2 flex gap-2 flex-wrap">
+          {[
+            { id: 'all', label: 'Todos los orígenes' },
+            { id: 'aliexpress', label: 'AliExpress' },
+            { id: 'cellshop', label: 'Cellshop' },
+          ].map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => setPlatform(p.id)}
+              className={`px-3 py-1 rounded-full text-sm ${platform === p.id ? 'bg-emerald-700 text-white' : 'bg-white border'}`}
+            >
+              {p.label}
             </button>
           ))}
         </div>
@@ -236,11 +287,12 @@ export default function SourcedFulfillmentsPage() {
                       >
                         {isManual ? 'Manual' : 'Checkout'}
                       </span>
+                      <span className="text-[11px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-md bg-gray-100 text-gray-700">
+                        {platformLabel(item.source_platform)}
+                      </span>
                     </div>
                     <p className="text-sm text-gray-500">
-                      {item.order_id
-                        ? `Pedido ${item.order_id.slice(0, 8)} · `
-                        : ''}
+                      {item.order_id ? `Pedido ${item.order_id.slice(0, 8)} · ` : ''}
                       {STATUS_LABEL[item.status] || item.status}
                     </p>
                     {(item.customer_name || item.customer_phone || item.customer_notes) && (
@@ -258,14 +310,14 @@ export default function SourcedFulfillmentsPage() {
                           className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-700 hover:underline"
                         >
                           <ExternalLink className="w-3.5 h-3.5" />
-                          Comprar en AliExpress
+                          {buyLabel(item.source_platform)}
                         </a>
                       )}
                       {item.source_product_id && (
                         <button
                           type="button"
                           className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900"
-                          onClick={() => copyText('ID AliExpress', item.source_product_id!)}
+                          onClick={() => copyText('ID origen', item.source_product_id!)}
                         >
                           <Copy className="w-3.5 h-3.5" />
                           {item.source_product_id}

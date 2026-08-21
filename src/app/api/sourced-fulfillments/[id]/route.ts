@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireUser } from '@/lib/auth/apiAuth';
 import { logger } from '@/lib/utils/logger';
 import { assertUserOwnsFallbackStore, getAdminClient } from '@/lib/services/sourcedCatalogService';
+import { assertUserOwnsLocalCatalogStore } from '@/lib/services/localCatalogService';
 
 export const runtime = 'nodejs';
 
@@ -12,6 +13,15 @@ const ALLOWED: Record<string, string[]> = {
   cancelled: [],
 };
 
+async function resolveOfficialStoreIds(userId: string): Promise<string[]> {
+  const ids: string[] = [];
+  const fallback = await assertUserOwnsFallbackStore(userId);
+  const local = await assertUserOwnsLocalCatalogStore(userId);
+  if (fallback.ok && fallback.store) ids.push(fallback.store.id);
+  if (local.ok && local.store) ids.push(local.store.id);
+  return Array.from(new Set(ids));
+}
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -21,9 +31,9 @@ export async function PATCH(
 
   try {
     const { id } = await params;
-    const ownership = await assertUserOwnsFallbackStore(auth.user.id);
-    if (!ownership.ok || !ownership.store) {
-      return NextResponse.json({ error: ownership.error }, { status: 403 });
+    const storeIds = await resolveOfficialStoreIds(auth.user.id);
+    if (storeIds.length === 0) {
+      return NextResponse.json({ error: 'Sin acceso' }, { status: 403 });
     }
 
     const body = await request.json().catch(() => ({}));
@@ -33,7 +43,7 @@ export async function PATCH(
       .from('sourced_fulfillments')
       .select('id, status, store_id')
       .eq('id', id)
-      .eq('store_id', ownership.store.id)
+      .in('store_id', storeIds)
       .single();
 
     if (fetchError || !current) {

@@ -116,10 +116,10 @@ export default function EnqueueSourcedPurchaseModal({
         <div className="flex items-start justify-between gap-3 mb-4">
           <div>
             <h2 id="enqueue-purchase-title" className="text-lg font-bold text-gray-900">
-              Encolar compra en AliExpress
+              Encolar compra en origen
             </h2>
             <p className="text-sm text-gray-500 mt-1">
-              Registrá el cliente y abrí AliExpress para comprar a mano.
+              Registrá el cliente y abrí AliExpress o Cellshop para comprar a mano.
             </p>
           </div>
           <button
@@ -270,7 +270,7 @@ export default function EnqueueSourcedPurchaseModal({
                 className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-medium hover:bg-gray-50"
               >
                 <ExternalLink className="w-4 h-4" />
-                Abrir AliExpress
+                Abrir origen
               </a>
             )}
           </div>

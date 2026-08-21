@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireUser } from '@/lib/auth/apiAuth';
 import { logger } from '@/lib/utils/logger';
-import { assertUserOwnsFallbackStore, getAdminClient } from '@/lib/services/sourcedCatalogService';
+import {
+  assertUserOwnsFallbackStore,
+  getAdminClient,
+} from '@/lib/services/sourcedCatalogService';
+import { assertUserOwnsLocalCatalogStore } from '@/lib/services/localCatalogService';
 
 export const runtime = 'nodejs';
 
@@ -12,18 +16,42 @@ function trimOrNull(value: unknown, max = 200): string | null {
   return t.slice(0, max);
 }
 
+async function resolveOfficialStoreIds(userId: string): Promise<{
+  ok: boolean;
+  error?: string;
+  storeIds: string[];
+}> {
+  const fallback = await assertUserOwnsFallbackStore(userId);
+  const local = await assertUserOwnsLocalCatalogStore(userId);
+  const ids: string[] = [];
+  if (fallback.ok && fallback.store) ids.push(fallback.store.id);
+  if (local.ok && local.store) ids.push(local.store.id);
+  if (ids.length === 0) {
+    return {
+      ok: false,
+      error:
+        (!fallback.ok && fallback.error) ||
+        (!local.ok && local.error) ||
+        'Sin tienda oficial',
+      storeIds: [],
+    };
+  }
+  return { ok: true, storeIds: Array.from(new Set(ids)) };
+}
+
 export async function GET(request: NextRequest) {
   const auth = await requireUser(request);
   if (!auth.ok) return auth.response;
 
   try {
-    const ownership = await assertUserOwnsFallbackStore(auth.user.id);
-    if (!ownership.ok || !ownership.store) {
-      return NextResponse.json({ error: ownership.error }, { status: 403 });
+    const resolved = await resolveOfficialStoreIds(auth.user.id);
+    if (!resolved.ok) {
+      return NextResponse.json({ error: resolved.error }, { status: 403 });
     }
 
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
+    const platform = searchParams.get('platform');
     const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
     const limit = Math.min(50, Math.max(1, parseInt(searchParams.get('limit') || '20', 10)));
     const offset = (page - 1) * limit;
@@ -65,12 +93,15 @@ export async function GET(request: NextRequest) {
       `,
         { count: 'exact' }
       )
-      .eq('store_id', ownership.store.id)
+      .in('store_id', resolved.storeIds)
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
     if (status && status !== 'all') {
       query = query.eq('status', status);
+    }
+    if (platform && platform !== 'all') {
+      query = query.eq('source_platform', platform);
     }
 
     const { data, error, count } = await query;
@@ -96,9 +127,9 @@ export async function POST(request: NextRequest) {
   if (!auth.ok) return auth.response;
 
   try {
-    const ownership = await assertUserOwnsFallbackStore(auth.user.id);
-    if (!ownership.ok || !ownership.store) {
-      return NextResponse.json({ error: ownership.error }, { status: 403 });
+    const resolved = await resolveOfficialStoreIds(auth.user.id);
+    if (!resolved.ok) {
+      return NextResponse.json({ error: resolved.error }, { status: 403 });
     }
 
     const body = await request.json().catch(() => ({}));
@@ -118,22 +149,25 @@ export async function POST(request: NextRequest) {
         'id, store_id, fulfillment_type, source_platform, source_product_id, source_url, title, status'
       )
       .eq('id', productId)
-      .eq('store_id', ownership.store.id)
+      .in('store_id', resolved.storeIds)
       .maybeSingle();
 
     if (productError) throw productError;
     if (!product) {
-      return NextResponse.json({ error: 'Producto no encontrado en la tienda Ubuy' }, { status: 404 });
+      return NextResponse.json(
+        { error: 'Producto no encontrado en las tiendas oficiales' },
+        { status: 404 }
+      );
     }
     if (product.fulfillment_type !== 'sourced') {
       return NextResponse.json(
-        { error: 'Solo se pueden encolar productos sourced (AliExpress)' },
+        { error: 'Solo se pueden encolar productos sourced' },
         { status: 400 }
       );
     }
     if (!product.source_url && !product.source_product_id) {
       return NextResponse.json(
-        { error: 'El producto no tiene link ni ID de AliExpress' },
+        { error: 'El producto no tiene link ni ID de origen' },
         { status: 400 }
       );
     }
@@ -144,7 +178,7 @@ export async function POST(request: NextRequest) {
         order_id: null,
         order_item_id: null,
         product_id: product.id,
-        store_id: ownership.store.id,
+        store_id: product.store_id,
         source_platform: product.source_platform || 'aliexpress',
         source_product_id: product.source_product_id || null,
         source_url: product.source_url || null,
