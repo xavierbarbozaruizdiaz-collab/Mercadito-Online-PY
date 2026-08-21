@@ -48,7 +48,7 @@ export default function MobileMenu() {
       >
         <div className="p-4 border-b border-[hsl(var(--border))] flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
-            <Logo className="w-8 h-8" />
+            <Logo className="w-10 h-10" />
             <span className="text-sm font-bold text-[hsl(var(--foreground))]">Menú</span>
           </div>
           <button

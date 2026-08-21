@@ -21,7 +21,7 @@ function generateManifest(): MetadataRoute.Manifest {
     start_url: '/',
     display: 'standalone',
     background_color: '#ffffff',
-    theme_color: '#3b82f6',
+    theme_color: '#22C55E',
     orientation: 'portrait-primary',
     scope: '/',
     lang: 'es-PY',
