@@ -133,7 +133,7 @@ export async function POST(request: NextRequest) {
     // Convertir File a Buffer
     const arrayBuffer = await file.arrayBuffer();
     const imageBuffer = Buffer.from(arrayBuffer);
-    let sharp: typeof import('sharp').default | null = null;
+    let sharp: ((input: Buffer) => import('sharp').Sharp) | null = null;
     try {
       sharp = (await import('sharp')).default;
     } catch (sharpError) {
@@ -179,11 +179,12 @@ export async function POST(request: NextRequest) {
 
     // [IMAGES LEVEL2] Generar y subir thumbnails en WebP (más livianos)
     const thumbnailSizes: Array<keyof typeof THUMBNAIL_SIZES> = ['thumbnail', 'small', 'medium'];
+    const sharpFactory = sharp;
     
-    for (const size of sharp ? thumbnailSizes : []) {
+    for (const size of sharpFactory ? thumbnailSizes : []) {
       try {
         const dimensions = THUMBNAIL_SIZES[size];
-        const thumbnail = await sharp(imageBuffer)
+        const thumbnail = await sharpFactory!(imageBuffer)
           .resize(dimensions.width, dimensions.height, {
             fit: 'inside',
             withoutEnlargement: true,
